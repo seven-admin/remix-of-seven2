@@ -1,0 +1,16 @@
+project_id = "pizerpoxuqopekmbvohh"
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = false
+
+[functions.webhook-assinatura]
+verify_jwt = false
+
+[functions.webhook-dispatcher]
+verify_jwt = false

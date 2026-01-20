@@ -1,0 +1,406 @@
+import { useState, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2 } from 'lucide-react';
+import { Toggle } from '@/components/ui/toggle';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useUnidades, useDeleteUnidadesBatch } from '@/hooks/useUnidades';
+import { useBlocos } from '@/hooks/useBlocos';
+import { useEmpreendimento } from '@/hooks/useEmpreendimentos';
+import { UNIDADE_STATUS_LABELS, UNIDADE_STATUS_COLORS, type Unidade } from '@/types/empreendimentos.types';
+import { MapaInterativo } from '@/components/mapa/MapaInterativo';
+import { UnidadeForm } from './UnidadeForm';
+import { UnidadeBulkForm } from './UnidadeBulkForm';
+import { BlocoForm } from './BlocoForm';
+import { ImportarUnidadesDialog } from './ImportarUnidadesDialog';
+import { VendaHistoricaDialog } from './VendaHistoricaDialog';
+import { cn } from '@/lib/utils';
+import { buildUnitLabel, type LabelFormatElement } from '@/lib/mapaUtils';
+
+interface UnidadesTabProps {
+  empreendimentoId: string;
+}
+
+export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
+  const { data: empreendimento } = useEmpreendimento(empreendimentoId);
+  const { data: unidades, isLoading } = useUnidades(empreendimentoId);
+  const { data: blocos } = useBlocos(empreendimentoId);
+  const deleteUnidadesBatch = useDeleteUnidadesBatch();
+
+  const [unidadeFormOpen, setUnidadeFormOpen] = useState(false);
+  const [bulkFormOpen, setBulkFormOpen] = useState(false);
+  const [blocoFormOpen, setBlocoFormOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [vendaHistoricaOpen, setVendaHistoricaOpen] = useState(false);
+  const [selectedUnidade, setSelectedUnidade] = useState<Unidade | null>(null);
+  
+  // Estado para seleção de unidades
+  const [selectionMode, setSelectionMode] = useState<'venda' | 'delete' | false>(false);
+  const [selectedUnidadeIds, setSelectedUnidadeIds] = useState<Set<string>>(new Set());
+
+  const tiposComMapa = ['loteamento', 'condominio'];
+  const usaMapa = empreendimento && tiposComMapa.includes(empreendimento.tipo);
+  const [viewMode, setViewMode] = useState<'grid' | 'mapa'>(usaMapa ? 'mapa' : 'grid');
+
+  const isLoteamento = empreendimento?.tipo === 'loteamento' || empreendimento?.tipo === 'condominio';
+  const agrupamentoLabel = isLoteamento ? 'Quadra' : 'Bloco';
+  const unidadeLabel = isLoteamento ? 'Lote' : 'Unidade';
+
+  const unidadesByBloco = useMemo(() => {
+    if (!unidades) return {};
+    
+    // Agrupar unidades por bloco
+    const grouped = unidades.reduce((acc, unidade) => {
+      const blocoId = unidade.bloco_id || 'sem-bloco';
+      if (!acc[blocoId]) acc[blocoId] = [];
+      acc[blocoId].push(unidade);
+      return acc;
+    }, {} as Record<string, Unidade[]>);
+    
+    // Ordenar unidades dentro de cada bloco por número
+    Object.values(grouped).forEach(blocoUnidades => {
+      blocoUnidades.sort((a, b) => {
+        const numA = parseInt(a.numero);
+        const numB = parseInt(b.numero);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
+      });
+    });
+    
+    return grouped;
+  }, [unidades]);
+
+  // Ordenar blocos/quadras por nome
+  const sortedBlocoEntries = useMemo(() => {
+    return Object.entries(unidadesByBloco).sort((a, b) => {
+      const blocoA = blocos?.find(bl => bl.id === a[0]);
+      const blocoB = blocos?.find(bl => bl.id === b[0]);
+      const nomeA = blocoA?.nome || 'zzz'; // 'sem-bloco' vai pro final
+      const nomeB = blocoB?.nome || 'zzz';
+      return nomeA.localeCompare(nomeB, 'pt-BR', { numeric: true });
+    });
+  }, [unidadesByBloco, blocos]);
+
+  // Formato do label para as unidades (mesmo do mapa)
+  const labelFormato = (empreendimento?.mapa_label_formato as LabelFormatElement[] | undefined) 
+    || ['bloco', 'tipologia', 'numero'];
+
+  // Unidades selecionadas (apenas disponíveis)
+  const unidadesSelecionadas = useMemo(() => {
+    if (!unidades) return [];
+    return unidades.filter(u => selectedUnidadeIds.has(u.id));
+  }, [unidades, selectedUnidadeIds]);
+
+  // Unidades disponíveis para seleção
+  const unidadesDisponiveis = useMemo(() => {
+    if (!unidades) return [];
+    return unidades.filter(u => u.status === 'disponivel');
+  }, [unidades]);
+
+  const handleEditUnidade = (unidade: Unidade) => {
+    if (selectionMode) return;
+    setSelectedUnidade(unidade);
+    setUnidadeFormOpen(true);
+  };
+
+  const handleNewUnidade = () => {
+    setSelectedUnidade(null);
+    setUnidadeFormOpen(true);
+  };
+
+  const handleToggleSelection = (unidadeId: string, status: string) => {
+    // Para venda histórica: apenas unidades disponíveis
+    // Para exclusão: todas as unidades
+    if (selectionMode === 'venda' && status !== 'disponivel') return;
+    
+    setSelectedUnidadeIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(unidadeId)) {
+        newSet.delete(unidadeId);
+      } else {
+        newSet.add(unidadeId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectionMode === 'venda') {
+      setSelectedUnidadeIds(new Set(unidadesDisponiveis.map(u => u.id)));
+    } else {
+      setSelectedUnidadeIds(new Set(unidades?.map(u => u.id) || []));
+    }
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedUnidadeIds(new Set());
+  };
+
+  const handleExitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedUnidadeIds(new Set());
+  };
+
+  const handleVendaHistoricaSuccess = () => {
+    handleExitSelectionMode();
+  };
+
+  const handleDeleteSelected = () => {
+    deleteUnidadesBatch.mutate(
+      { ids: Array.from(selectedUnidadeIds), empreendimentoId },
+      { onSuccess: handleExitSelectionMode }
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold">{isLoteamento ? 'Lotes' : 'Unidades'}</h3>
+            <p className="text-sm text-muted-foreground">
+              {unidades?.length || 0} {isLoteamento ? 'lotes' : 'unidades'} cadastrad{isLoteamento ? 'os' : 'as'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectionMode ? (
+              <>
+                <span className="text-sm text-muted-foreground">
+                  {selectedUnidadeIds.size} selecionado(s)
+                </span>
+                <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                  Selecionar Todos
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDeselectAll}>
+                  Limpar
+                </Button>
+                {selectionMode === 'venda' && (
+                  <Button
+                    size="sm"
+                    onClick={() => setVendaHistoricaOpen(true)}
+                    disabled={selectedUnidadeIds.size === 0}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    Registrar Venda ({selectedUnidadeIds.size})
+                  </Button>
+                )}
+                {selectionMode === 'delete' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={selectedUnidadeIds.size === 0 || deleteUnidadesBatch.isPending}
+                      >
+                        {deleteUnidadesBatch.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir ({selectedUnidadeIds.size})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar exclusão em lote</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir {selectedUnidadeIds.size} unidade(s)?
+                          Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteSelected}>
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleExitSelectionMode}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                {usaMapa && (
+                  <div className="flex items-center border rounded-lg p-1">
+                    <Toggle pressed={viewMode === 'grid'} onPressedChange={() => setViewMode('grid')} size="sm">
+                      <Grid className="h-4 w-4" />
+                    </Toggle>
+                    <Toggle pressed={viewMode === 'mapa'} onPressedChange={() => setViewMode('mapa')} size="sm">
+                      <MapIcon className="h-4 w-4" />
+                    </Toggle>
+                  </div>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setSelectionMode('delete')}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir em Lote
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectionMode('venda')}>
+                  <History className="h-4 w-4 mr-2" />
+                  Venda Histórica
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setBlocoFormOpen(true)}>
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Nov{isLoteamento ? 'a' : 'o'} {agrupamentoLabel}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setBulkFormOpen(true)}>
+                  <Layers className="h-4 w-4 mr-2" />
+                  Adicionar em Lote
+                </Button>
+                <Button size="sm" onClick={handleNewUnidade}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nov{isLoteamento ? 'o' : 'a'} {unidadeLabel}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {selectionMode && (
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+            {selectionMode === 'venda' 
+              ? <>Clique nas unidades <strong>disponíveis</strong> (verde) para selecioná-las para registro de venda histórica.</>
+              : <>Clique nas unidades que deseja <strong>excluir</strong>. Esta ação é permanente.</>
+            }
+          </div>
+        )}
+
+        {viewMode === 'mapa' && usaMapa && !selectionMode ? (
+          <div className="min-h-[500px]">
+            <MapaInterativo empreendimentoId={empreendimentoId} />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-4 mb-6">
+              {Object.entries(UNIDADE_STATUS_LABELS).map(([status, label]) => (
+                <div key={status} className="flex items-center gap-2">
+                  <div className={cn('w-4 h-4 rounded', UNIDADE_STATUS_COLORS[status as keyof typeof UNIDADE_STATUS_COLORS])} />
+                  <span className="text-sm">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {unidades && unidades.length > 0 ? (
+              <div className="space-y-6">
+                {sortedBlocoEntries.map(([blocoId, blocoUnidades]) => {
+                  const bloco = blocos?.find(b => b.id === blocoId);
+                  return (
+                    <div key={blocoId}>
+                      <h4 className="font-medium mb-3">
+                        {bloco?.nome || `Sem ${agrupamentoLabel}`}
+                      </h4>
+                      <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-14 lg:grid-cols-18 gap-2">
+                        {blocoUnidades?.map((unidade) => {
+                          const isSelected = selectedUnidadeIds.has(unidade.id);
+                          const isDisponivel = unidade.status === 'disponivel';
+                          const label = buildUnitLabel(unidade, labelFormato);
+                          
+                          return (
+                            <button
+                              key={unidade.id}
+                              onClick={() => {
+                                if (selectionMode) {
+                                  handleToggleSelection(unidade.id, unidade.status);
+                                } else {
+                                  handleEditUnidade(unidade);
+                                }
+                              }}
+                              className={cn(
+                                'relative group h-10 min-w-[3.5rem] px-1.5 rounded flex items-center justify-center text-xs font-medium text-white transition-all truncate',
+                                UNIDADE_STATUS_COLORS[unidade.status],
+                                selectionMode === 'venda' && isDisponivel && 'cursor-pointer ring-offset-2 hover:ring-2 ring-primary',
+                                selectionMode === 'venda' && !isDisponivel && 'opacity-50 cursor-not-allowed',
+                                selectionMode === 'delete' && 'cursor-pointer ring-offset-2 hover:ring-2 ring-destructive',
+                                isSelected && selectionMode === 'venda' && 'ring-2 ring-primary ring-offset-2',
+                                isSelected && selectionMode === 'delete' && 'ring-2 ring-destructive ring-offset-2',
+                                !selectionMode && 'cursor-pointer hover:opacity-80'
+                              )}
+                              title={`${label} - ${UNIDADE_STATUS_LABELS[unidade.status]}`}
+                              disabled={selectionMode === 'venda' && !isDisponivel}
+                            >
+                              {label}
+                              {selectionMode && isSelected && (
+                                <div className={cn(
+                                  "absolute -top-1 -right-1 rounded-full p-0.5",
+                                  selectionMode === 'delete' ? 'bg-destructive' : 'bg-primary'
+                                )}>
+                                  <Check className="h-3 w-3 text-primary-foreground" />
+                                </div>
+                              )}
+                              {!selectionMode && (
+                                <Pencil className="absolute top-0.5 right-0.5 h-3 w-3 opacity-0 group-hover:opacity-100" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum{isLoteamento ? ' lote' : 'a unidade'} cadastrad{isLoteamento ? 'o' : 'a'}
+              </p>
+            )}
+          </>
+        )}
+
+        <UnidadeForm 
+          open={unidadeFormOpen} 
+          onOpenChange={setUnidadeFormOpen} 
+          empreendimentoId={empreendimentoId} 
+          unidade={selectedUnidade}
+          tipoEmpreendimento={empreendimento?.tipo}
+        />
+        <UnidadeBulkForm
+          open={bulkFormOpen}
+          onOpenChange={setBulkFormOpen}
+          empreendimentoId={empreendimentoId}
+          tipoEmpreendimento={empreendimento?.tipo || 'predio'}
+        />
+        <BlocoForm 
+          open={blocoFormOpen} 
+          onOpenChange={setBlocoFormOpen} 
+          empreendimentoId={empreendimentoId}
+          tipoEmpreendimento={empreendimento?.tipo}
+        />
+        <ImportarUnidadesDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          empreendimentoId={empreendimentoId}
+          tipoEmpreendimento={empreendimento?.tipo}
+        />
+        <VendaHistoricaDialog
+          open={vendaHistoricaOpen}
+          onOpenChange={setVendaHistoricaOpen}
+          empreendimentoId={empreendimentoId}
+          unidadesSelecionadas={unidadesSelecionadas}
+          onSuccess={handleVendaHistoricaSuccess}
+        />
+      </CardContent>
+    </Card>
+  );
+}
