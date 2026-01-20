@@ -131,7 +131,7 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
       corretor_id: values.corretor_id || undefined,
       imobiliaria_id: values.imobiliaria_id || undefined,
       empreendimento_id: values.empreendimento_id || undefined,
-      gestor_id: user?.id,
+      gestor_id: initialData?.gestor_id || user?.id,
       data_hora: dataHora.toISOString(),
       duracao_minutos: values.duracao_minutos,
       observacoes: values.observacoes || undefined,
