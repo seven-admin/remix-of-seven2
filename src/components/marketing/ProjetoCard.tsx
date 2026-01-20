@@ -11,14 +11,15 @@ import {
   PRIORIDADE_LABELS, 
   PRIORIDADE_COLORS 
 } from '@/types/marketing.types';
-import React from 'react';
+import React, { memo, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 
 interface ProjetoCardProps {
   projeto: ProjetoMarketing;
   isDragging?: boolean;
 }
 
-export function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
+export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
   const navigate = useNavigate();
 
   const getCategoriaIcon = () => {
@@ -36,7 +37,7 @@ export function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
     }
   };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
     // Não navegar durante drag
     if (isDragging) {
       e.preventDefault();
@@ -44,11 +45,16 @@ export function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
       return;
     }
     navigate(`/marketing/${projeto.id}`);
-  };
+  }, [isDragging, navigate, projeto.id]);
 
   return (
     <Card 
-      className="hover:shadow-md transition-shadow bg-background cursor-pointer select-none"
+      className={cn(
+        "bg-background cursor-pointer select-none",
+        isDragging 
+          ? "opacity-95 scale-[1.02] shadow-xl rotate-[2deg] ring-2 ring-primary/40"
+          : "hover:shadow-md transition-shadow"
+      )}
       onClick={handleClick}
     >
       <CardHeader className="pb-2 pt-3 px-3">
@@ -102,4 +108,4 @@ export function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

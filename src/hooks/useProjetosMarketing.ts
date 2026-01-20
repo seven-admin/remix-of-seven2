@@ -270,10 +270,11 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       toast.error('Erro ao mover ticket: ' + error.message);
     },
     onSuccess: () => {
-      // Sincronizar com servidor após delay (não interrompe animação)
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
-      }, 500);
+      // Invalidar sem refetch imediato - optimistic update já atualizou UI
+      queryClient.invalidateQueries({ 
+        queryKey: ['projetos-marketing'],
+        refetchType: 'none'
+      });
     }
   });
 

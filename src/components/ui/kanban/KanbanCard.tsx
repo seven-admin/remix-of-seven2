@@ -6,15 +6,14 @@ export function KanbanCardWrapper({ id, index, children }: KanbanCardWrapperProp
   return (
     <Draggable draggableId={id} index={index}>
       {(provided, snapshot) => {
-        // Determinar estilo de transição baseado no estado
+        // Estilo simplificado - deixar dnd controlar durante drag
         const style = {
           ...provided.draggableProps.style,
-          // Não interferir durante arrasto, animação suave no drop
-          transition: snapshot.isDragging
-            ? undefined // Deixar dnd controlar durante arrasto
-            : snapshot.isDropAnimating
-              ? 'all 0.15s cubic-bezier(0.2, 0, 0, 1)'
-              : 'transform 0.15s ease',
+          transition: snapshot.isDragging 
+            ? undefined 
+            : snapshot.isDropAnimating 
+              ? 'all 0.12s ease-out' 
+              : undefined,
         };
 
         return (
