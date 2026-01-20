@@ -38,7 +38,6 @@ export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: Pr
   };
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Não navegar durante drag
     if (isDragging) {
       e.preventDefault();
       e.stopPropagation();
@@ -47,65 +46,67 @@ export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: Pr
     navigate(`/marketing/${projeto.id}`);
   }, [isDragging, navigate, projeto.id]);
 
+  // Cor da borda baseada na prioridade
+  const borderColor = {
+    urgente: 'border-l-red-500',
+    alta: 'border-l-orange-500',
+    normal: 'border-l-blue-500',
+    baixa: 'border-l-slate-400',
+  }[projeto.prioridade] || '';
+
   return (
     <Card 
       className={cn(
-        "bg-background cursor-pointer select-none",
+        "bg-background cursor-pointer select-none border-l-[3px]",
+        borderColor,
         isDragging 
-          ? "opacity-95 scale-[1.02] shadow-xl rotate-[2deg] ring-2 ring-primary/40"
-          : "hover:shadow-md transition-shadow"
+          ? "opacity-95 scale-[1.02] shadow-xl rotate-[1deg] ring-2 ring-primary/40"
+          : "hover:shadow-sm transition-shadow"
       )}
       onClick={handleClick}
     >
-      <CardHeader className="pb-2 pt-3 px-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg">{getCategoriaIcon()}</span>
-            <div className="min-w-0">
-              <p className="font-medium text-sm truncate">{projeto.titulo}</p>
-              <p className="text-xs text-muted-foreground">{projeto.codigo}</p>
-            </div>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-3">
-        <div className="flex flex-wrap gap-1">
-          <Badge variant="outline" className="text-xs">
-            {CATEGORIA_LABELS[projeto.categoria]}
-          </Badge>
+      {/* Header compacto */}
+      <div className="p-2 pb-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm flex-shrink-0">{getCategoriaIcon()}</span>
+          <p className="font-medium text-xs truncate flex-1">{projeto.titulo}</p>
           <Badge 
-            className="text-xs text-white"
+            className="text-[10px] px-1.5 py-0 h-4 text-white flex-shrink-0"
             style={{ backgroundColor: PRIORIDADE_COLORS[projeto.prioridade] }}
           >
-            {PRIORIDADE_LABELS[projeto.prioridade]}
+            {PRIORIDADE_LABELS[projeto.prioridade][0].toUpperCase()}
           </Badge>
         </div>
-
-        {projeto.empreendimento && (
-          <p className="text-xs text-muted-foreground truncate">
+        <p className="text-[10px] text-muted-foreground ml-5 mt-0.5">{projeto.codigo}</p>
+      </div>
+      
+      {/* Footer condensado */}
+      <div className="px-2 pb-2 flex items-center justify-between gap-2">
+        {projeto.empreendimento ? (
+          <span className="text-[10px] text-muted-foreground truncate flex-1">
             🏢 {projeto.empreendimento.nome}
-          </p>
+          </span>
+        ) : (
+          <span className="flex-1" />
         )}
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {projeto.data_previsao && (
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              <Calendar className="h-2.5 w-2.5" />
               {format(new Date(projeto.data_previsao), 'dd/MM', { locale: ptBR })}
-            </div>
+            </span>
           )}
           
           {projeto.supervisor && (
-            <div className="flex items-center gap-1">
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="text-[10px]">
-                  {projeto.supervisor.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            <Avatar className="h-4 w-4">
+              <AvatarFallback className="text-[8px] bg-muted">
+                {projeto.supervisor.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
           )}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 });
