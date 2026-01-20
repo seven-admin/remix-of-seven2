@@ -167,6 +167,24 @@ export interface Negociacao {
   updated_at: string;
 }
 
+export interface NegociacaoCondicaoLocal {
+  _localId: string;
+  tipo_parcela_codigo: string;
+  descricao?: string;
+  quantidade: number;
+  valor?: number;
+  valor_tipo: string;
+  data_vencimento?: string;
+  intervalo_dias: number;
+  evento_vencimento?: string;
+  com_correcao: boolean;
+  indice_correcao: string;
+  parcelas_sem_correcao: number;
+  forma_quitacao: string;
+  forma_pagamento: string;
+  observacao_texto?: string;
+}
+
 export interface NegociacaoFormData {
   cliente_id?: string;
   cliente_nome?: string;
@@ -184,6 +202,7 @@ export interface NegociacaoFormData {
   observacoes?: string;
   data_previsao_fechamento?: string;
   unidade_ids?: string[];
+  condicoes_pagamento?: NegociacaoCondicaoLocal[];
 }
 
 export interface NegociacaoUnidade {

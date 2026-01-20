@@ -38,9 +38,11 @@ import { useImobiliarias } from '@/hooks/useImobiliarias';
 import { useClientes } from '@/hooks/useClientes';
 import { useCreateNegociacao, useUpdateNegociacao } from '@/hooks/useNegociacoes';
 import { useEtapasPadraoAtivas } from '@/hooks/useFunis';
-import { Negociacao, NegociacaoFormData } from '@/types/negociacoes.types';
+import { Negociacao, NegociacaoFormData, NegociacaoCondicaoLocal } from '@/types/negociacoes.types';
 import { User, Home, DollarSign, Users, FileText, ChevronLeft, ChevronRight, Check, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LocalCondicoesPagamentoEditor, LocalCondicao } from './LocalCondicoesPagamentoEditor';
+import { NegociacaoCondicoesPagamentoInlineEditor } from './NegociacaoCondicoesPagamentoInlineEditor';
 
 // Função auxiliar para formatação de moeda
 const formatCurrency = (value: number) => {
@@ -66,7 +68,8 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
   const [clienteTab, setClienteTab] = useState<'existente' | 'novo'>('existente');
   const [formData, setFormData] = useState<NegociacaoFormData>({
     empreendimento_id: '',
-    unidade_ids: []
+    unidade_ids: [],
+    condicoes_pagamento: []
   });
   const [selectedUnidades, setSelectedUnidades] = useState<string[]>([]);
   const [filtroBloco, setFiltroBloco] = useState<string>('todos');
@@ -131,7 +134,8 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
       setFormData({
         empreendimento_id: '',
         funil_etapa_id: etapaInicial?.id,
-        unidade_ids: []
+        unidade_ids: [],
+        condicoes_pagamento: []
       });
       setSelectedUnidades([]);
     }
@@ -445,41 +449,41 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="valor_negociacao">Valor Total</Label>
-                    <CurrencyInput
-                      id="valor_negociacao"
-                      value={formData.valor_negociacao}
-                      onChange={(value) => setFormData(prev => ({ ...prev, valor_negociacao: value }))}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valor_entrada">Valor de Entrada</Label>
-                    <CurrencyInput
-                      id="valor_entrada"
-                      value={formData.valor_entrada}
-                      onChange={(value) => setFormData(prev => ({ ...prev, valor_entrada: value }))}
-                      placeholder="0,00"
-                    />
-                    {formData.valor_negociacao && formData.valor_entrada && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {((formData.valor_entrada / formData.valor_negociacao) * 100).toFixed(1)}% do valor total
-                      </p>
-                    )}
-                  </div>
-                </div>
-
                 <div>
-                  <Label htmlFor="condicao_pagamento">Condição de Pagamento</Label>
-                  <Input
-                    id="condicao_pagamento"
-                    value={formData.condicao_pagamento || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, condicao_pagamento: e.target.value }))}
-                    placeholder="Ex: 10% entrada + 36x mensais"
+                  <Label htmlFor="valor_negociacao">Valor Total da Proposta *</Label>
+                  <CurrencyInput
+                    id="valor_negociacao"
+                    value={formData.valor_negociacao}
+                    onChange={(value) => setFormData(prev => ({ ...prev, valor_negociacao: value }))}
+                    placeholder="0,00"
                   />
                 </div>
+
+                {/* Editor de Condições de Pagamento */}
+                {formData.valor_negociacao && formData.valor_negociacao > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-base font-semibold">Condições de Pagamento</Label>
+                    
+                    {negociacao?.id ? (
+                      // Para edição, usa o editor que salva direto no banco
+                      <NegociacaoCondicoesPagamentoInlineEditor
+                        negociacaoId={negociacao.id}
+                        empreendimentoId={formData.empreendimento_id}
+                        valorReferencia={formData.valor_negociacao}
+                      />
+                    ) : (
+                      // Para criação, usa o editor local
+                      <LocalCondicoesPagamentoEditor
+                        valorReferencia={formData.valor_negociacao}
+                        condicoes={(formData.condicoes_pagamento as LocalCondicao[]) || []}
+                        onChange={(condicoes) => setFormData(prev => ({ 
+                          ...prev, 
+                          condicoes_pagamento: condicoes as NegociacaoCondicaoLocal[]
+                        }))}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
