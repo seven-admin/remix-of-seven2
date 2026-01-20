@@ -144,9 +144,11 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Sempre derivar valor da soma das unidades
     const submitData: NegociacaoFormData = {
       ...formData,
-      unidade_ids: selectedUnidades
+      unidade_ids: selectedUnidades,
+      valor_negociacao: valorTotalUnidades
     };
 
     if (negociacao) {
@@ -431,32 +433,23 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
             {/* Step 3: Valores */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                {/* Valor calculado das unidades */}
-                {selectedUnidades.length > 0 && valorTotalUnidades > 0 && (
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calculator className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Valor das unidades selecionadas</span>
-                      </div>
-                      <span className="text-lg font-bold text-primary">
-                        {valorTotalUnidades.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </span>
+                {/* Valor derivado das unidades (sem campo editável) */}
+                <div className="p-4 bg-muted/50 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Valor Total da Proposta</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {selectedUnidades.length} unidade(s)
-                    </p>
+                    <span className="text-lg font-bold text-primary">
+                      {valorTotalUnidades.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
                   </div>
-                )}
-
-                <div>
-                  <Label htmlFor="valor_negociacao">Valor Total da Proposta *</Label>
-                  <CurrencyInput
-                    id="valor_negociacao"
-                    value={formData.valor_negociacao}
-                    onChange={(value) => setFormData(prev => ({ ...prev, valor_negociacao: value }))}
-                    placeholder="0,00"
-                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedUnidades.length > 0 
+                      ? `Calculado a partir de ${selectedUnidades.length} unidade(s) selecionada(s)`
+                      : 'Selecione unidade(s) no passo anterior para definir o valor'
+                    }
+                  </p>
                 </div>
 
                 {/* Editor de Condições de Pagamento */}
@@ -468,12 +461,12 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
                     <NegociacaoCondicoesPagamentoInlineEditor
                       negociacaoId={negociacao.id}
                       empreendimentoId={formData.empreendimento_id}
-                      valorReferencia={formData.valor_negociacao || 0}
+                      valorReferencia={valorTotalUnidades}
                     />
                   ) : (
                     // Para criação, usa o editor local
                     <LocalCondicoesPagamentoEditor
-                      valorReferencia={formData.valor_negociacao || 0}
+                      valorReferencia={valorTotalUnidades}
                       condicoes={(formData.condicoes_pagamento as LocalCondicao[]) || []}
                       onChange={(condicoes) => setFormData(prev => ({
                         ...prev,

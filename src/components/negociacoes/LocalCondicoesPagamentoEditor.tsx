@@ -230,7 +230,7 @@ export function LocalCondicoesPagamentoEditor({
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Defina o valor total da proposta para configurar as condições de pagamento.
+          Selecione unidade(s) para definir o valor e configurar as condições de pagamento.
         </AlertDescription>
       </Alert>
     );
