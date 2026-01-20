@@ -6,7 +6,7 @@ import { NegociacaoForm } from './NegociacaoForm';
 import { NegociacaoHistoricoTimeline } from './NegociacaoHistoricoTimeline';
 import { NegociacaoCard } from './NegociacaoCard';
 import { PropostaDialog } from './PropostaDialog';
-import { useNegociacoes, useMoverNegociacao, useDeleteNegociacao, useConverterPropostaEmContrato } from '@/hooks/useNegociacoes';
+import { useNegociacoes, useMoverNegociacao, useDeleteNegociacao, useConverterPropostaEmContrato, useSolicitarReserva } from '@/hooks/useNegociacoes';
 import { useCreateContrato } from '@/hooks/useContratos';
 import { useEtapasPadraoAtivas } from '@/hooks/useFunis';
 import { Negociacao } from '@/types/negociacoes.types';
@@ -40,6 +40,7 @@ export function FunilKanbanBoard({ filters }: FunilKanbanBoardProps) {
   const deleteMutation = useDeleteNegociacao();
   const createContratoMutation = useCreateContrato();
   const converterContratoMutation = useConverterPropostaEmContrato();
+  const solicitarReservaMutation = useSolicitarReserva();
 
   const [selectedNegociacao, setSelectedNegociacao] = useState<Negociacao | null>(null);
   const [targetEtapa, setTargetEtapa] = useState<FunilEtapa | undefined>();
@@ -114,6 +115,10 @@ export function FunilKanbanBoard({ filters }: FunilKanbanBoardProps) {
     setSelectedNegociacao(negociacao);
     setPropostaMode('recusar');
     setPropostaOpen(true);
+  };
+
+  const handleSolicitarReserva = async (negociacao: Negociacao) => {
+    await solicitarReservaMutation.mutateAsync(negociacao.id);
   };
 
   // Handle contract creation request from MoverNegociacaoDialog
@@ -251,6 +256,7 @@ export function FunilKanbanBoard({ filters }: FunilKanbanBoardProps) {
             onEnviarProposta={handleEnviarProposta}
             onAceitarProposta={handleAceitarProposta}
             onRecusarProposta={handleRecusarProposta}
+            onSolicitarReserva={handleSolicitarReserva}
           />
         )}
       />

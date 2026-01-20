@@ -207,9 +207,9 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>{negociacao ? 'Editar Negociação' : 'Nova Negociação'}</DialogTitle>
+          <DialogTitle>{negociacao ? 'Editar Ficha de Proposta' : 'Nova Ficha de Proposta'}</DialogTitle>
           <DialogDescription>
-            {negociacao ? `Editando ${negociacao.codigo}` : 'Preencha os dados da negociação'}
+            {negociacao ? `Editando ${negociacao.codigo}` : 'Preencha os dados da ficha de proposta'}
           </DialogDescription>
         </DialogHeader>
 
@@ -615,7 +615,7 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
               </Button>
             ) : (
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Salvando...' : negociacao ? 'Salvar' : 'Criar Negociação'}
+                {isLoading ? 'Salvando...' : negociacao ? 'Salvar' : 'Criar Ficha'}
               </Button>
             )}
           </div>

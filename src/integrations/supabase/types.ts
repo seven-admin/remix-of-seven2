@@ -3471,6 +3471,7 @@ export type Database = {
           corretor_id: string | null
           created_at: string
           created_by: string | null
+          dados_filiacao_ok: boolean | null
           data_aceite: string | null
           data_conversao: string | null
           data_emissao_proposta: string | null
@@ -3479,8 +3480,11 @@ export type Database = {
           data_validade_proposta: string | null
           desconto_percentual: number | null
           desconto_valor: number | null
+          documentos_anexados: boolean | null
           empreendimento_id: string
+          estado_civil_validado: boolean | null
           etapa: Database["public"]["Enums"]["etapa_funil"]
+          ficha_completa: boolean | null
           funil_etapa_id: string | null
           gestor_id: string | null
           id: string
@@ -3491,6 +3495,7 @@ export type Database = {
           motivo_perda: string | null
           motivo_recusa: string | null
           motivo_rejeicao: string | null
+          motivo_validacao: string | null
           numero_proposta: string | null
           observacoes: string | null
           ordem_kanban: number
@@ -3502,6 +3507,8 @@ export type Database = {
           status_proposta: string | null
           updated_at: string
           updated_by: string | null
+          validacao_comercial_em: string | null
+          validacao_comercial_por: string | null
           valor_entrada: number | null
           valor_negociacao: number | null
           valor_proposta: number | null
@@ -3517,6 +3524,7 @@ export type Database = {
           corretor_id?: string | null
           created_at?: string
           created_by?: string | null
+          dados_filiacao_ok?: boolean | null
           data_aceite?: string | null
           data_conversao?: string | null
           data_emissao_proposta?: string | null
@@ -3525,8 +3533,11 @@ export type Database = {
           data_validade_proposta?: string | null
           desconto_percentual?: number | null
           desconto_valor?: number | null
+          documentos_anexados?: boolean | null
           empreendimento_id: string
+          estado_civil_validado?: boolean | null
           etapa?: Database["public"]["Enums"]["etapa_funil"]
+          ficha_completa?: boolean | null
           funil_etapa_id?: string | null
           gestor_id?: string | null
           id?: string
@@ -3537,6 +3548,7 @@ export type Database = {
           motivo_perda?: string | null
           motivo_recusa?: string | null
           motivo_rejeicao?: string | null
+          motivo_validacao?: string | null
           numero_proposta?: string | null
           observacoes?: string | null
           ordem_kanban?: number
@@ -3548,6 +3560,8 @@ export type Database = {
           status_proposta?: string | null
           updated_at?: string
           updated_by?: string | null
+          validacao_comercial_em?: string | null
+          validacao_comercial_por?: string | null
           valor_entrada?: number | null
           valor_negociacao?: number | null
           valor_proposta?: number | null
@@ -3563,6 +3577,7 @@ export type Database = {
           corretor_id?: string | null
           created_at?: string
           created_by?: string | null
+          dados_filiacao_ok?: boolean | null
           data_aceite?: string | null
           data_conversao?: string | null
           data_emissao_proposta?: string | null
@@ -3571,8 +3586,11 @@ export type Database = {
           data_validade_proposta?: string | null
           desconto_percentual?: number | null
           desconto_valor?: number | null
+          documentos_anexados?: boolean | null
           empreendimento_id?: string
+          estado_civil_validado?: boolean | null
           etapa?: Database["public"]["Enums"]["etapa_funil"]
+          ficha_completa?: boolean | null
           funil_etapa_id?: string | null
           gestor_id?: string | null
           id?: string
@@ -3583,6 +3601,7 @@ export type Database = {
           motivo_perda?: string | null
           motivo_recusa?: string | null
           motivo_rejeicao?: string | null
+          motivo_validacao?: string | null
           numero_proposta?: string | null
           observacoes?: string | null
           ordem_kanban?: number
@@ -3594,6 +3613,8 @@ export type Database = {
           status_proposta?: string | null
           updated_at?: string
           updated_by?: string | null
+          validacao_comercial_em?: string | null
+          validacao_comercial_por?: string | null
           valor_entrada?: number | null
           valor_negociacao?: number | null
           valor_proposta?: number | null
@@ -3667,6 +3688,13 @@ export type Database = {
           {
             foreignKeyName: "negociacoes_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negociacoes_validacao_comercial_por_fkey"
+            columns: ["validacao_comercial_por"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -5088,6 +5116,10 @@ export type Database = {
       }
       user_has_empreendimento_access: {
         Args: { _empreendimento_id: string; _user_id: string }
+        Returns: boolean
+      }
+      verificar_ficha_proposta_completa: {
+        Args: { neg_id: string }
         Returns: boolean
       }
     }
