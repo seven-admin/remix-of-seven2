@@ -22,7 +22,7 @@ const formSchema = z.object({
   // Step 1: Ticket data
   titulo: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
   descricao: z.string().optional(),
-  categoria: z.enum(['render_3d', 'design_grafico', 'video_animacao', 'evento']),
+  categoria: z.enum(['render_3d', 'design_grafico', 'video_animacao', 'evento', 'pedido_orcamento']),
   prioridade: z.enum(['baixa', 'media', 'alta', 'urgente']),
   empreendimento_id: z.string().optional(),
   data_previsao: z.string().optional(),

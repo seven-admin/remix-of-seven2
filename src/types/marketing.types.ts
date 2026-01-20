@@ -1,6 +1,6 @@
 // Tipos para o módulo de Marketing - Tickets de Produção
 
-export type CategoriaTicket = 'render_3d' | 'design_grafico' | 'video_animacao' | 'evento';
+export type CategoriaTicket = 'render_3d' | 'design_grafico' | 'video_animacao' | 'evento' | 'pedido_orcamento';
 
 export type StatusTicket = 'aguardando_analise' | 'em_producao' | 'revisao' | 'aprovacao_cliente' | 'ajuste' | 'concluido' | 'arquivado';
 
@@ -158,7 +158,8 @@ export const CATEGORIA_LABELS: Record<CategoriaTicket, string> = {
   render_3d: 'Renders / 3D',
   design_grafico: 'Design Gráfico',
   video_animacao: 'Vídeos / Animação',
-  evento: 'Evento'
+  evento: 'Evento',
+  pedido_orcamento: 'Pedido de Orçamento'
 };
 
 export const STATUS_LABELS: Record<StatusTicket, string> = {
