@@ -515,7 +515,7 @@ export function useCreateNegociacao() {
 
   return useMutation({
     mutationFn: async (formData: NegociacaoFormData) => {
-      const { cliente_id, cliente_nome, cliente_email, cliente_telefone, unidade_ids, funil_etapa_id, ...negociacaoData } = formData;
+      const { cliente_id, cliente_nome, cliente_email, cliente_telefone, unidade_ids, funil_etapa_id, condicoes_pagamento, ...negociacaoData } = formData;
 
       let finalClienteId = cliente_id;
 
@@ -587,6 +587,37 @@ export function useCreateNegociacao() {
           .in('id', unidade_ids);
       }
 
+      // Add payment conditions
+      if (condicoes_pagamento && condicoes_pagamento.length > 0) {
+        const condicoesData = condicoes_pagamento.map((c, index) => ({
+          negociacao_id: negociacao.id,
+          ordem: index,
+          tipo_parcela_codigo: c.tipo_parcela_codigo,
+          quantidade: c.quantidade,
+          valor: c.valor,
+          valor_tipo: c.valor_tipo || 'fixo',
+          forma_quitacao: c.forma_quitacao || 'dinheiro',
+          forma_pagamento: c.forma_pagamento || 'boleto',
+          intervalo_dias: c.intervalo_dias || 30,
+          com_correcao: c.com_correcao || false,
+          indice_correcao: c.indice_correcao || 'INCC',
+          parcelas_sem_correcao: c.parcelas_sem_correcao || 0,
+          descricao: c.descricao,
+          observacao_texto: c.observacao_texto,
+          data_vencimento: c.data_vencimento,
+          evento_vencimento: c.evento_vencimento,
+        }));
+
+        const { error: condicoesError } = await db
+          .from('negociacao_condicoes_pagamento')
+          .insert(condicoesData);
+
+        if (condicoesError) {
+          console.error('Erro ao criar condições de pagamento:', condicoesError);
+          // Não lança erro para não bloquear a criação da negociação
+        }
+      }
+
       // Add initial history
       await db
         .from('negociacao_historico')
@@ -602,6 +633,7 @@ export function useCreateNegociacao() {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacao-condicoes-pagamento'] });
       invalidateDashboards(queryClient);
       toast.success('Negociação criada com sucesso!');
     },
