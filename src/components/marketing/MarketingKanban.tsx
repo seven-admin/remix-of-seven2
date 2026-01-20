@@ -188,20 +188,7 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
         </div>
       )}
       renderCard={(projeto, isDragging) => (
-        <div 
-          className={cn(
-            "transition-all duration-100 ease-out",
-            isDragging && [
-              'opacity-95',
-              'scale-[1.02]', 
-              'shadow-xl',
-              'rotate-[2deg]',
-              'ring-2 ring-primary/40'
-            ]
-          )}
-        >
-          <ProjetoCard projeto={projeto} isDragging={isDragging} />
-        </div>
+        <ProjetoCard projeto={projeto} isDragging={isDragging} />
       )}
     />
   );
