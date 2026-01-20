@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, Clock, User, MapPin, Phone } from 'lucide-react';
+import { Calendar, Clock, User, MapPin, Phone, Headphones } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,10 +12,15 @@ const TIPO_ICON: Record<string, React.ElementType> = {
   visita: MapPin,
   ligacao: Phone,
   reuniao: User,
+  atendimento: Headphones,
 };
 
-export function ProximasAtividades() {
-  const { data: atividades, isLoading } = useProximasAtividades();
+interface ProximasAtividadesProps {
+  empreendimentoId?: string;
+}
+
+export function ProximasAtividades({ empreendimentoId }: ProximasAtividadesProps) {
+  const { data: atividades, isLoading } = useProximasAtividades(10, empreendimentoId);
 
   if (isLoading) {
     return (
@@ -87,11 +92,18 @@ export function ProximasAtividades() {
                       </div>
                     </div>
 
-                    {isToday && (
-                      <Badge variant="default" className="shrink-0 text-xs">
-                        Hoje
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {atividade.tipo === 'atendimento' && atividade.categoria && (
+                        <Badge variant="secondary" className="text-xs">
+                          {atividade.categoria === 'retorno' ? 'Retorno' : 'Novo'}
+                        </Badge>
+                      )}
+                      {isToday && (
+                        <Badge variant="default" className="text-xs">
+                          Hoje
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 );
               })}

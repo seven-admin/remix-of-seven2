@@ -16,10 +16,11 @@ import {
 import type { Atividade, AtividadeFormData } from '@/types/atividades.types';
 
 interface AlertasFollowupProps {
+  empreendimentoId?: string;
   onAtividadeClick?: (atividade: Atividade) => void;
 }
 
-export function AlertasFollowup({ onAtividadeClick }: AlertasFollowupProps) {
+export function AlertasFollowup({ empreendimentoId, onAtividadeClick }: AlertasFollowupProps) {
   const { data: followups, isLoading: loadingFollowups } = useAtividadesPendentesFollowup();
   const { data: vencidas, isLoading: loadingVencidas } = useAtividadesVencidas();
   const marcarRealizado = useMarcarFollowupRealizado();
@@ -55,9 +56,14 @@ export function AlertasFollowup({ onAtividadeClick }: AlertasFollowupProps) {
   };
 
   // Combinar e ordenar por urgência
+  const filterByEmpreendimento = (a: Atividade) => {
+    if (!empreendimentoId) return true;
+    return a.empreendimento_id === empreendimentoId;
+  };
+
   const alertas = [
-    ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
-    ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
+    ...(vencidas || []).filter(filterByEmpreendimento).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
+    ...(followups || []).filter(filterByEmpreendimento).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
   ].sort((a, b) => {
     const dataA = a.tipo_alerta === 'vencida' ? a.data_hora : a.data_followup;
     const dataB = b.tipo_alerta === 'vencida' ? b.data_hora : b.data_followup;
