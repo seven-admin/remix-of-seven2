@@ -460,30 +460,28 @@ export function NegociacaoForm({ open, onOpenChange, negociacao }: NegociacaoFor
                 </div>
 
                 {/* Editor de Condições de Pagamento */}
-                {formData.valor_negociacao && formData.valor_negociacao > 0 && (
-                  <div className="space-y-3 pt-2">
-                    <Label className="text-base font-semibold">Condições de Pagamento</Label>
-                    
-                    {negociacao?.id ? (
-                      // Para edição, usa o editor que salva direto no banco
-                      <NegociacaoCondicoesPagamentoInlineEditor
-                        negociacaoId={negociacao.id}
-                        empreendimentoId={formData.empreendimento_id}
-                        valorReferencia={formData.valor_negociacao}
-                      />
-                    ) : (
-                      // Para criação, usa o editor local
-                      <LocalCondicoesPagamentoEditor
-                        valorReferencia={formData.valor_negociacao}
-                        condicoes={(formData.condicoes_pagamento as LocalCondicao[]) || []}
-                        onChange={(condicoes) => setFormData(prev => ({ 
-                          ...prev, 
-                          condicoes_pagamento: condicoes as NegociacaoCondicaoLocal[]
-                        }))}
-                      />
-                    )}
-                  </div>
-                )}
+                <div className="space-y-3 pt-2">
+                  <Label className="text-base font-semibold">Condições de Pagamento</Label>
+                  
+                  {negociacao?.id ? (
+                    // Para edição, usa o editor que salva direto no banco
+                    <NegociacaoCondicoesPagamentoInlineEditor
+                      negociacaoId={negociacao.id}
+                      empreendimentoId={formData.empreendimento_id}
+                      valorReferencia={formData.valor_negociacao || 0}
+                    />
+                  ) : (
+                    // Para criação, usa o editor local
+                    <LocalCondicoesPagamentoEditor
+                      valorReferencia={formData.valor_negociacao || 0}
+                      condicoes={(formData.condicoes_pagamento as LocalCondicao[]) || []}
+                      onChange={(condicoes) => setFormData(prev => ({
+                        ...prev,
+                        condicoes_pagamento: condicoes as NegociacaoCondicaoLocal[]
+                      }))}
+                    />
+                  )}
+                </div>
               </div>
             )}
 
