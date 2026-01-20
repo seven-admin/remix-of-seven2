@@ -49,13 +49,13 @@ const Funil = () => {
 
   return (
     <MainLayout
-      title="Negociações"
-      subtitle="Gerencie suas negociações em modelo Kanban"
+      title="Fichas de Proposta"
+      subtitle="Gerencie suas fichas de proposta em modelo Kanban"
     >
       {/* Metrics Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Total de Negociações</p>
+          <p className="text-sm text-muted-foreground">Total de Fichas</p>
           <p className="text-2xl font-bold">{totalNegociacoes}</p>
         </Card>
         <Card className="p-4">
@@ -133,7 +133,7 @@ const Funil = () => {
         </div>
         <Button onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
-          Nova Negociação
+          Nova Ficha de Proposta
         </Button>
       </div>
 

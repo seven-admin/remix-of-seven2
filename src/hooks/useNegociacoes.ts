@@ -883,10 +883,158 @@ export function useDeleteNegociacao() {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
-      toast.success('Negociação removida com sucesso!');
+      toast.success('Ficha removida com sucesso!');
     },
     onError: (error: Error) => {
-      toast.error('Erro ao remover negociação: ' + error.message);
+      toast.error('Erro ao remover ficha: ' + error.message);
+    }
+  });
+}
+
+// ====================================================
+// Hook para Solicitar Reserva
+// ====================================================
+
+export function useSolicitarReserva() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Verificar se a ficha está completa
+      const { data: result, error: checkError } = await db.rpc('verificar_ficha_proposta_completa', { neg_id: id });
+      
+      if (checkError) throw checkError;
+      if (!result) {
+        throw new Error('A ficha de proposta não está completa. Preencha todos os campos obrigatórios.');
+      }
+
+      // Atualizar status de aprovação para pendente
+      const { error } = await db
+        .from('negociacoes')
+        .update({ 
+          status_aprovacao: 'pendente',
+          solicitada_em: new Date().toISOString(),
+          updated_by: user?.id
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Registrar histórico
+      await db
+        .from('negociacao_historico')
+        .insert({
+          negociacao_id: id,
+          user_id: user?.id,
+          observacao: 'Reserva solicitada - aguardando aprovação'
+        });
+
+      return { id };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      invalidateDashboards(queryClient);
+      toast.success('Reserva solicitada com sucesso! Aguardando aprovação.');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao solicitar reserva: ' + error.message);
+    }
+  });
+}
+
+// ====================================================
+// Hooks de Validação Comercial
+// ====================================================
+
+export function useAprovarReserva() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo?: string }) => {
+      const { error } = await db
+        .from('negociacoes')
+        .update({ 
+          status_aprovacao: 'aprovada',
+          aprovada_em: new Date().toISOString(),
+          validacao_comercial_em: new Date().toISOString(),
+          validacao_comercial_por: user?.id,
+          motivo_validacao: motivo,
+          updated_by: user?.id
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Registrar histórico
+      await db
+        .from('negociacao_historico')
+        .insert({
+          negociacao_id: id,
+          user_id: user?.id,
+          observacao: `Reserva aprovada${motivo ? ': ' + motivo : ''}`
+        });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      invalidateDashboards(queryClient);
+      toast.success('Reserva aprovada com sucesso!');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao aprovar reserva: ' + error.message);
+    }
+  });
+}
+
+export function useRejeitarReserva() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
+      const { error } = await db
+        .from('negociacoes')
+        .update({ 
+          status_aprovacao: 'rejeitada',
+          rejeitada_em: new Date().toISOString(),
+          motivo_rejeicao: motivo,
+          updated_by: user?.id
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Registrar histórico
+      await db
+        .from('negociacao_historico')
+        .insert({
+          negociacao_id: id,
+          user_id: user?.id,
+          observacao: 'Reserva rejeitada: ' + motivo
+        });
+
+      // Liberar unidades
+      const { data: negUnidades } = await db
+        .from('negociacao_unidades')
+        .select('unidade_id')
+        .eq('negociacao_id', id);
+
+      if (negUnidades && negUnidades.length > 0) {
+        await supabase
+          .from('unidades')
+          .update({ status: 'disponivel' })
+          .in('id', negUnidades.map((u: { unidade_id: string }) => u.unidade_id));
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['unidades'] });
+      invalidateDashboards(queryClient);
+      toast.success('Reserva rejeitada');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao rejeitar reserva: ' + error.message);
     }
   });
 }

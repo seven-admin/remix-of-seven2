@@ -100,8 +100,7 @@ const menuGroups: MenuGroup[] = [
     label: 'Comercial',
     icon: Target,
     items: [
-      { icon: Kanban, label: 'Negociações', path: '/negociacoes', moduleName: 'negociacoes' },
-      { icon: FileText, label: 'Propostas', path: '/propostas', moduleName: 'propostas' },
+      { icon: Kanban, label: 'Fichas de Proposta', path: '/negociacoes', moduleName: 'negociacoes' },
       { icon: ClipboardCheck, label: 'Solicitações', path: '/solicitacoes', moduleName: 'solicitacoes', adminOnly: true },
     ],
   },

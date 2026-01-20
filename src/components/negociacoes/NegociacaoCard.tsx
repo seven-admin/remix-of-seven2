@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,11 +9,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Building2, UserCog, ArrowRight, History, Edit, Trash2, FileText, Send, Check, X } from 'lucide-react';
-import { Negociacao, STATUS_PROPOSTA_LABELS, STATUS_PROPOSTA_COLORS } from '@/types/negociacoes.types';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { MoreVertical, Building2, UserCog, ArrowRight, History, Edit, Trash2, FileText, Send, Check, X, AlertCircle, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import { Negociacao, STATUS_PROPOSTA_LABELS, STATUS_PROPOSTA_COLORS, STATUS_APROVACAO_LABELS, STATUS_APROVACAO_COLORS } from '@/types/negociacoes.types';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useValidacaoFichaProposta } from '@/hooks/useValidacaoFichaProposta';
 
 interface NegociacaoCardProps {
   negociacao: Negociacao;
@@ -25,6 +32,7 @@ interface NegociacaoCardProps {
   onEnviarProposta?: (negociacao: Negociacao) => void;
   onAceitarProposta?: (negociacao: Negociacao) => void;
   onRecusarProposta?: (negociacao: Negociacao) => void;
+  onSolicitarReserva?: (negociacao: Negociacao) => void;
 }
 
 export function NegociacaoCard({ 
@@ -37,8 +45,11 @@ export function NegociacaoCard({
   onGerarProposta,
   onEnviarProposta,
   onAceitarProposta,
-  onRecusarProposta
+  onRecusarProposta,
+  onSolicitarReserva
 }: NegociacaoCardProps) {
+  const validacao = useValidacaoFichaProposta(negociacao);
+  
   const formatCurrency = (value?: number) => {
     if (!value) return '-';
     return new Intl.NumberFormat('pt-BR', {
@@ -61,6 +72,58 @@ export function NegociacaoCard({
         isDragging && "opacity-80 shadow-lg rotate-1 ring-2 ring-primary"
       )}
     >
+      {/* Status da Ficha - Indicador Visual */}
+      {!negociacao.numero_proposta && (
+        <div className="mb-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2">
+                {validacao.fichaCompleta ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                )}
+                <Progress value={validacao.percentualCompleto} className="h-1.5 flex-1" />
+                <span className="text-[10px] text-muted-foreground">{validacao.percentualCompleto}%</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              {validacao.fichaCompleta ? (
+                <p className="text-xs text-green-600">Ficha completa - pronta para solicitar reserva</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-amber-600">Pendências:</p>
+                  <ul className="text-xs list-disc pl-3 space-y-0.5">
+                    {validacao.pendencias.slice(0, 5).map((p, i) => (
+                      <li key={i}>{p}</li>
+                    ))}
+                    {validacao.pendencias.length > 5 && (
+                      <li>+{validacao.pendencias.length - 5} mais...</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      
+      {/* Status de Aprovação */}
+      {negociacao.status_aprovacao && negociacao.status_aprovacao !== 'aprovada' && (
+        <div className="mb-2">
+          <Badge 
+            variant="outline" 
+            className="text-[10px]"
+            style={{ 
+              borderColor: STATUS_APROVACAO_COLORS[negociacao.status_aprovacao],
+              color: STATUS_APROVACAO_COLORS[negociacao.status_aprovacao]
+            }}
+          >
+            {STATUS_APROVACAO_LABELS[negociacao.status_aprovacao]}
+          </Badge>
+        </div>
+      )}
+      
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{negociacao.cliente?.nome || 'Cliente'}</p>
@@ -95,6 +158,15 @@ export function NegociacaoCard({
             
             {/* Proposal Actions */}
             <DropdownMenuSeparator />
+            
+            {/* Solicitar Reserva - quando ficha completa e sem proposta */}
+            {!negociacao.numero_proposta && validacao.podesolicitarReserva && onSolicitarReserva && (
+              <DropdownMenuItem onClick={() => onSolicitarReserva(negociacao)}>
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Solicitar Reserva
+              </DropdownMenuItem>
+            )}
+            
             {!negociacao.numero_proposta && onGerarProposta && (
               <DropdownMenuItem onClick={() => onGerarProposta(negociacao)}>
                 <FileText className="h-4 w-4 mr-2" />

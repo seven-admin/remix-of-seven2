@@ -126,6 +126,15 @@ export interface Negociacao {
   ordem_kanban: number;
   unidades?: NegociacaoUnidade[];
   
+  // ====== Campos de Validação da Ficha ======
+  ficha_completa?: boolean;
+  documentos_anexados?: boolean;
+  dados_filiacao_ok?: boolean;
+  estado_civil_validado?: boolean;
+  validacao_comercial_em?: string;
+  validacao_comercial_por?: string;
+  motivo_validacao?: string;
+  
   // ====== Campos de Aprovação (Gatekeeper Flow) ======
   status_aprovacao?: StatusAprovacao;
   solicitada_em?: string;
