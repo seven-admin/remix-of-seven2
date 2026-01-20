@@ -21,8 +21,12 @@ const TIPO_CORES: Record<string, string> = {
   atendimento: '#10B981',
 };
 
-export function AtividadesPorTipo() {
-  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana();
+interface AtividadesPorTipoProps {
+  empreendimentoId?: string;
+}
+
+export function AtividadesPorTipo({ empreendimentoId }: AtividadesPorTipoProps) {
+  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(empreendimentoId);
 
   if (isLoading) {
     return (

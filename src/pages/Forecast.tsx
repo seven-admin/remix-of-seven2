@@ -13,18 +13,29 @@ import { AlertasFollowup } from '@/components/forecast/AlertasFollowup';
 import { AtividadesPorTipo } from '@/components/forecast/AtividadesPorTipo';
 import { ProximasAtividades } from '@/components/forecast/ProximasAtividades';
 import { RankingCorretoresAtivos } from '@/components/forecast/RankingCorretoresAtivos';
+import { AtendimentosResumo } from '@/components/forecast/AtendimentosResumo';
 import { AtividadeForm } from '@/components/atividades/AtividadeForm';
 import { useTVLayoutConfig } from '@/hooks/useTVLayoutConfig';
 import { TVLayoutConfigDialog } from '@/components/tv-layout';
 import { useResumoAtividades } from '@/hooks/useForecast';
 import { useCreateAtividade } from '@/hooks/useAtividades';
+import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { AtividadeFormData } from '@/types/atividades.types';
 
 export default function Forecast() {
-  const { data: resumo, isLoading, refetch } = useResumoAtividades();
+  const [empreendimentoId, setEmpreendimentoId] = useState<string | undefined>(undefined);
+  const { data: empreendimentos } = useEmpreendimentos();
+  const { data: resumo, isLoading, refetch } = useResumoAtividades(empreendimentoId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modoTV, setModoTV] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
@@ -188,6 +199,12 @@ export default function Forecast() {
     switch (itemId) {
       case 'kpis':
         return <div key={itemId}>{renderTVKPIs()}</div>;
+      case 'atendimentos-resumo':
+        return (
+          <div key={itemId}>
+            <AtendimentosResumo empreendimentoId={empreendimentoId} />
+          </div>
+        );
       case 'funil-temperatura':
         return (
           <Card key={itemId}>
@@ -195,7 +212,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Funil de Temperatura</CardTitle>
             </CardHeader>
             <CardContent>
-              <FunilTemperatura />
+              <FunilTemperatura empreendimentoId={empreendimentoId} />
             </CardContent>
           </Card>
         );
@@ -206,7 +223,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Atividades por Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <AtividadesPorTipo />
+              <AtividadesPorTipo empreendimentoId={empreendimentoId} />
             </CardContent>
           </Card>
         );
@@ -217,7 +234,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Próximas Atividades</CardTitle>
             </CardHeader>
             <CardContent>
-              <ProximasAtividades />
+              <ProximasAtividades empreendimentoId={empreendimentoId} />
             </CardContent>
           </Card>
         );
@@ -228,7 +245,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Ranking de Corretores</CardTitle>
             </CardHeader>
             <CardContent>
-              <RankingCorretoresAtivos />
+              <RankingCorretoresAtivos empreendimentoId={empreendimentoId} />
             </CardContent>
           </Card>
         );
@@ -305,7 +322,23 @@ export default function Forecast() {
             <h1 className="text-3xl font-bold text-foreground">Forecast</h1>
             <p className="text-muted-foreground">Previsão de vendas e indicadores comerciais</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <Select
+              value={empreendimentoId || 'all'}
+              onValueChange={(v) => setEmpreendimentoId(v === 'all' ? undefined : v)}
+            >
+              <SelectTrigger className="w-full sm:w-[260px]">
+                <SelectValue placeholder="Todos os Empreendimentos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Empreendimentos</SelectItem>
+                {(empreendimentos || []).map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={toggleModoTV}>
               <Monitor className="h-4 w-4 mr-2" />
               Modo TV
@@ -369,23 +402,26 @@ export default function Forecast() {
           )}
         </div>
 
+        {/* Atendimentos: Novo x Retorno */}
+        <AtendimentosResumo empreendimentoId={empreendimentoId} />
+
         {/* Primeira linha: Funil + Atividades por Tipo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FunilTemperatura />
-          <AtividadesPorTipo />
+          <FunilTemperatura empreendimentoId={empreendimentoId} />
+          <AtividadesPorTipo empreendimentoId={empreendimentoId} />
         </div>
 
         {/* Segunda linha: Próximas Atividades + Visitas por Empreendimento */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ProximasAtividades />
-          <VisitasPorEmpreendimento />
+          <ProximasAtividades empreendimentoId={empreendimentoId} />
+          <VisitasPorEmpreendimento empreendimentoId={empreendimentoId} />
         </div>
 
         {/* Terceira linha: Ranking de Corretores */}
-        <RankingCorretoresAtivos />
+        <RankingCorretoresAtivos empreendimentoId={empreendimentoId} />
 
         {/* Alertas de Follow-up */}
-        <AlertasFollowup />
+        <AlertasFollowup empreendimentoId={empreendimentoId} />
       </div>
 
       {/* Dialog Nova Atividade */}

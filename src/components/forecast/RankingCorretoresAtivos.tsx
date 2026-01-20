@@ -4,8 +4,12 @@ import { useAtividadesPorCorretor } from '@/hooks/useForecast';
 import { Activity, Trophy, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function RankingCorretoresAtivos() {
-  const { data: corretores, isLoading } = useAtividadesPorCorretor();
+interface RankingCorretoresAtivosProps {
+  empreendimentoId?: string;
+}
+
+export function RankingCorretoresAtivos({ empreendimentoId }: RankingCorretoresAtivosProps) {
+  const { data: corretores, isLoading } = useAtividadesPorCorretor(empreendimentoId);
 
   if (isLoading) {
     return (
