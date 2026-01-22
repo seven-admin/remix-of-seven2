@@ -10,15 +10,11 @@ import { Imobiliaria, ImobiliariaFormData } from '@/types/mercado.types';
 import { useCepLookup } from '@/hooks/useCepLookup';
 import { Building2, MapPin, UserCog, Phone, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { validarCNPJ, formatarCNPJ, formatarTelefone } from '@/lib/documentUtils';
+import { formatarCNPJ, formatarTelefone } from '@/lib/documentUtils';
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
-  cnpj: z.string()
-    .optional()
-    .refine((val) => !val || val.replace(/\D/g, '').length === 0 || validarCNPJ(val), {
-      message: 'CNPJ inválido',
-    }),
+  cnpj: z.string().optional(),
   site: z.string().optional(),
   endereco_logradouro: z.string().optional(),
   endereco_numero: z.string().optional(),
