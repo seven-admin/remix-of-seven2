@@ -451,7 +451,7 @@ export default function Atividades() {
                           {atividade.status === 'pendente' && (
                             <>
                               <Button variant="ghost" size="icon" onClick={() => handleConcluir(atividade)} title="Concluir">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <CheckCircle className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleEdit(atividade)} title="Editar">
                                 <Edit className="h-4 w-4" />
@@ -620,6 +620,16 @@ export default function Atividades() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Paginação (lista) */}
+            {!isLoading && atividades.length > 0 && (
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                onPageChange={setPage}
+              />
+            )}
           </>
         )}
 
@@ -675,16 +685,6 @@ export default function Atividades() {
                         {atividade.cliente?.nome} • {atividade.corretor?.nome_completo}
                       </p>
                     </div>
-
-        {/* Paginação (lista) */}
-        {view === 'lista' && !isLoading && atividades.length > 0 && (
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            onPageChange={setPage}
-          />
-        )}
                     <Badge variant="destructive">
                       {format(new Date(atividade.data_hora), 'dd/MM/yyyy', { locale: ptBR })}
                     </Badge>

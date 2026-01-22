@@ -1,21 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { forwardRef, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,7 +32,10 @@ interface ProjetoEditFormProps {
   projeto: ProjetoMarketing;
 }
 
-export function ProjetoEditForm({ open, onOpenChange, projeto }: ProjetoEditFormProps) {
+export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(function ProjetoEditForm(
+  { open, onOpenChange, projeto },
+  ref
+) {
   const { updateProjeto } = useProjetosMarketing();
 
   const [formData, setFormData] = useState({
@@ -87,7 +79,7 @@ export function ProjetoEditForm({ open, onOpenChange, projeto }: ProjetoEditForm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent ref={ref} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Projeto</DialogTitle>
         </DialogHeader>
@@ -204,4 +196,6 @@ export function ProjetoEditForm({ open, onOpenChange, projeto }: ProjetoEditForm
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+ProjetoEditForm.displayName = 'ProjetoEditForm';

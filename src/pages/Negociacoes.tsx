@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,7 @@ import { FunilKanbanBoard } from '@/components/negociacoes/FunilKanbanBoard';
 import { NegociacaoForm } from '@/components/negociacoes/NegociacaoForm';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useCorretores } from '@/hooks/useCorretores';
-import { useNegociacoes } from '@/hooks/useNegociacoes';
+import { useNegociacoesKanban } from '@/hooks/useNegociacoes';
 import { useEtapasPadraoAtivas } from '@/hooks/useFunis';
 import { Card } from '@/components/ui/card';
 import { formatarMoedaCompacta } from '@/lib/formatters';
@@ -27,12 +27,15 @@ const Funil = () => {
 
   const { data: empreendimentos = [] } = useEmpreendimentos();
   const { corretores = [] } = useCorretores();
-  const { data: negociacoes = [], isLoading: isLoadingNegociacoes } = useNegociacoes(filters);
+  const { data: negociacoes = [], isLoading: isLoadingNegociacoes } = useNegociacoesKanban(filters);
   const { data: etapas = [] } = useEtapasPadraoAtivas();
 
   // Calculate metrics
   const totalNegociacoes = negociacoes.length;
-  const valorTotal = negociacoes.reduce((acc, n) => acc + (n.valor_negociacao || 0), 0);
+  const valorTotal = useMemo(
+    () => negociacoes.reduce((acc, n) => acc + (n.valor_negociacao || 0), 0),
+    [negociacoes]
+  );
   
   // Get success stage for conversion calculation
   const etapaFechado = etapas.find(e => e.is_final_sucesso);
@@ -42,10 +45,14 @@ const Funil = () => {
 
 
   // Count per stage for mini metrics
-  const countPerStage = etapas.reduce((acc, etapa) => {
-    acc[etapa.id] = negociacoes.filter(n => n.funil_etapa_id === etapa.id).length;
+  const countPerStage = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const n of negociacoes) {
+      if (!n.funil_etapa_id) continue;
+      acc[n.funil_etapa_id] = (acc[n.funil_etapa_id] || 0) + 1;
+    }
     return acc;
-  }, {} as Record<string, number>);
+  }, [negociacoes]);
 
   return (
     <MainLayout

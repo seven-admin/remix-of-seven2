@@ -72,6 +72,59 @@ export function useNegociacoes(filters?: NegociacaoFilters, options?: { enabled?
   });
 }
 
+// Versão leve para Kanban/listagem (reduz joins/payload e melhora TTFB)
+export function useNegociacoesKanban(filters?: NegociacaoFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['negociacoes-kanban', filters],
+    enabled: options?.enabled ?? true,
+    queryFn: async () => {
+      let query = db
+        .from('negociacoes')
+        .select(`
+          id,
+          codigo,
+          valor_negociacao,
+          valor_proposta,
+          numero_proposta,
+          status_proposta,
+          funil_etapa_id,
+          ordem_kanban,
+          cliente:clientes(id, nome),
+          empreendimento:empreendimentos(id, nome),
+          gestor:profiles!gestor_id(id, full_name),
+          unidades:negociacao_unidades(id)
+        `)
+        .eq('is_active', true)
+        .order('ordem_kanban', { ascending: true });
+
+      if (filters?.empreendimento_id) {
+        query = query.eq('empreendimento_id', filters.empreendimento_id);
+      }
+
+      if (filters?.corretor_id) {
+        query = query.eq('corretor_id', filters.corretor_id);
+      }
+
+      if (filters?.funil_etapa_id) {
+        query = query.eq('funil_etapa_id', filters.funil_etapa_id);
+      }
+
+      if (filters?.status_proposta) {
+        query = query.eq('status_proposta', filters.status_proposta);
+      }
+
+      if (filters?.com_proposta === true) {
+        query = query.not('numero_proposta', 'is', null);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Negociacao[];
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useNegociacao(id: string | undefined) {
   return useQuery({
     queryKey: ['negociacao', id],

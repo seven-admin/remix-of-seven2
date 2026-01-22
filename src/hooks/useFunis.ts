@@ -247,26 +247,19 @@ export function useEtapasPadraoAtivas() {
   return useQuery({
     queryKey: ['funil_etapas', 'padrao'],
     queryFn: async () => {
-      // Buscar funil padrão
-      const { data: funil, error: funilError } = await supabase
-        .from('funis')
-        .select('id')
-        .eq('is_default', true)
-        .eq('is_active', true)
-        .single();
-
-      if (funilError) throw funilError;
-
+      // 1 request: filtra etapas do funil padrão via join
       const { data, error } = await supabase
         .from('funil_etapas')
-        .select('*')
-        .eq('funil_id', funil.id)
+        .select('*, funis!inner(is_default, is_active)')
         .eq('is_active', true)
+        .eq('funis.is_default', true)
+        .eq('funis.is_active', true)
         .order('ordem');
 
       if (error) throw error;
       return data as FunilEtapa[];
     },
+    staleTime: 1000 * 60 * 10, // 10 min
   });
 }
 
