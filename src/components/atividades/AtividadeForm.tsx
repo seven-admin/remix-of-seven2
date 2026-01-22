@@ -1,9 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import { Phone, Users, MapPin, MessageSquare, CalendarIcon, ChevronDown } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +36,8 @@ import { useCorretores } from '@/hooks/useCorretores';
 import { useImobiliarias } from '@/hooks/useImobiliarias';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useGestorEmpreendimentos } from '@/hooks/useGestorEmpreendimentos';
+import { useGestoresProduto } from '@/hooks/useGestores';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Atividade, AtividadeFormData, AtividadeTipo, AtividadeCategoria } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_CATEGORIA_LABELS } from '@/types/atividades.types';
@@ -63,19 +69,30 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+export interface AtividadeFormSubmitData {
+  formData: AtividadeFormData;
+  gestorIds?: string[]; // Se presente, criar para múltiplos gestores
+}
+
 interface AtividadeFormProps {
   initialData?: Atividade;
-  onSubmit: (data: AtividadeFormData) => void;
+  onSubmit: (data: AtividadeFormSubmitData) => void;
   isLoading?: boolean;
 }
 
 export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFormProps) {
   const { user } = useAuth();
+  const { isSuperAdmin } = usePermissions();
   const { data: clientes = [] } = useClientes();
   const { corretores } = useCorretores();
   const { imobiliarias } = useImobiliarias();
   const { data: todosEmpreendimentos = [] } = useEmpreendimentos();
   const { data: gestorData } = useGestorEmpreendimentos();
+  const { data: gestores = [] } = useGestoresProduto();
+
+  const [atribuirParaGestores, setAtribuirParaGestores] = useState(false);
+  const [todosGestores, setTodosGestores] = useState(false);
+  const [gestoresSelecionados, setGestoresSelecionados] = useState<string[]>([]);
 
   // Determinar lista de empreendimentos a exibir
   const hasGestorEmpreendimentos = gestorData?.empreendimentos && gestorData.empreendimentos.length > 0;
@@ -141,7 +158,22 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
       data_followup: values.data_followup?.toISOString(),
     };
 
-    onSubmit(formData);
+    // Se super-admin ativou atribuição para gestores
+    if (isSuperAdmin && atribuirParaGestores && !initialData) {
+      const gestorIds = todosGestores 
+        ? gestores.map(g => g.id) 
+        : gestoresSelecionados;
+      
+      // Validar que pelo menos um gestor foi selecionado
+      if (gestorIds.length === 0) {
+        toast.error('Selecione pelo menos um gestor para atribuir a atividade');
+        return;
+      }
+      
+      onSubmit({ formData, gestorIds });
+    } else {
+      onSubmit({ formData });
+    }
   };
 
   return (
@@ -223,6 +255,87 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
             </FormItem>
           )}
         />
+
+        {/* Seção Atribuir para Gestores - Apenas Super Admin em modo criação */}
+        {isSuperAdmin && !initialData && gestores.length > 0 && (
+          <Card className="p-4 bg-muted/30 border-primary/20">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold">Atribuir para Gestores de Produto</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Criar esta atividade para um ou mais gestores
+                  </p>
+                </div>
+                <Switch
+                  checked={atribuirParaGestores}
+                  onCheckedChange={setAtribuirParaGestores}
+                />
+              </div>
+
+              {atribuirParaGestores && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="todos-gestores"
+                      checked={todosGestores}
+                      onCheckedChange={(checked) => {
+                        setTodosGestores(checked === true);
+                        if (checked) {
+                          setGestoresSelecionados([]);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="todos-gestores" className="cursor-pointer font-medium">
+                      Todos os Gestores ({gestores.length})
+                    </Label>
+                  </div>
+
+                  {!todosGestores && (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">
+                        Selecione os gestores individualmente:
+                      </Label>
+                      <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md bg-background">
+                        {gestores.map((gestor) => (
+                          <div key={gestor.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`gestor-${gestor.id}`}
+                              checked={gestoresSelecionados.includes(gestor.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setGestoresSelecionados([...gestoresSelecionados, gestor.id]);
+                                } else {
+                                  setGestoresSelecionados(
+                                    gestoresSelecionados.filter((id) => id !== gestor.id)
+                                  );
+                                }
+                              }}
+                            />
+                            <Label
+                              htmlFor={`gestor-${gestor.id}`}
+                              className="cursor-pointer text-sm flex-1"
+                            >
+                              {gestor.full_name}
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({gestor.email})
+                              </span>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      {!todosGestores && gestoresSelecionados.length === 0 && (
+                        <p className="text-xs text-destructive">
+                          Selecione pelo menos um gestor
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Data e Hora */}
         <div className="grid grid-cols-2 gap-4">
