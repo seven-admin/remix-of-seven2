@@ -30,7 +30,6 @@ export function useNegociacoes(filters?: NegociacaoFilters, options?: { enabled?
           empreendimento:empreendimentos(id, nome),
           corretor:corretores(id, nome_completo),
           imobiliaria:imobiliarias(id, nome),
-          gestor:profiles!gestor_id(id, full_name),
           funil_etapa:funil_etapas(id, nome, cor, cor_bg, is_inicial, is_final_sucesso, is_final_perda, ordem),
           unidades:negociacao_unidades(
             id,
@@ -91,7 +90,6 @@ export function useNegociacoesKanban(filters?: NegociacaoFilters, options?: { en
           ordem_kanban,
           cliente:clientes(id, nome),
           empreendimento:empreendimentos(id, nome),
-          gestor:profiles!gestor_id(id, full_name),
           unidades:negociacao_unidades(id)
         `)
         .eq('is_active', true)
@@ -139,7 +137,6 @@ export function useNegociacao(id: string | undefined) {
           empreendimento:empreendimentos(id, nome),
           corretor:corretores(id, nome_completo),
           imobiliaria:imobiliarias(id, nome),
-          gestor:profiles!gestor_id(id, full_name),
           funil_etapa:funil_etapas(id, nome, cor, cor_bg, is_inicial, is_final_sucesso, is_final_perda, ordem),
           unidades:negociacao_unidades(
             id,
