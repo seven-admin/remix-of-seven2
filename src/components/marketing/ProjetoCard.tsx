@@ -11,7 +11,7 @@ import {
   PRIORIDADE_LABELS, 
   PRIORIDADE_COLORS 
 } from '@/types/marketing.types';
-import React, { memo, useCallback } from 'react';
+import React, { forwardRef, memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ProjetoCardProps {
@@ -19,7 +19,10 @@ interface ProjetoCardProps {
   isDragging?: boolean;
 }
 
-export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: ProjetoCardProps) {
+const ProjetoCardInner = forwardRef<HTMLDivElement, ProjetoCardProps>(function ProjetoCardInner(
+  { projeto, isDragging },
+  ref
+) {
   const navigate = useNavigate();
 
   const getCategoriaIcon = () => {
@@ -56,6 +59,7 @@ export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: Pr
 
   return (
     <Card 
+      ref={ref}
       className={cn(
         "bg-background cursor-pointer select-none border-l-[3px]",
         borderColor,
@@ -110,3 +114,7 @@ export const ProjetoCard = memo(function ProjetoCard({ projeto, isDragging }: Pr
     </Card>
   );
 });
+
+export const ProjetoCard = memo(ProjetoCardInner);
+
+ProjetoCard.displayName = 'ProjetoCard';
