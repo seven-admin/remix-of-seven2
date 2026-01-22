@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Phone, Users, MapPin, Headphones, CheckCircle, XCircle, Trash2, Edit, List, Calendar, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { Plus, Phone, Users, MapPin, Headphones, CheckCircle, XCircle, Trash2, Edit, List, Calendar, AlertCircle } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,9 +24,8 @@ import { useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancel
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useClientes } from '@/hooks/useClientes';
-import { useIsMobile } from '@/hooks/use-mobile';
 import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeForm';
-import type { Atividade, AtividadeFilters, AtividadeTipo, AtividadeStatus, AtividadeFormData } from '@/types/atividades.types';
+import type { Atividade, AtividadeFilters, AtividadeTipo, AtividadeStatus } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_STATUS_LABELS } from '@/types/atividades.types';
 import { cn } from '@/lib/utils';
 
@@ -38,20 +37,19 @@ const TIPO_ICONS: Record<AtividadeTipo, typeof Phone> = {
 };
 
 const STATUS_COLORS: Record<AtividadeStatus, string> = {
-  pendente: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  concluida: 'bg-green-100 text-green-800 border-green-200',
-  cancelada: 'bg-gray-100 text-gray-600 border-gray-200',
+  pendente: 'bg-accent text-accent-foreground border-border',
+  concluida: 'bg-primary/10 text-primary border-primary/20',
+  cancelada: 'bg-muted text-muted-foreground border-border',
 };
 
 const TIPO_COLORS: Record<AtividadeTipo, string> = {
-  ligacao: 'bg-blue-100 text-blue-800 border-blue-200',
-  reuniao: 'bg-purple-100 text-purple-800 border-purple-200',
-  visita: 'bg-orange-100 text-orange-800 border-orange-200',
-  atendimento: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+  ligacao: 'bg-secondary text-secondary-foreground border-border',
+  reuniao: 'bg-primary/10 text-primary border-primary/20',
+  visita: 'bg-accent text-accent-foreground border-border',
+  atendimento: 'bg-muted text-foreground border-border',
 };
 
 export default function Atividades() {
-  const isMobile = useIsMobile();
   const [view, setView] = useState<'lista' | 'calendario'>('lista');
   const [filters, setFilters] = useState<AtividadeFilters>({});
   const [page, setPage] = useState(1);
@@ -225,7 +223,7 @@ export default function Atividades() {
                 variant="outline" 
                 onClick={handleConcluirEmLote}
                 disabled={concluirEmLote.isPending}
-                className="text-green-600 border-green-200 hover:bg-green-50"
+                className="text-primary border-primary/30 hover:bg-primary/10"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Concluir {selectedIds.size} selecionada(s)
@@ -281,7 +279,7 @@ export default function Atividades() {
                 <CardTitle className="text-base">Filtros</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-4">
                   <Select value={filters.tipo || ''} onValueChange={(v) => setFilters({ ...filters, tipo: v === 'all' ? undefined : v as AtividadeTipo })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Tipo" />
@@ -580,10 +578,10 @@ export default function Atividades() {
                                   {atividade.status === 'pendente' && (
                                     <>
                                       <Button variant="ghost" size="icon" onClick={() => handleConcluir(atividade)} title="Concluir">
-                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                        <CheckCircle className="h-4 w-4" />
                                       </Button>
                                       <Button variant="ghost" size="icon" onClick={() => handleCancelar(atividade.id)} title="Cancelar">
-                                        <XCircle className="h-4 w-4 text-orange-600" />
+                                        <XCircle className="h-4 w-4" />
                                       </Button>
                                       <Button variant="ghost" size="icon" onClick={() => handleEdit(atividade)} title="Editar">
                                         <Edit className="h-4 w-4" />
