@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Phone, Users, MapPin, Headphones, Calendar, Clock, User, Building2, MessageSquare, ThermometerSun, CalendarCheck } from 'lucide-react';
 import type { Atividade, AtividadeTipo, AtividadeStatus } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_STATUS_LABELS } from '@/types/atividades.types';
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils';
 
 interface AtividadeDetalheDialogProps {
   atividade: Atividade | null;
+  loading?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -45,15 +47,14 @@ const TEMPERATURA_LABELS: Record<string, { label: string; color: string; emoji: 
   quente: { label: 'Quente', color: 'bg-orange-100 text-orange-800', emoji: '🔥' },
 };
 
-export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: AtividadeDetalheDialogProps) {
-  if (!atividade) return null;
-
-  const TipoIcon = TIPO_ICONS[atividade.tipo];
-  const temperatura = atividade.temperatura_cliente 
+export function AtividadeDetalheDialog({ atividade, loading = false, open, onOpenChange }: AtividadeDetalheDialogProps) {
+  const TipoIcon = atividade ? TIPO_ICONS[atividade.tipo] : Phone;
+  const temperatura = atividade?.temperatura_cliente 
     ? TEMPERATURA_LABELS[atividade.temperatura_cliente] 
     : null;
 
   const isAtrasada = (() => {
+    if (!atividade) return false;
     if (atividade.status !== 'pendente') return false;
     if (!atividade.deadline_date) return false;
     const hoje = new Date();
@@ -70,6 +71,31 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
           <DialogTitle className="text-lg">Detalhes da Atividade</DialogTitle>
         </DialogHeader>
 
+        {loading || !atividade ? (
+          <div className="space-y-4">
+            <div>
+              <Skeleton className="h-6 w-3/4" />
+              <div className="mt-3 flex gap-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-6 w-24" />
+              </div>
+            </div>
+            <Separator />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <Separator />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Título e Badges */}
           <div>
@@ -186,11 +212,11 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
           {/* Resultado (se concluída) */}
           {atividade.status === 'concluida' && atividade.resultado && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-600">
+              <div className="flex items-center gap-2 text-primary">
                 <CalendarCheck className="h-4 w-4" />
                 <span className="text-sm font-medium">Resultado</span>
               </div>
-              <p className="text-sm bg-green-50 p-3 rounded-lg border border-green-200 whitespace-pre-wrap">
+              <p className="text-sm bg-primary/5 p-3 rounded-lg border border-primary/20 whitespace-pre-wrap">
                 {atividade.resultado}
               </p>
             </div>
@@ -209,9 +235,9 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
 
           {/* Follow-up */}
           {atividade.requer_followup && atividade.data_followup && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <Calendar className="h-4 w-4 text-amber-600" />
-              <span className="text-sm text-amber-800">
+            <div className="flex items-center gap-2 p-3 bg-accent/30 rounded-lg border border-border">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">
                 Follow-up agendado para{' '}
                 <strong>
                   {format(new Date(atividade.data_followup), "dd/MM/yyyy", { locale: ptBR })}
@@ -220,6 +246,7 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

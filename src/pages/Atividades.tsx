@@ -20,7 +20,7 @@ import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtivida
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
-import { useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
+import { useAtividade, useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useClientes } from '@/hooks/useClientes';
@@ -59,7 +59,7 @@ export default function Atividades() {
   const [concluirDialogOpen, setConcluirDialogOpen] = useState(false);
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
   const [detalheDialogOpen, setDetalheDialogOpen] = useState(false);
-  const [detalheAtividade, setDetalheAtividade] = useState<Atividade | null>(null);
+  const [detalheAtividadeId, setDetalheAtividadeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -86,6 +86,8 @@ export default function Atividades() {
   const deleteAtividade = useDeleteAtividade();
   const cancelarAtividade = useCancelarAtividade();
   const concluirEmLote = useConcluirAtividadesEmLote();
+
+  const { data: detalheAtividade, isLoading: isLoadingDetalheAtividade } = useAtividade(detalheAtividadeId ?? undefined);
 
   // Resetar paginação ao mudar filtros / tamanho da página
   useEffect(() => {
@@ -120,9 +122,14 @@ export default function Atividades() {
       setEditingAtividade(atividade);
       setDialogOpen(true);
     } else {
-      setDetalheAtividade(atividade);
+      setDetalheAtividadeId(atividade.id);
       setDetalheDialogOpen(true);
     }
+  };
+
+  const handleOpenDetalheById = (id: string) => {
+    setDetalheAtividadeId(id);
+    setDetalheDialogOpen(true);
   };
 
   const handleConcluir = (atividade: Atividade) => {
@@ -410,12 +417,26 @@ export default function Atividades() {
                   const atrasada = isAtrasada(atividade);
                   const isSelected = selectedIds.has(atividade.id);
                   return (
-                    <Card key={atividade.id} className={cn("p-4", isVencida && "border-destructive", isSelected && "ring-2 ring-primary")}>
+                    <Card
+                      key={atividade.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleOpenDetalheById(atividade.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') handleOpenDetalheById(atividade.id);
+                      }}
+                      className={cn(
+                        'p-4 cursor-pointer transition-colors hover:bg-muted/30',
+                        isVencida && 'border-destructive',
+                        isSelected && 'ring-2 ring-primary'
+                      )}
+                    >
                       <div className="flex items-start gap-3">
                         {atividade.status === 'pendente' && (
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelect(atividade.id)}
+                            onClick={(e) => e.stopPropagation()}
                             className="mt-1"
                           />
                         )}
@@ -450,17 +471,38 @@ export default function Atividades() {
                         <div className="flex flex-col gap-1">
                           {atividade.status === 'pendente' && (
                             <>
-                              <Button variant="ghost" size="icon" onClick={() => handleConcluir(atividade)} title="Concluir">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConcluir(atividade);
+                                }}
+                                title="Concluir"
+                              >
                                 <CheckCircle className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(atividade)} title="Editar">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(atividade);
+                                }}
+                                title="Editar"
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" title="Excluir">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Excluir"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
@@ -530,12 +572,26 @@ export default function Atividades() {
                           const atrasada = isAtrasada(atividade);
                           const isSelected = selectedIds.has(atividade.id);
                           return (
-                            <TableRow key={atividade.id} className={cn(isVencida && 'bg-destructive/5', isSelected && 'bg-primary/5')}>
+                            <TableRow
+                              key={atividade.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleOpenDetalheById(atividade.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') handleOpenDetalheById(atividade.id);
+                              }}
+                              className={cn(
+                                'cursor-pointer',
+                                isVencida && 'bg-destructive/5',
+                                isSelected && 'bg-primary/5'
+                              )}
+                            >
                               <TableCell>
                                 {atividade.status === 'pendente' && (
                                   <Checkbox
                                     checked={isSelected}
                                     onCheckedChange={() => toggleSelect(atividade.id)}
+                                    onClick={(e) => e.stopPropagation()}
                                   />
                                 )}
                               </TableCell>
@@ -577,20 +633,49 @@ export default function Atividades() {
                                 <div className="flex items-center justify-end gap-1">
                                   {atividade.status === 'pendente' && (
                                     <>
-                                      <Button variant="ghost" size="icon" onClick={() => handleConcluir(atividade)} title="Concluir">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleConcluir(atividade);
+                                        }}
+                                        title="Concluir"
+                                      >
                                         <CheckCircle className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="icon" onClick={() => handleCancelar(atividade.id)} title="Cancelar">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCancelar(atividade.id);
+                                        }}
+                                        title="Cancelar"
+                                      >
                                         <XCircle className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="icon" onClick={() => handleEdit(atividade)} title="Editar">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEdit(atividade);
+                                        }}
+                                        title="Editar"
+                                      >
                                         <Edit className="h-4 w-4" />
                                       </Button>
                                     </>
                                   )}
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" title="Excluir">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        title="Excluir"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>
                                     </AlertDialogTrigger>
@@ -724,7 +809,11 @@ export default function Atividades() {
       <AtividadeDetalheDialog
         atividade={detalheAtividade}
         open={detalheDialogOpen}
-        onOpenChange={setDetalheDialogOpen}
+        loading={isLoadingDetalheAtividade}
+        onOpenChange={(open) => {
+          setDetalheDialogOpen(open);
+          if (!open) setDetalheAtividadeId(null);
+        }}
       />
     </MainLayout>
   );
