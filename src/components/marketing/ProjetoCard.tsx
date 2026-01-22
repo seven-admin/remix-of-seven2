@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Calendar } from 'lucide-react';
@@ -7,7 +7,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   ProjetoMarketing, 
-  CATEGORIA_LABELS, 
   PRIORIDADE_LABELS, 
   PRIORIDADE_COLORS 
 } from '@/types/marketing.types';
