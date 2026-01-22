@@ -101,8 +101,8 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
   // Determinar a coluna de um projeto
   const getProjectColumn = useCallback((projeto: ProjetoMarketing) => {
     // Se projeto tem ticket_etapa_id, usar diretamente
-    if ((projeto as any).ticket_etapa_id) {
-      return (projeto as any).ticket_etapa_id;
+    if (projeto.ticket_etapa_id) {
+      return projeto.ticket_etapa_id;
     }
     // Se temos etapas dinâmicas, mapear status legado
     if (etapasDinamicas.length > 0) {
@@ -122,6 +122,7 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
 
     // Se usando etapas dinâmicas, encontrar o status correspondente ou usar ID
     let novoStatus: StatusProjeto;
+    const ticketEtapaId = etapasDinamicas.length > 0 ? destinationColumn : undefined;
     
     if (etapasDinamicas.length > 0) {
       const etapaDestino = etapasDinamicas.find(e => e.id === destinationColumn);
@@ -158,7 +159,8 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
     moveProjetoKanban.mutate({
       projetoId: projeto.id,
       novoStatus,
-      novaOrdem
+      novaOrdem,
+      ticketEtapaId
     });
   }, [projetos, moveProjetoKanban, etapasDinamicas, getProjectColumn]);
 

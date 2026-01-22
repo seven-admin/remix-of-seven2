@@ -185,11 +185,13 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       projetoId, 
       novoStatus, 
       novaOrdem,
+      ticketEtapaId,
       observacao 
     }: { 
       projetoId: string; 
       novoStatus: StatusTicket; 
       novaOrdem: number;
+      ticketEtapaId?: string | null;
       observacao?: string;
     }) => {
       const dbStatus = toDBStatus(novoStatus);
@@ -207,6 +209,7 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
         .update({ 
           status: dbStatus, 
           ordem_kanban: novaOrdem,
+          ...(typeof ticketEtapaId !== 'undefined' && { ticket_etapa_id: ticketEtapaId }),
           ...(dbStatus === 'em_producao' && !projeto?.data_inicio && { data_inicio: new Date().toISOString().split('T')[0] }),
           ...(dbStatus === 'concluido' && { data_entrega: new Date().toISOString().split('T')[0] })
         })
@@ -230,7 +233,7 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       }
     },
     // OPTIMISTIC UPDATE - Atualiza UI instantaneamente em TODOS os caches
-    onMutate: async ({ projetoId, novoStatus, novaOrdem }) => {
+    onMutate: async ({ projetoId, novoStatus, novaOrdem, ticketEtapaId }) => {
       // Cancelar TODAS as queries de projetos-marketing (incluindo com filtros)
       await queryClient.cancelQueries({ queryKey: ['projetos-marketing'] });
       
@@ -252,7 +255,12 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
           if (!old) return old;
           return old.map(p => 
             p.id === projetoId 
-              ? { ...p, status: novoStatus, ordem_kanban: novaOrdem }
+              ? { 
+                  ...p,
+                  status: novoStatus,
+                  ordem_kanban: novaOrdem,
+                  ...(typeof ticketEtapaId !== 'undefined' && { ticket_etapa_id: ticketEtapaId })
+                }
               : p
           );
         });
