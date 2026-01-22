@@ -45,6 +45,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { ClienteForm } from '@/components/clientes/ClienteForm';
 import { ClienteInteracoesDialog } from '@/components/clientes/ClienteInteracoesDialog';
 import { ClienteHistoricoAtividadesDialog } from '@/components/clientes/ClienteHistoricoAtividadesDialog';
+import { ClienteQuickViewDialog } from '@/components/clientes/ClienteQuickViewDialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -58,6 +59,7 @@ const Clientes = () => {
   const [editingClienteId, setEditingClienteId] = useState<string | null>(null);
   const [interacoesCliente, setInteracoesCliente] = useState<Cliente | null>(null);
   const [historicoCliente, setHistoricoCliente] = useState<Cliente | null>(null);
+  const [quickViewCliente, setQuickViewCliente] = useState<Cliente | null>(null);
   const [page, setPage] = useState(1);
   
   const filters = {
@@ -233,7 +235,13 @@ const Clientes = () => {
             <Card key={cliente.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-medium">{cliente.nome}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setQuickViewCliente(cliente)}
+                    className="font-medium text-left hover:underline"
+                  >
+                    {cliente.nome}
+                  </button>
                   <p className="text-sm text-muted-foreground">{cliente.email || '-'}</p>
                   <p className="text-sm text-muted-foreground">{formatPhone(cliente.telefone)}</p>
                 </div>
@@ -321,7 +329,7 @@ const Clientes = () => {
                 <TableRow 
                   key={cliente.id} 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleEdit(cliente)}
+                  onClick={() => setQuickViewCliente(cliente)}
                 >
                   <TableCell>
                     <p className="font-medium">{cliente.nome}</p>
@@ -454,6 +462,16 @@ const Clientes = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ClienteQuickViewDialog
+        cliente={quickViewCliente}
+        open={!!quickViewCliente}
+        onOpenChange={(open) => !open && setQuickViewCliente(null)}
+        onOpenFull={(cliente) => {
+          setQuickViewCliente(null);
+          handleEdit(cliente);
+        }}
+      />
 
       <ClienteInteracoesDialog
         cliente={interacoesCliente}

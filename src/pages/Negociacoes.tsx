@@ -27,7 +27,7 @@ const Funil = () => {
 
   const { data: empreendimentos = [] } = useEmpreendimentos();
   const { corretores = [] } = useCorretores();
-  const { data: negociacoes = [] } = useNegociacoes(filters);
+  const { data: negociacoes = [], isLoading: isLoadingNegociacoes } = useNegociacoes(filters);
   const { data: etapas = [] } = useEtapasPadraoAtivas();
 
   // Calculate metrics
@@ -139,7 +139,11 @@ const Funil = () => {
 
       {/* Kanban Board */}
       <div className="min-h-[500px]">
-        <FunilKanbanBoard filters={filters} />
+        <FunilKanbanBoard
+          filters={filters}
+          negociacoes={negociacoes}
+          isLoadingNegociacoes={isLoadingNegociacoes}
+        />
       </div>
 
       {/* Form Dialog */}

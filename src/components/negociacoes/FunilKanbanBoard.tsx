@@ -30,12 +30,17 @@ interface FunilKanbanBoardProps {
     empreendimento_id?: string;
     corretor_id?: string;
   };
+  negociacoes?: Negociacao[];
+  isLoadingNegociacoes?: boolean;
 }
 
-export function FunilKanbanBoard({ filters }: FunilKanbanBoardProps) {
+export function FunilKanbanBoard({ filters, negociacoes: negociacoesProp, isLoadingNegociacoes }: FunilKanbanBoardProps) {
   const navigate = useNavigate();
   const { data: etapas = [], isLoading: etapasLoading } = useEtapasPadraoAtivas();
-  const { data: negociacoes = [], isLoading: negociacoesLoading } = useNegociacoes(filters);
+  // Permite reutilizar dados já carregados na página (evita fetch duplicado)
+  const hookResult = useNegociacoes(filters, { enabled: !negociacoesProp });
+  const negociacoes = negociacoesProp ?? hookResult.data ?? [];
+  const negociacoesLoading = isLoadingNegociacoes ?? hookResult.isLoading;
   const moverMutation = useMoverNegociacao();
   const deleteMutation = useDeleteNegociacao();
   const createContratoMutation = useCreateContrato();
