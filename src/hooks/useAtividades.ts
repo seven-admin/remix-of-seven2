@@ -17,6 +17,20 @@ export interface UseAtividadesOptions {
   pageSize?: number;
 }
 
+function applyAtividadesFilters(query: any, filters?: AtividadeFilters) {
+  let q = query as any;
+  if (filters?.tipo) q = q.eq('tipo', filters.tipo);
+  if (filters?.categoria) q = q.eq('categoria', filters.categoria);
+  if (filters?.status) q = q.eq('status', filters.status);
+  if (filters?.responsavel_id) q = q.eq('gestor_id', filters.responsavel_id);
+  if (filters?.created_by) q = q.eq('created_by', filters.created_by);
+  if (filters?.empreendimento_id) q = q.eq('empreendimento_id', filters.empreendimento_id);
+  if (filters?.cliente_id) q = q.eq('cliente_id', filters.cliente_id);
+  if (filters?.data_inicio) q = q.gte('data_hora', filters.data_inicio);
+  if (filters?.data_fim) q = q.lte('data_hora', filters.data_fim);
+  return q;
+}
+
 export function useAtividades(options: UseAtividadesOptions = {}) {
   const { filters, page = 1, pageSize = 20 } = options;
 
@@ -46,42 +60,8 @@ export function useAtividades(options: UseAtividadesOptions = {}) {
         `
         ) as any;
 
-      if (filters?.tipo) {
-        countQuery = countQuery.eq('tipo', filters.tipo);
-        dataQuery = dataQuery.eq('tipo', filters.tipo);
-      }
-      if (filters?.categoria) {
-        countQuery = countQuery.eq('categoria', filters.categoria);
-        dataQuery = dataQuery.eq('categoria', filters.categoria);
-      }
-      if (filters?.status) {
-        countQuery = countQuery.eq('status', filters.status);
-        dataQuery = dataQuery.eq('status', filters.status);
-      }
-      if (filters?.responsavel_id) {
-        countQuery = countQuery.eq('gestor_id', filters.responsavel_id);
-        dataQuery = dataQuery.eq('gestor_id', filters.responsavel_id);
-      }
-      if (filters?.created_by) {
-        countQuery = countQuery.eq('created_by', filters.created_by);
-        dataQuery = dataQuery.eq('created_by', filters.created_by);
-      }
-      if (filters?.empreendimento_id) {
-        countQuery = countQuery.eq('empreendimento_id', filters.empreendimento_id);
-        dataQuery = dataQuery.eq('empreendimento_id', filters.empreendimento_id);
-      }
-      if (filters?.cliente_id) {
-        countQuery = countQuery.eq('cliente_id', filters.cliente_id);
-        dataQuery = dataQuery.eq('cliente_id', filters.cliente_id);
-      }
-      if (filters?.data_inicio) {
-        countQuery = countQuery.gte('data_hora', filters.data_inicio);
-        dataQuery = dataQuery.gte('data_hora', filters.data_inicio);
-      }
-      if (filters?.data_fim) {
-        countQuery = countQuery.lte('data_hora', filters.data_fim);
-        dataQuery = dataQuery.lte('data_hora', filters.data_fim);
-      }
+      countQuery = applyAtividadesFilters(countQuery, filters);
+      dataQuery = applyAtividadesFilters(dataQuery, filters);
 
       const { count, error: countError } = await countQuery;
       if (countError) throw countError;
@@ -98,6 +78,45 @@ export function useAtividades(options: UseAtividadesOptions = {}) {
         count: count || 0,
         totalPages: Math.ceil((count || 0) / pageSize)
       };
+    },
+  });
+}
+
+export function useAtividadesStatusResumo(options: { filters?: AtividadeFilters } = {}) {
+  const { filters } = options;
+
+  return useQuery({
+    queryKey: ['atividades-resumo-status', filters],
+    queryFn: async () => {
+      const statuses = ['pendente', 'concluida', 'cancelada'] as const;
+
+      const results = await Promise.all(
+        statuses.map(async (status) => {
+          let q = supabase
+            .from('atividades' as any)
+            .select('*', { count: 'exact', head: true }) as any;
+
+          q = applyAtividadesFilters(q, { ...(filters || {}), status });
+
+          const { count, error } = await q;
+          if (error) throw error;
+          return [status, count || 0] as const;
+        })
+      );
+
+      const resumo = {
+        pendente: 0,
+        concluida: 0,
+        cancelada: 0,
+        total: 0,
+      };
+
+      results.forEach(([status, count]) => {
+        (resumo as any)[status] = count;
+        resumo.total += count;
+      });
+
+      return resumo;
     },
   });
 }

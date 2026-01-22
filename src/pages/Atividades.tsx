@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Phone, Users, MapPin, Headphones, CheckCircle, XCircle, Trash2, Edit, List, Calendar, AlertCircle, CheckSquare, Square } from 'lucide-react';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,7 +20,7 @@ import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtivida
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
-import { useAtividades, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
+import { useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useClientes } from '@/hooks/useClientes';
@@ -53,6 +54,8 @@ export default function Atividades() {
   const isMobile = useIsMobile();
   const [view, setView] = useState<'lista' | 'calendario'>('lista');
   const [filters, setFilters] = useState<AtividadeFilters>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAtividade, setEditingAtividade] = useState<Atividade | null>(null);
   const [concluirDialogOpen, setConcluirDialogOpen] = useState(false);
@@ -66,8 +69,12 @@ export default function Atividades() {
   const ano = currentDate.getFullYear();
   const mes = currentDate.getMonth() + 1;
 
-  const { data: atividadesData, isLoading } = useAtividades({ filters });
+  const { data: atividadesData, isLoading } = useAtividades({ filters, page, pageSize });
   const atividades = atividadesData?.items || [];
+  const totalPages = atividadesData?.totalPages || 1;
+  const totalItems = atividadesData?.count || 0;
+
+  const { data: resumoStatus } = useAtividadesStatusResumo({ filters });
   const { data: atividadesMes, isLoading: isLoadingMes } = useAgendaMensal(ano, mes);
   const { data: atividadesDia } = useAgendaDia(selectedDate);
   const { data: atividadesHoje } = useAtividadesHoje();
@@ -81,6 +88,26 @@ export default function Atividades() {
   const deleteAtividade = useDeleteAtividade();
   const cancelarAtividade = useCancelarAtividade();
   const concluirEmLote = useConcluirAtividadesEmLote();
+
+  // Resetar paginação ao mudar filtros / tamanho da página
+  useEffect(() => {
+    setPage(1);
+    setSelectedIds(new Set());
+  }, [filters, pageSize]);
+
+  const hojeDateOnly = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const isAtrasada = (atividade: Atividade) => {
+    if (atividade.status !== 'pendente') return false;
+    if (!atividade.deadline_date) return false;
+    const prazo = new Date(`${atividade.deadline_date}T00:00:00`);
+    prazo.setHours(0, 0, 0, 0);
+    return prazo < hojeDateOnly;
+  };
 
   // Atividades pendentes para seleção
   const atividadesPendentes = atividades?.filter(a => a.status === 'pendente') || [];
@@ -254,7 +281,7 @@ export default function Atividades() {
                 <CardTitle className="text-base">Filtros</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-4">
                   <Select value={filters.tipo || ''} onValueChange={(v) => setFilters({ ...filters, tipo: v === 'all' ? undefined : v as AtividadeTipo })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Tipo" />
@@ -282,6 +309,18 @@ export default function Atividades() {
                   <Select value={filters.responsavel_id || ''} onValueChange={(v) => setFilters({ ...filters, responsavel_id: v === 'all' ? undefined : v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {gestores?.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filters.created_by || ''} onValueChange={(v) => setFilters({ ...filters, created_by: v === 'all' ? undefined : v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Criado por" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
@@ -321,6 +360,37 @@ export default function Atividades() {
                     onChange={(e) => setFilters({ ...filters, data_inicio: e.target.value || undefined })}
                     placeholder="Data início"
                   />
+
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Itens" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20 / pág</SelectItem>
+                      <SelectItem value="50">50 / pág</SelectItem>
+                      <SelectItem value="100">100 / pág</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Resumo por status (total filtrado) */}
+            <Card>
+              <CardContent className="py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className={cn('border', STATUS_COLORS.pendente)}>
+                    Pendentes: {resumoStatus?.pendente ?? 0}
+                  </Badge>
+                  <Badge variant="outline" className={cn('border', STATUS_COLORS.concluida)}>
+                    Concluídas: {resumoStatus?.concluida ?? 0}
+                  </Badge>
+                  <Badge variant="outline" className={cn('border', STATUS_COLORS.cancelada)}>
+                    Canceladas: {resumoStatus?.cancelada ?? 0}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    Total: {resumoStatus?.total ?? totalItems}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -339,6 +409,7 @@ export default function Atividades() {
                 atividades?.map((atividade) => {
                   const TipoIcon = TIPO_ICONS[atividade.tipo];
                   const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
+                  const atrasada = isAtrasada(atividade);
                   const isSelected = selectedIds.has(atividade.id);
                   return (
                     <Card key={atividade.id} className={cn("p-4", isVencida && "border-destructive", isSelected && "ring-2 ring-primary")}>
@@ -359,6 +430,11 @@ export default function Atividades() {
                             <Badge variant="outline" className={STATUS_COLORS[atividade.status]}>
                               {ATIVIDADE_STATUS_LABELS[atividade.status]}
                             </Badge>
+                            {atrasada && (
+                              <Badge variant="outline" className="border-destructive text-destructive">
+                                Atrasada
+                              </Badge>
+                            )}
                           </div>
                           <h4 className="font-medium truncate">{atividade.titulo}</h4>
                           <p className="text-sm text-muted-foreground truncate">
@@ -367,6 +443,11 @@ export default function Atividades() {
                           <p className="text-xs text-muted-foreground mt-1">
                             {format(new Date(atividade.data_hora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                           </p>
+                          {atividade.deadline_date && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Prazo: {format(new Date(`${atividade.deadline_date}T00:00:00`), 'dd/MM/yyyy', { locale: ptBR })}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           {atividade.status === 'pendente' && (
@@ -432,6 +513,7 @@ export default function Atividades() {
                         <TableHead className="hidden lg:table-cell">Corretor</TableHead>
                         <TableHead className="hidden lg:table-cell">Gestor</TableHead>
                         <TableHead>Data/Hora</TableHead>
+                        <TableHead>Prazo</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
@@ -439,7 +521,7 @@ export default function Atividades() {
                     <TableBody>
                       {atividades?.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                             Nenhuma atividade encontrada
                           </TableCell>
                         </TableRow>
@@ -447,9 +529,10 @@ export default function Atividades() {
                         atividades?.map((atividade) => {
                           const TipoIcon = TIPO_ICONS[atividade.tipo];
                           const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
+                          const atrasada = isAtrasada(atividade);
                           const isSelected = selectedIds.has(atividade.id);
                           return (
-                            <TableRow key={atividade.id} className={cn(isVencida && 'bg-red-50', isSelected && 'bg-primary/5')}>
+                            <TableRow key={atividade.id} className={cn(isVencida && 'bg-destructive/5', isSelected && 'bg-primary/5')}>
                               <TableCell>
                                 {atividade.status === 'pendente' && (
                                   <Checkbox
@@ -470,6 +553,22 @@ export default function Atividades() {
                               <TableCell className="hidden lg:table-cell">{atividade.gestor?.full_name || '-'}</TableCell>
                               <TableCell>
                                 {format(new Date(atividade.data_hora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </TableCell>
+                              <TableCell>
+                                {atividade.deadline_date ? (
+                                  <div className="flex items-center gap-2">
+                                    <span>
+                                      {format(new Date(`${atividade.deadline_date}T00:00:00`), 'dd/MM/yyyy', { locale: ptBR })}
+                                    </span>
+                                    {atrasada && (
+                                      <Badge variant="outline" className="border-destructive text-destructive">
+                                        Atrasada
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  '-'
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={STATUS_COLORS[atividade.status]}>
@@ -578,6 +677,16 @@ export default function Atividades() {
                         {atividade.cliente?.nome} • {atividade.corretor?.nome_completo}
                       </p>
                     </div>
+
+        {/* Paginação (lista) */}
+        {view === 'lista' && !isLoading && atividades.length > 0 && (
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={setPage}
+          />
+        )}
                     <Badge variant="destructive">
                       {format(new Date(atividade.data_hora), 'dd/MM/yyyy', { locale: ptBR })}
                     </Badge>

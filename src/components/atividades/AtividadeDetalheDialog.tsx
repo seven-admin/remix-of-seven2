@@ -53,6 +53,16 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
     ? TEMPERATURA_LABELS[atividade.temperatura_cliente] 
     : null;
 
+  const isAtrasada = (() => {
+    if (atividade.status !== 'pendente') return false;
+    if (!atividade.deadline_date) return false;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const prazo = new Date(`${atividade.deadline_date}T00:00:00`);
+    prazo.setHours(0, 0, 0, 0);
+    return prazo < hoje;
+  })();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -138,6 +148,27 @@ export function AtividadeDetalheDialog({ atividade, open, onOpenChange }: Ativid
               </span>
             )}
           </div>
+
+          {/* Prazo (deadline) */}
+          {atividade.deadline_date && (
+            <div className={cn(
+              'flex items-center justify-between gap-3 p-3 rounded-lg border',
+              isAtrasada ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'
+            )}>
+              <div className="flex items-center gap-2">
+                <Calendar className={cn('h-4 w-4', isAtrasada ? 'text-destructive' : 'text-muted-foreground')} />
+                <span className="text-sm text-muted-foreground">Prazo:</span>
+                <strong className={cn('text-sm', isAtrasada ? 'text-destructive' : 'text-foreground')}>
+                  {format(new Date(`${atividade.deadline_date}T00:00:00`), 'dd/MM/yyyy', { locale: ptBR })}
+                </strong>
+              </div>
+              {isAtrasada && (
+                <Badge variant="outline" className="border-destructive text-destructive">
+                  Atrasada
+                </Badge>
+              )}
+            </div>
+          )}
 
           {/* Observações */}
           {atividade.observacoes && (

@@ -50,23 +50,34 @@ const TIPO_ICONS: Record<AtividadeTipo, typeof Phone> = {
   atendimento: MessageSquare,
 };
 
-const formSchema = z.object({
-  tipo: z.enum(['ligacao', 'reuniao', 'visita', 'atendimento']),
-  categoria: z.enum(['primeiro_atendimento', 'retorno']),
-  titulo: z.string().min(1, 'Título é obrigatório'),
-  cliente_id: z.string().optional(),
-  corretor_id: z.string().optional(),
-  imobiliaria_id: z.string().optional(),
-  empreendimento_id: z.string().optional(),
-  data: z.date({ required_error: 'Data é obrigatória' }),
-  hora: z.string().min(1, 'Hora é obrigatória'),
-  duracao_minutos: z.coerce.number().min(5).max(480).optional(),
-  observacoes: z.string().optional(),
-  temperatura_cliente: z.enum(['frio', 'morno', 'quente']).optional(),
-  requer_followup: z.boolean().default(false),
-  data_followup: z.date().optional(),
-  deadline_date: z.date().optional(),
-});
+const formSchema = z
+  .object({
+    tipo: z.enum(['ligacao', 'reuniao', 'visita', 'atendimento']),
+    categoria: z.enum(['primeiro_atendimento', 'retorno']).optional(),
+    titulo: z.string().min(1, 'Título é obrigatório'),
+    cliente_id: z.string().optional(),
+    corretor_id: z.string().optional(),
+    imobiliaria_id: z.string().optional(),
+    empreendimento_id: z.string().optional(),
+    data: z.date({ required_error: 'Data é obrigatória' }),
+    hora: z.string().min(1, 'Hora é obrigatória'),
+    duracao_minutos: z.coerce.number().min(5).max(480).optional(),
+    observacoes: z.string().optional(),
+    temperatura_cliente: z.enum(['frio', 'morno', 'quente']).optional(),
+    requer_followup: z.boolean().default(false),
+    data_followup: z.date().optional(),
+    deadline_date: z.date().optional(),
+  })
+  .superRefine((values, ctx) => {
+    // Categoria só é obrigatória quando a atividade está vinculada a um cliente.
+    if (values.cliente_id && !values.categoria) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['categoria'],
+        message: 'Selecione uma categoria',
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -113,7 +124,7 @@ export function AtividadeForm(props: AtividadeFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipo: initialData?.tipo || 'ligacao',
-      categoria: (initialData?.categoria as AtividadeCategoria) || 'primeiro_atendimento',
+        categoria: (initialData?.categoria as AtividadeCategoria) || undefined,
       titulo: initialData?.titulo || '',
       cliente_id: initialData?.cliente_id || defaultClienteId || undefined,
       corretor_id: initialData?.corretor_id || undefined,
@@ -126,6 +137,7 @@ export function AtividadeForm(props: AtividadeFormProps) {
       temperatura_cliente: initialData?.temperatura_cliente || undefined,
       requer_followup: initialData?.requer_followup || false,
       data_followup: initialData?.data_followup ? new Date(initialData.data_followup) : undefined,
+        deadline_date: initialData?.deadline_date ? new Date(initialData.deadline_date) : undefined,
     },
   });
 
@@ -139,6 +151,14 @@ export function AtividadeForm(props: AtividadeFormProps) {
 
   const requerFollowup = form.watch('requer_followup');
   const clienteId = form.watch('cliente_id');
+
+  // Se remover o cliente, a categoria deixa de fazer sentido
+  useEffect(() => {
+    if (!clienteId) {
+      form.setValue('categoria', undefined);
+      form.setValue('temperatura_cliente', undefined);
+    }
+  }, [clienteId, form]);
 
   // Auto-selecionar empreendimento quando gestor tem apenas 1 vinculado
   useEffect(() => {
@@ -154,7 +174,9 @@ export function AtividadeForm(props: AtividadeFormProps) {
 
     const formData: AtividadeFormData = {
       tipo: values.tipo,
-      categoria: values.categoria as AtividadeCategoria,
+      ...(values.cliente_id && values.categoria
+        ? { categoria: values.categoria as AtividadeCategoria }
+        : {}),
       titulo: values.titulo,
       cliente_id: values.cliente_id || undefined,
       corretor_id: values.corretor_id || undefined,
@@ -168,6 +190,7 @@ export function AtividadeForm(props: AtividadeFormProps) {
       temperatura_cliente: values.temperatura_cliente as ClienteTemperatura | undefined,
       requer_followup: values.requer_followup,
       data_followup: values.data_followup?.toISOString(),
+      deadline_date: values.deadline_date ? format(values.deadline_date, 'yyyy-MM-dd') : undefined,
     };
 
     // Se super-admin ativou atribuição para gestores
@@ -224,34 +247,36 @@ export function AtividadeForm(props: AtividadeFormProps) {
           )}
         />
 
-        {/* Categoria: Primeiro Atendimento ou Retorno */}
-        <FormField
-          control={form.control}
-          name="categoria"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Categoria</FormLabel>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(ATIVIDADE_CATEGORIA_LABELS) as AtividadeCategoria[]).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => field.onChange(cat)}
-                    className={cn(
-                      'flex items-center justify-center gap-2 p-3 rounded-lg border transition-colors text-sm',
-                      field.value === cat
-                        ? 'border-primary bg-primary/10 text-primary font-medium'
-                        : 'border-input hover:bg-accent'
-                    )}
-                  >
-                    {ATIVIDADE_CATEGORIA_LABELS[cat]}
-                  </button>
-                ))}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Categoria: Só faz sentido quando há cliente vinculado */}
+        {clienteId && (
+          <FormField
+            control={form.control}
+            name="categoria"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Categoria</FormLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(ATIVIDADE_CATEGORIA_LABELS) as AtividadeCategoria[]).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => field.onChange(cat)}
+                      className={cn(
+                        'flex items-center justify-center gap-2 p-3 rounded-lg border transition-colors text-sm',
+                        field.value === cat
+                          ? 'border-primary bg-primary/10 text-primary font-medium'
+                          : 'border-input hover:bg-accent'
+                      )}
+                    >
+                      {ATIVIDADE_CATEGORIA_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Título */}
         <FormField
@@ -401,6 +426,43 @@ export function AtividadeForm(props: AtividadeFormProps) {
             )}
           />
         </div>
+
+        {/* Prazo (deadline) */}
+        <FormField
+          control={form.control}
+          name="deadline_date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Prazo (opcional)</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !field.value && 'text-muted-foreground'
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, 'dd/MM/yyyy') : 'Definir prazo'}
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Cliente */}
         <FormField

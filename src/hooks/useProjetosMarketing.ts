@@ -302,6 +302,25 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     }
   });
 
+  // Excluir projeto definitivamente
+  const deleteProjeto = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('projetos_marketing')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      queryClient.invalidateQueries({ queryKey: ['projeto-marketing'] });
+      toast.success('Ticket excluído!');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao excluir ticket: ' + error.message);
+    }
+  });
+
   return {
     projetos,
     isLoading,
@@ -310,7 +329,8 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     createProjeto,
     updateProjeto,
     moveProjetoKanban,
-    arquivarProjeto
+    arquivarProjeto,
+    deleteProjeto
   };
 }
 
