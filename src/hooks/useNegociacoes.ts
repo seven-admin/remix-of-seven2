@@ -17,9 +17,10 @@ import { invalidateDashboards } from '@/lib/invalidateDashboards';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-export function useNegociacoes(filters?: NegociacaoFilters) {
+export function useNegociacoes(filters?: NegociacaoFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['negociacoes', filters],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       let query = db
         .from('negociacoes')
