@@ -11,11 +11,26 @@ import type {
   ConfiguracoesAtividades,
 } from '@/types/atividades.types';
 
-export function useAtividades(filters?: AtividadeFilters) {
+export interface UseAtividadesOptions {
+  filters?: AtividadeFilters;
+  page?: number;
+  pageSize?: number;
+}
+
+export function useAtividades(options: UseAtividadesOptions = {}) {
+  const { filters, page = 1, pageSize = 20 } = options;
+
   return useQuery({
-    queryKey: ['atividades', filters],
-    queryFn: async (): Promise<Atividade[]> => {
-      let query = supabase
+    queryKey: ['atividades', filters, page, pageSize],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let countQuery = supabase
+        .from('atividades')
+        .select('*', { count: 'exact', head: true });
+
+      let dataQuery = supabase
         .from('atividades')
         .select(`
           *,
@@ -24,21 +39,60 @@ export function useAtividades(filters?: AtividadeFilters) {
           imobiliaria:imobiliarias(id, nome),
           empreendimento:empreendimentos(id, nome),
           gestor:profiles(id, full_name)
-        `)
-        .order('data_hora', { ascending: true });
+        `);
 
-      if (filters?.tipo) query = query.eq('tipo', filters.tipo);
-      if (filters?.categoria) query = query.eq('categoria', filters.categoria);
-      if (filters?.status) query = query.eq('status', filters.status);
-      if (filters?.gestor_id) query = query.eq('gestor_id', filters.gestor_id);
-      if (filters?.empreendimento_id) query = query.eq('empreendimento_id', filters.empreendimento_id);
-      if (filters?.cliente_id) query = query.eq('cliente_id', filters.cliente_id);
-      if (filters?.data_inicio) query = query.gte('data_hora', filters.data_inicio);
-      if (filters?.data_fim) query = query.lte('data_hora', filters.data_fim);
+      if (filters?.tipo) {
+        countQuery = countQuery.eq('tipo', filters.tipo);
+        dataQuery = dataQuery.eq('tipo', filters.tipo);
+      }
+      if (filters?.categoria) {
+        countQuery = countQuery.eq('categoria', filters.categoria);
+        dataQuery = dataQuery.eq('categoria', filters.categoria);
+      }
+      if (filters?.status) {
+        countQuery = countQuery.eq('status', filters.status);
+        dataQuery = dataQuery.eq('status', filters.status);
+      }
+      if (filters?.responsavel_id) {
+        countQuery = countQuery.eq('gestor_id', filters.responsavel_id);
+        dataQuery = dataQuery.eq('gestor_id', filters.responsavel_id);
+      }
+      if (filters?.created_by) {
+        countQuery = countQuery.eq('created_by', filters.created_by);
+        dataQuery = dataQuery.eq('created_by', filters.created_by);
+      }
+      if (filters?.empreendimento_id) {
+        countQuery = countQuery.eq('empreendimento_id', filters.empreendimento_id);
+        dataQuery = dataQuery.eq('empreendimento_id', filters.empreendimento_id);
+      }
+      if (filters?.cliente_id) {
+        countQuery = countQuery.eq('cliente_id', filters.cliente_id);
+        dataQuery = dataQuery.eq('cliente_id', filters.cliente_id);
+      }
+      if (filters?.data_inicio) {
+        countQuery = countQuery.gte('data_hora', filters.data_inicio);
+        dataQuery = dataQuery.gte('data_hora', filters.data_inicio);
+      }
+      if (filters?.data_fim) {
+        countQuery = countQuery.lte('data_hora', filters.data_fim);
+        dataQuery = dataQuery.lte('data_hora', filters.data_fim);
+      }
 
-      const { data, error } = await query;
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+
+      dataQuery = dataQuery
+        .order('data_hora', { ascending: true })
+        .range(from, to);
+
+      const { data, error } = await dataQuery;
       if (error) throw error;
-      return (data || []) as unknown as Atividade[];
+
+      return {
+        items: (data as unknown as Atividade[]) || [],
+        count: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      };
     },
   });
 }

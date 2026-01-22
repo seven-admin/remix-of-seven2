@@ -62,6 +62,12 @@ export interface Atividade {
     id: string;
     full_name: string;
   } | null;
+  created_by?: string | null;
+  criador?: {
+    id: string;
+    full_name: string;
+  } | null;
+  deadline_date?: string | null;
   data_hora: string;
   duracao_minutos?: number | null;
   observacoes?: string | null;
@@ -88,6 +94,7 @@ export interface AtividadeFormData {
   temperatura_cliente?: ClienteTemperatura;
   requer_followup?: boolean;
   data_followup?: string;
+  deadline_date?: string;
 }
 
 export interface ConcluirAtividadeData {
@@ -101,7 +108,8 @@ export interface AtividadeFilters {
   tipo?: AtividadeTipo;
   categoria?: AtividadeCategoria;
   status?: AtividadeStatus;
-  gestor_id?: string;
+  responsavel_id?: string;
+  created_by?: string;
   empreendimento_id?: string;
   cliente_id?: string;
   data_inicio?: string;
