@@ -108,6 +108,9 @@ export interface AtividadeFilters {
   tipo?: AtividadeTipo;
   categoria?: AtividadeCategoria;
   status?: AtividadeStatus;
+  // legado: alguns pontos antigos do app ainda referenciam gestor_id como filtro
+  // (equivalente ao responsavel_id no novo padrão)
+  gestor_id?: string;
   responsavel_id?: string;
   created_by?: string;
   empreendimento_id?: string;

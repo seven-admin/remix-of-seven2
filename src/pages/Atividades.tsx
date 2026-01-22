@@ -133,7 +133,7 @@ export default function Atividades() {
   const handleDelete = (id: string) => deleteAtividade.mutate(id);
   const handleCancelar = (id: string) => cancelarAtividade.mutate(id);
 
-  const handleSubmit = (data: AtividadeFormSubmitData) => {
+  const handleAtividadeSubmit: (data: AtividadeFormSubmitData) => void = (data) => {
     if (editingAtividade) {
       // Na edição, sempre usa o formData normal
       updateAtividade.mutate({ id: editingAtividade.id, data: data.formData }, {
@@ -705,7 +705,7 @@ export default function Atividades() {
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             <AtividadeForm 
               initialData={editingAtividade || undefined} 
-              onSubmit={handleSubmit}
+              onSubmit={handleAtividadeSubmit}
               isLoading={createAtividade.isPending || updateAtividade.isPending}
             />
           </div>
