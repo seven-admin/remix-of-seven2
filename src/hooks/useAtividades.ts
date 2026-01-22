@@ -26,20 +26,25 @@ export function useAtividades(options: UseAtividadesOptions = {}) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      // NOTE: Tipos do Supabase podem ficar defasados quando o schema muda.
+      // Para evitar TS2589 (inferência profunda) e manter o build verde,
+      // usamos um cast pontual aqui, preservando o retorno tipado do hook.
       let countQuery = supabase
-        .from('atividades')
-        .select('*', { count: 'exact', head: true });
+        .from('atividades' as any)
+        .select('*', { count: 'exact', head: true }) as any;
 
       let dataQuery = supabase
-        .from('atividades')
-        .select(`
+        .from('atividades' as any)
+        .select(
+          `
           *,
           cliente:clientes(id, nome, temperatura),
           corretor:corretores(id, nome_completo),
           imobiliaria:imobiliarias(id, nome),
           empreendimento:empreendimentos(id, nome),
           gestor:profiles(id, full_name)
-        `);
+        `
+        ) as any;
 
       if (filters?.tipo) {
         countQuery = countQuery.eq('tipo', filters.tipo);
