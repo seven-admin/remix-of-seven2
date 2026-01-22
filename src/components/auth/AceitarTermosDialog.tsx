@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,8 +7,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useConfiguracao } from '@/hooks/useConfiguracoesSistema';
@@ -23,9 +20,6 @@ interface AceitarTermosDialogProps {
 }
 
 export function AceitarTermosDialog({ open, onAccepted }: AceitarTermosDialogProps) {
-  const [aceitouTermos, setAceitouTermos] = useState(false);
-  const [aceitouPolitica, setAceitouPolitica] = useState(false);
-  
   const { data: termos, isLoading: loadingTermos } = useConfiguracao('termos_uso');
   const { data: politica, isLoading: loadingPolitica } = useConfiguracao('politica_privacidade');
   const registrarAceite = useRegistrarAceite();
@@ -42,7 +36,6 @@ export function AceitarTermosDialog({ open, onAccepted }: AceitarTermosDialogPro
   };
   
   const isLoading = loadingTermos || loadingPolitica;
-  const podeConfirmar = aceitouTermos && aceitouPolitica && !registrarAceite.isPending;
   
   return (
     <Dialog open={open}>
@@ -94,28 +87,10 @@ export function AceitarTermosDialog({ open, onAccepted }: AceitarTermosDialogPro
               </TabsContent>
             </Tabs>
             
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="aceito-termos"
-                  checked={aceitouTermos}
-                  onCheckedChange={(checked) => setAceitouTermos(checked === true)}
-                />
-                <Label htmlFor="aceito-termos" className="text-sm leading-relaxed cursor-pointer">
-                  Li e aceito os <strong>Termos de Uso</strong> do sistema
-                </Label>
-              </div>
-              
-              <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="aceito-politica"
-                  checked={aceitouPolitica}
-                  onCheckedChange={(checked) => setAceitouPolitica(checked === true)}
-                />
-                <Label htmlFor="aceito-politica" className="text-sm leading-relaxed cursor-pointer">
-                  Li e aceito a <strong>Política de Privacidade</strong>
-                </Label>
-              </div>
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground text-center mb-4">
+                Ao clicar em "Aceitar e Continuar", você confirma que leu e concorda com os Termos de Uso e a Política de Privacidade do sistema.
+              </p>
             </div>
           </>
         )}
@@ -123,11 +98,12 @@ export function AceitarTermosDialog({ open, onAccepted }: AceitarTermosDialogPro
         <DialogFooter>
           <Button 
             onClick={handleConfirmar}
-            disabled={!podeConfirmar}
-            className="w-full sm:w-auto"
+            disabled={registrarAceite.isPending}
+            className="w-full"
+            size="lg"
           >
             {registrarAceite.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Confirmar e Continuar
+            Li e Aceito os Termos - Continuar
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -18,7 +18,7 @@ import { AtividadeForm } from '@/components/atividades/AtividadeForm';
 import { useTVLayoutConfig } from '@/hooks/useTVLayoutConfig';
 import { TVLayoutConfigDialog } from '@/components/tv-layout';
 import { useResumoAtividades } from '@/hooks/useForecast';
-import { useCreateAtividade } from '@/hooks/useAtividades';
+import { useCreateAtividade, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import {
   Select,
@@ -30,7 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { AtividadeFormData } from '@/types/atividades.types';
+import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeForm';
 
 export default function Forecast() {
   const [empreendimentoId, setEmpreendimentoId] = useState<string | undefined>(undefined);
@@ -41,14 +41,26 @@ export default function Forecast() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(new Date());
   const createAtividade = useCreateAtividade();
+  const createAtividadesParaGestores = useCreateAtividadesParaGestores();
   const { config, visibleItems, toggleVisibility, reorder, resetToDefault } = useTVLayoutConfig('forecast');
 
-  const handleSubmit = (data: AtividadeFormData) => {
-    createAtividade.mutate(data, {
-      onSuccess: () => {
-        setDialogOpen(false);
-      }
-    });
+  const handleSubmit = (data: AtividadeFormSubmitData) => {
+    if (data.gestorIds && data.gestorIds.length > 0) {
+      createAtividadesParaGestores.mutate(
+        { formData: data.formData, gestorIds: data.gestorIds },
+        {
+          onSuccess: () => {
+            setDialogOpen(false);
+          }
+        }
+      );
+    } else {
+      createAtividade.mutate(data.formData, {
+        onSuccess: () => {
+          setDialogOpen(false);
+        }
+      });
+    }
   };
 
   // Toggle modo TV

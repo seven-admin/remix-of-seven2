@@ -19,11 +19,12 @@ import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtivida
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
-import { useAtividades, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote } from '@/hooks/useAtividades';
+import { useAtividades, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useClientes } from '@/hooks/useClientes';
 import { useIsMobile } from '@/hooks/use-mobile';
+import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeForm';
 import type { Atividade, AtividadeFilters, AtividadeTipo, AtividadeStatus, AtividadeFormData } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_STATUS_LABELS } from '@/types/atividades.types';
 import { cn } from '@/lib/utils';
@@ -74,6 +75,7 @@ export default function Atividades() {
   const { data: empreendimentos } = useEmpreendimentos();
   const { data: clientes } = useClientes();
   const createAtividade = useCreateAtividade();
+  const createAtividadesParaGestores = useCreateAtividadesParaGestores();
   const updateAtividade = useUpdateAtividade();
   const deleteAtividade = useDeleteAtividade();
   const cancelarAtividade = useCancelarAtividade();
@@ -105,20 +107,33 @@ export default function Atividades() {
   const handleDelete = (id: string) => deleteAtividade.mutate(id);
   const handleCancelar = (id: string) => cancelarAtividade.mutate(id);
 
-  const handleSubmit = (data: AtividadeFormData) => {
+  const handleSubmit = (data: AtividadeFormSubmitData) => {
     if (editingAtividade) {
-      updateAtividade.mutate({ id: editingAtividade.id, data }, {
+      // Na edição, sempre usa o formData normal
+      updateAtividade.mutate({ id: editingAtividade.id, data: data.formData }, {
         onSuccess: () => {
           setDialogOpen(false);
           setEditingAtividade(null);
         }
       });
     } else {
-      createAtividade.mutate(data, {
-        onSuccess: () => {
-          setDialogOpen(false);
-        }
-      });
+      // Na criação, verifica se tem gestorIds (múltiplos gestores)
+      if (data.gestorIds && data.gestorIds.length > 0) {
+        createAtividadesParaGestores.mutate(
+          { formData: data.formData, gestorIds: data.gestorIds },
+          {
+            onSuccess: () => {
+              setDialogOpen(false);
+            }
+          }
+        );
+      } else {
+        createAtividade.mutate(data.formData, {
+          onSuccess: () => {
+            setDialogOpen(false);
+          }
+        });
+      }
     }
   };
 

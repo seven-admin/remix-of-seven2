@@ -78,6 +78,31 @@ export function useCreateAtividade() {
   });
 }
 
+// Hook para criar atividades em lote para múltiplos gestores
+export function useCreateAtividadesParaGestores() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ formData, gestorIds }: { formData: Omit<AtividadeFormData, 'gestor_id'>; gestorIds: string[] }) => {
+      // Criar uma atividade para cada gestor
+      const atividadesParaInserir = gestorIds.map(gestorId => ({
+        ...formData,
+        gestor_id: gestorId,
+      }));
+
+      const { data, error } = await supabase.from('atividades').insert(atividadesParaInserir).select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      queryClient.invalidateQueries({ queryKey: ['agenda'] });
+      invalidateDashboards(queryClient);
+      toast.success(`${data.length} atividade(s) criada(s) com sucesso!`);
+    },
+    onError: () => toast.error('Erro ao criar atividades para gestores'),
+  });
+}
+
 export function useUpdateAtividade() {
   const queryClient = useQueryClient();
   return useMutation({
