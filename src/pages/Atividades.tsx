@@ -66,7 +66,8 @@ export default function Atividades() {
   const ano = currentDate.getFullYear();
   const mes = currentDate.getMonth() + 1;
 
-  const { data: atividades, isLoading } = useAtividades(filters);
+  const { data: atividadesData, isLoading } = useAtividades({ filters });
+  const atividades = atividadesData?.items || [];
   const { data: atividadesMes, isLoading: isLoadingMes } = useAgendaMensal(ano, mes);
   const { data: atividadesDia } = useAgendaDia(selectedDate);
   const { data: atividadesHoje } = useAtividadesHoje();
@@ -278,9 +279,9 @@ export default function Atividades() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={filters.gestor_id || ''} onValueChange={(v) => setFilters({ ...filters, gestor_id: v === 'all' ? undefined : v })}>
+                  <Select value={filters.responsavel_id || ''} onValueChange={(v) => setFilters({ ...filters, responsavel_id: v === 'all' ? undefined : v })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Gestor de Produto" />
+                      <SelectValue placeholder="Responsável" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>

@@ -20,8 +20,10 @@ export type Database = {
           cliente_id: string | null
           corretor_id: string | null
           created_at: string
+          created_by: string | null
           data_followup: string | null
           data_hora: string
+          deadline_date: string | null
           duracao_minutos: number | null
           empreendimento_id: string | null
           gestor_id: string | null
@@ -41,8 +43,10 @@ export type Database = {
           cliente_id?: string | null
           corretor_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_followup?: string | null
           data_hora: string
+          deadline_date?: string | null
           duracao_minutos?: number | null
           empreendimento_id?: string | null
           gestor_id?: string | null
@@ -62,8 +66,10 @@ export type Database = {
           cliente_id?: string | null
           corretor_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_followup?: string | null
           data_hora?: string
+          deadline_date?: string | null
           duracao_minutos?: number | null
           empreendimento_id?: string | null
           gestor_id?: string | null

@@ -55,9 +55,10 @@ export function ClienteHistoricoAtividadesDialog({
 }: ClienteHistoricoAtividadesDialogProps) {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: atividades = [], isLoading } = useAtividades(
-    cliente?.id ? { cliente_id: cliente.id } : undefined
+  const { data: atividadesData, isLoading } = useAtividades(
+    cliente?.id ? { filters: { cliente_id: cliente.id } } : {}
   );
+  const atividades = atividadesData?.items || [];
 
   const createOne = useCreateAtividade();
   const createBatch = useCreateAtividadesParaGestores();

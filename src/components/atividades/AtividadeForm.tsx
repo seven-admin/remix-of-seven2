@@ -65,6 +65,7 @@ const formSchema = z.object({
   temperatura_cliente: z.enum(['frio', 'morno', 'quente']).optional(),
   requer_followup: z.boolean().default(false),
   data_followup: z.date().optional(),
+  deadline_date: z.date().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
