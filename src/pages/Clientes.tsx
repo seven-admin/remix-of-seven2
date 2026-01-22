@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Download, MoreVertical, Edit, Trash2, MessageSquare, UserX, RefreshCw, UserCheck } from 'lucide-react';
+import { Plus, Search, Download, MoreVertical, Edit, Trash2, MessageSquare, UserX, RefreshCw, UserCheck, ClipboardList } from 'lucide-react';
 import { useClientesPaginated, useDeleteCliente, useCreateCliente, useUpdateCliente, useClienteStats, useQualificarCliente, useMarcarPerdido, useReativarCliente, useCliente } from '@/hooks/useClientes';
 import { Cliente, ClienteFormData, ClienteFase, CLIENTE_FASE_LABELS, CLIENTE_FASE_COLORS, CLIENTE_TEMPERATURA_LABELS, CLIENTE_TEMPERATURA_COLORS, ClienteTemperatura } from '@/types/clientes.types';
 import { format } from 'date-fns';
@@ -44,6 +44,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClienteForm } from '@/components/clientes/ClienteForm';
 import { ClienteInteracoesDialog } from '@/components/clientes/ClienteInteracoesDialog';
+import { ClienteHistoricoAtividadesDialog } from '@/components/clientes/ClienteHistoricoAtividadesDialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,6 +57,7 @@ const Clientes = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClienteId, setEditingClienteId] = useState<string | null>(null);
   const [interacoesCliente, setInteracoesCliente] = useState<Cliente | null>(null);
+  const [historicoCliente, setHistoricoCliente] = useState<Cliente | null>(null);
   const [page, setPage] = useState(1);
   
   const filters = {
@@ -246,6 +248,10 @@ const Clientes = () => {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Interações
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setHistoricoCliente(cliente)}>
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Histórico (Atividades)
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleEdit(cliente)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Editar
@@ -346,6 +352,10 @@ const Clientes = () => {
                         <DropdownMenuItem onClick={() => setInteracoesCliente(cliente)}>
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Interações
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setHistoricoCliente(cliente)}>
+                          <ClipboardList className="h-4 w-4 mr-2" />
+                          Histórico (Atividades)
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEdit(cliente)}>
                           <Edit className="h-4 w-4 mr-2" />
@@ -449,6 +459,12 @@ const Clientes = () => {
         cliente={interacoesCliente}
         open={!!interacoesCliente}
         onOpenChange={(open) => !open && setInteracoesCliente(null)}
+      />
+
+      <ClienteHistoricoAtividadesDialog
+        cliente={historicoCliente}
+        open={!!historicoCliente}
+        onOpenChange={(open) => !open && setHistoricoCliente(null)}
       />
     </MainLayout>
   );
