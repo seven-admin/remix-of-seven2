@@ -1,1 +1,4 @@
 project_id = "pizerpoxuqopekmbvohh"
+
+[functions.delete-imobiliaria]
+verify_jwt = false

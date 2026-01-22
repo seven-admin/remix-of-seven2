@@ -1,27 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Building, Phone, Mail, MapPin, Users, Trash2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useImobiliarias, useImobiliaria, useImobiliariasPaginated } from '@/hooks/useImobiliarias';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ImobiliariaForm } from '@/components/mercado/ImobiliariaForm';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Imobiliaria } from '@/types/mercado.types';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Imobiliarias() {
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingImobiliariaId, setEditingImobiliariaId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [imobiliariaParaExcluir, setImobiliariaParaExcluir] = useState<Pick<Imobiliaria, 'id' | 'nome'> | null>(null);
+  const [isCheckingDelete, setIsCheckingDelete] = useState(false);
+  const [deleteCheck, setDeleteCheck] = useState<{ negociacoes: number; corretores: number } | null>(null);
+  const { toast } = useToast();
   
-  const { create, update, delete: deleteImobiliaria, isCreating, isUpdating } = useImobiliarias();
+  const { create, update, delete: deleteImobiliaria, isCreating, isUpdating, isDeleting } = useImobiliarias();
   const { data, isLoading } = useImobiliariasPaginated(page, 20, search || undefined);
   const { data: imobiliariaDetalhe, isLoading: isLoadingImobiliaria } = useImobiliaria(editingImobiliariaId || undefined);
   const { canAccessModule } = usePermissions();
@@ -54,6 +62,54 @@ export default function Imobiliarias() {
       setEditingImobiliariaId(null);
     }
   };
+
+  const handleOpenDelete = (imob: Imobiliaria) => {
+    setImobiliariaParaExcluir({ id: imob.id, nome: imob.nome });
+    setDeleteDialogOpen(true);
+  };
+
+  const shouldShowUnlinkLabel = useMemo(() => {
+    return (deleteCheck?.negociacoes ?? 0) > 0;
+  }, [deleteCheck]);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!deleteDialogOpen || !imobiliariaParaExcluir?.id) return;
+
+      setIsCheckingDelete(true);
+      setDeleteCheck(null);
+      try {
+        const [negRes, corRes] = await Promise.all([
+          supabase
+            .from('negociacoes')
+            .select('id', { count: 'exact', head: true })
+            .eq('imobiliaria_id', imobiliariaParaExcluir.id),
+          supabase
+            .from('corretores')
+            .select('id', { count: 'exact', head: true })
+            .eq('imobiliaria_id', imobiliariaParaExcluir.id),
+        ]);
+
+        if (negRes.error) throw negRes.error;
+        if (corRes.error) throw corRes.error;
+
+        setDeleteCheck({
+          negociacoes: negRes.count ?? 0,
+          corretores: corRes.count ?? 0,
+        });
+      } catch (err: any) {
+        toast({
+          title: 'Erro ao validar exclusão',
+          description: err?.message || 'Não foi possível checar vínculos desta imobiliária.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsCheckingDelete(false);
+      }
+    };
+
+    run();
+  }, [deleteDialogOpen, imobiliariaParaExcluir?.id, toast]);
 
   return (
     <MainLayout title="Imobiliárias" subtitle="Gestão de imobiliárias parceiras">
@@ -190,30 +246,9 @@ export default function Imobiliarias() {
                           </TableCell>
                           {canDelete && (
                             <TableCell onClick={(e) => e.stopPropagation()}>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Excluir imobiliária?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta ação não pode ser desfeita. Todos os corretores vinculados perderão o vínculo.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteImobiliaria(imob.id)}
-                                      className="bg-destructive hover:bg-destructive/90"
-                                    >
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenDelete(imob)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </TableCell>
                           )}
                         </TableRow>
@@ -232,6 +267,65 @@ export default function Imobiliarias() {
             )}
           </CardContent>
         </Card>
+
+        {canDelete && (
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open);
+              if (!open) {
+                setImobiliariaParaExcluir(null);
+                setDeleteCheck(null);
+                setIsCheckingDelete(false);
+              }
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir imobiliária?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {isCheckingDelete ? (
+                    <div className="space-y-2 pt-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p>
+                        Esta ação não pode ser desfeita. Corretores vinculados perderão o vínculo.
+                      </p>
+                      {deleteCheck && deleteCheck.negociacoes > 0 && (
+                        <p className="font-medium text-foreground">
+                          Existem {deleteCheck.negociacoes} negociação(ões) vinculada(s) (incluindo inativas). Para excluir, a ação fará o
+                          desvínculo dessas negociações.
+                        </p>
+                      )}
+                      {deleteCheck && deleteCheck.corretores > 0 && (
+                        <p className="text-muted-foreground">
+                          Corretores vinculados: {deleteCheck.corretores}.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={isCheckingDelete || !imobiliariaParaExcluir?.id || isDeleting}
+                  onClick={() => {
+                    if (!imobiliariaParaExcluir?.id) return;
+                    deleteImobiliaria(imobiliariaParaExcluir.id);
+                    setDeleteDialogOpen(false);
+                  }}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {shouldShowUnlinkLabel ? 'Desvincular e excluir' : 'Excluir'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </MainLayout>
   );
