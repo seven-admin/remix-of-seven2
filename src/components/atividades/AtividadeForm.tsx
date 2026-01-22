@@ -74,13 +74,16 @@ export interface AtividadeFormSubmitData {
   gestorIds?: string[]; // Se presente, criar para múltiplos gestores
 }
 
-interface AtividadeFormProps {
+export interface AtividadeFormProps {
   initialData?: Atividade;
   onSubmit: (data: AtividadeFormSubmitData) => void;
   isLoading?: boolean;
+  defaultClienteId?: string;
+  lockCliente?: boolean;
 }
 
-export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFormProps) {
+export function AtividadeForm(props: AtividadeFormProps) {
+  const { initialData, onSubmit, isLoading, defaultClienteId, lockCliente } = props;
   const { user } = useAuth();
   const { isSuperAdmin } = usePermissions();
   const { data: clientes = [] } = useClientes();
@@ -111,7 +114,7 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
       tipo: initialData?.tipo || 'ligacao',
       categoria: (initialData?.categoria as AtividadeCategoria) || 'primeiro_atendimento',
       titulo: initialData?.titulo || '',
-      cliente_id: initialData?.cliente_id || undefined,
+      cliente_id: initialData?.cliente_id || defaultClienteId || undefined,
       corretor_id: initialData?.corretor_id || undefined,
       imobiliaria_id: initialData?.imobiliaria_id || undefined,
       empreendimento_id: initialData?.empreendimento_id || undefined,
@@ -124,6 +127,14 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
       data_followup: initialData?.data_followup ? new Date(initialData.data_followup) : undefined,
     },
   });
+
+  // Se abriu o formulário já vinculado a um cliente (ex.: histórico do cliente),
+  // garantir que o valor fique fixo mesmo se o form re-renderizar.
+  useEffect(() => {
+    if (!initialData && defaultClienteId) {
+      form.setValue('cliente_id', defaultClienteId);
+    }
+  }, [defaultClienteId, form, initialData]);
 
   const requerFollowup = form.watch('requer_followup');
   const clienteId = form.watch('cliente_id');
@@ -397,7 +408,11 @@ export function AtividadeForm({ initialData, onSubmit, isLoading }: AtividadeFor
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cliente (opcional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value}
+                disabled={!!lockCliente}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um cliente" />
