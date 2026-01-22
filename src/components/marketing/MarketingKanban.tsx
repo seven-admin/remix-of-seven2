@@ -12,8 +12,9 @@ import {
   STATUS_COLORS,
   KANBAN_COLUMNS 
 } from '@/types/marketing.types';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MarketingKanbanProps {
   projetos: ProjetoMarketing[];
@@ -24,6 +25,8 @@ interface MarketingKanbanProps {
 export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKanbanProps) {
   const { moveProjetoKanban } = useProjetosMarketing();
   const { data: etapasDinamicas = [], isLoading: etapasLoading } = useTicketEtapas(categoria);
+  const isMobile = useIsMobile();
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
 
   // Usar etapas dinâmicas se disponíveis, senão fallback para constantes
   const columns: KanbanColumnType[] = useMemo(() => {
@@ -42,6 +45,19 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
       color: STATUS_COLORS[status],
     }));
   }, [etapasDinamicas]);
+
+  // Definir primeira coluna como ativa (para highlight das abas no mobile)
+  useEffect(() => {
+    if (!isMobile) return;
+    if (columns.length === 0) return;
+    setActiveColumnId((prev) => prev ?? columns[0]!.id);
+  }, [isMobile, columns]);
+
+  const scrollToColumn = useCallback((columnId: string) => {
+    setActiveColumnId(columnId);
+    const el = document.getElementById(`kanban-col-${columnId}`);
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  }, []);
 
   // Criar mapeamento de status legado para etapa dinâmica
   const statusToEtapaMap = useMemo(() => {
@@ -165,31 +181,57 @@ export function MarketingKanban({ projetos, isLoading, categoria }: MarketingKan
   }
 
   return (
-    <KanbanBoard<ProjetoMarketing>
-      columns={columns}
-      items={projetos}
-      getItemId={(projeto) => projeto.id}
-      getItemColumn={getProjectColumn}
-      emptyMessage="Arraste projetos aqui"
-      onMove={() => {}}
-      onMoveWithData={handleMove}
-      renderColumnHeader={(column, itemCount) => (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: column.color }}
-            />
-            <h3 className="font-medium text-sm">{column.title}</h3>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            {itemCount}
-          </Badge>
+    <div className="space-y-3">
+      {/* Abas (mobile) */}
+      {isMobile && columns.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {columns.map((c) => {
+            const count = projetos.filter((p) => getProjectColumn(p) === c.id).length;
+            const isActive = activeColumnId === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => scrollToColumn(c.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-xs",
+                  isActive ? "bg-muted" : "bg-background"
+                )}
+              >
+                <span className="font-medium">{c.title}</span>
+                <span className="ml-2 text-muted-foreground">{count}</span>
+              </button>
+            );
+          })}
         </div>
       )}
-      renderCard={(projeto, isDragging) => (
-        <ProjetoCard projeto={projeto} isDragging={isDragging} />
-      )}
-    />
+
+      <KanbanBoard<ProjetoMarketing>
+        columns={columns}
+        items={projetos}
+        getItemId={(projeto) => projeto.id}
+        getItemColumn={getProjectColumn}
+        emptyMessage="Arraste projetos aqui"
+        onMove={() => {}}
+        onMoveWithData={handleMove}
+        renderColumnHeader={(column, itemCount) => (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: column.color }}
+              />
+              <h3 className="font-medium text-sm">{column.title}</h3>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {itemCount}
+            </Badge>
+          </div>
+        )}
+        renderCard={(projeto, isDragging) => (
+          <ProjetoCard projeto={projeto} isDragging={isDragging} />
+        )}
+      />
+    </div>
   );
 }

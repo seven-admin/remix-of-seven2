@@ -62,8 +62,12 @@ export function KanbanBoard<T>({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="w-full overflow-x-auto pb-4">
-        <div className="flex gap-4 p-1 min-w-max">
+      {/*
+        Mobile: layout de 1 coluna por vez via snap horizontal.
+        Mantemos todas as colunas no DOM para preservar drag-and-drop entre colunas.
+      */}
+      <div className="w-full overflow-x-auto pb-4 overscroll-x-contain snap-x snap-mandatory">
+        <div className="flex gap-4 p-1 min-w-max scroll-smooth">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}

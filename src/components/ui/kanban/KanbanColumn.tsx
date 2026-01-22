@@ -14,8 +14,12 @@ export function KanbanColumn<T>({
 }: KanbanColumnProps<T>) {
   return (
     <div
+      id={`kanban-col-${column.id}`}
+      data-kanban-column-id={column.id}
       className={cn(
-        "flex flex-col w-72 shrink-0 rounded-lg border bg-muted/30",
+        // Mobile: ocupa quase toda a largura e encaixa (snap) coluna por coluna.
+        // Desktop: mantém o tamanho compacto.
+        "flex flex-col w-[calc(100vw-2rem)] sm:w-72 shrink-0 rounded-lg border bg-muted/30 snap-start",
         className
       )}
       style={{ backgroundColor: column.bgColor }}
@@ -49,10 +53,10 @@ export function KanbanColumn<T>({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={cn(
-              "flex-1 p-2 overflow-y-auto min-h-[200px] rounded-b-lg transition-colors duration-150",
+              // Altura em “tela cheia” no mobile (dvh lida melhor com a barra do navegador).
+              "flex-1 p-2 overflow-y-auto min-h-[200px] rounded-b-lg transition-colors duration-150 max-h-[calc(100dvh-240px)] sm:max-h-[calc(100vh-280px)]",
               snapshot.isDraggingOver && "bg-primary/10 ring-2 ring-inset ring-primary/30"
             )}
-            style={{ maxHeight: 'calc(100vh - 280px)' }}
           >
             {items.map((item, index) => (
               <KanbanCardWrapper 
