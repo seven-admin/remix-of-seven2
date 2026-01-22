@@ -13,6 +13,8 @@ export interface Ticket {
   descricao: string | null;
   categoria: CategoriaTicket;
   status: StatusTicket;
+  // Quando o Kanban usa etapas dinâmicas, este campo é a fonte de verdade da coluna.
+  ticket_etapa_id?: string | null;
   prioridade: PrioridadeTicket;
   cliente_id: string | null;
   supervisor_id: string | null;
