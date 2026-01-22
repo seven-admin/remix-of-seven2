@@ -89,12 +89,16 @@ export function useImobiliarias() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('imobiliarias')
-        .delete()
-        .eq('id', id);
-      
+      const { data, error } = await supabase.functions.invoke('delete-imobiliaria', {
+        body: { imobiliaria_id: id },
+      });
+
       if (error) throw error;
+
+      // Edge functions may return { error } in the JSON body with 200 depending on handler.
+      if ((data as any)?.error) {
+        throw new Error((data as any).error);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['imobiliarias'] });
