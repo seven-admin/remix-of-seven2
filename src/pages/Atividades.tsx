@@ -720,42 +720,58 @@ export default function Atividades() {
 
         {/* View: Calendário */}
         {view === 'calendario' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* Calendário */}
-            <div className="lg:col-span-2">
-              {isLoadingMes ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <Skeleton className="h-[400px] w-full" />
-                  </CardContent>
-                </Card>
-              ) : (
-                <AgendaCalendario
-                  atividades={atividadesMes || []}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  onMonthChange={handleMonthChange}
-                />
-              )}
+          <div className="relative">
+            {/* 
+              No desktop, o painel do dia fica SOBREPOSTO (fixed) para não forçar a altura do grid
+              e não criar o "vazio" abaixo do calendário. Reservamos espaço com padding-right.
+            */}
+            <div className="grid grid-cols-1 gap-6 items-start lg:pr-[444px]">
+              {/* Calendário */}
+              <div>
+                {isLoadingMes ? (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <Skeleton className="h-[400px] w-full" />
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <AgendaCalendario
+                    atividades={atividadesMes || []}
+                    selectedDate={selectedDate}
+                    onDateSelect={setSelectedDate}
+                    onMonthChange={handleMonthChange}
+                  />
+                )}
+              </div>
+
+              {/* Mobile/Tablet: painel no fluxo (abaixo) */}
+              <div className="lg:hidden">
+                <div className="max-h-[70vh] min-h-0 overflow-hidden">
+                  <AgendaDia
+                    data={selectedDate}
+                    atividades={atividadesDia || []}
+                    onAtividadeClick={handleEdit}
+                    onNovaAtividade={handleNova}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Lista do Dia Selecionado */}
-            <div className="lg:sticky lg:top-6 self-start">
-              <div className="lg:h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)] min-h-0 overflow-hidden">
-                <AgendaDia
-                  data={selectedDate}
-                  atividades={atividadesDia || []}
-                  onAtividadeClick={handleEdit}
-                  onNovaAtividade={handleNova}
-                  className="h-full"
-                />
-              </div>
+            {/* Desktop: painel sobreposto */}
+            <div className="hidden lg:block lg:fixed lg:right-6 lg:top-24 lg:w-[420px] lg:h-[calc(100vh-120px)] z-20">
+              <AgendaDia
+                data={selectedDate}
+                atividades={atividadesDia || []}
+                onAtividadeClick={handleEdit}
+                onNovaAtividade={handleNova}
+                className="h-full"
+              />
             </div>
           </div>
         )}
 
         {/* Atividades Vencidas */}
-        {atividadesVencidas && atividadesVencidas.length > 0 && (
+        {view !== 'calendario' && atividadesVencidas && atividadesVencidas.length > 0 && (
           <Card className="border-destructive/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">

@@ -63,7 +63,7 @@ export function AgendaDia({
       </div>
 
       {/* Timeline */}
-      <ScrollArea className="flex-1 min-h-0 h-full">
+      <ScrollArea className="flex-1 min-h-0">
         {atividades.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <CalendarDays className="h-12 w-12 mb-4 opacity-50" />
