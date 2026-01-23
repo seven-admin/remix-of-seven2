@@ -740,14 +740,16 @@ export default function Atividades() {
             </div>
 
             {/* Lista do Dia Selecionado */}
-            <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-220px)] min-h-0">
-              <AgendaDia 
-                data={selectedDate}
-                atividades={atividadesDia || []}
-                onAtividadeClick={handleEdit}
-                onNovaAtividade={handleNova}
-                className="h-full"
-              />
+            <div className="lg:sticky lg:top-6 self-start">
+              <div className="lg:h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)] min-h-0 overflow-hidden">
+                <AgendaDia
+                  data={selectedDate}
+                  atividades={atividadesDia || []}
+                  onAtividadeClick={handleEdit}
+                  onNovaAtividade={handleNova}
+                  className="h-full"
+                />
+              </div>
             </div>
           </div>
         )}
