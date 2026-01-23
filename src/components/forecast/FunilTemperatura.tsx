@@ -12,12 +12,12 @@ const CORES_TEMPERATURA: Record<ClienteTemperatura, string> = {
 };
 
 interface FunilTemperaturaProps {
-  empreendimentoId?: string;
+  gestorId?: string;
   onTemperaturaClick?: (temperatura: ClienteTemperatura) => void;
 }
 
-export function FunilTemperatura({ empreendimentoId, onTemperaturaClick }: FunilTemperaturaProps) {
-  const { data: funil, isLoading } = useFunilTemperatura(empreendimentoId);
+export function FunilTemperatura({ gestorId, onTemperaturaClick }: FunilTemperaturaProps) {
+  const { data: funil, isLoading } = useFunilTemperatura(gestorId);
 
   if (isLoading) {
     return (

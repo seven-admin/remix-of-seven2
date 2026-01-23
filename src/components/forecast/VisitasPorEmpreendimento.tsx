@@ -13,12 +13,12 @@ const CORES_RANKING = [
 ];
 
 interface VisitasPorEmpreendimentoProps {
-  empreendimentoId?: string;
+  gestorId?: string;
   onEmpreendimentoClick?: (empreendimentoId: string) => void;
 }
 
-export function VisitasPorEmpreendimento({ empreendimentoId, onEmpreendimentoClick }: VisitasPorEmpreendimentoProps) {
-  const { data: visitas, isLoading } = useVisitasPorEmpreendimento(empreendimentoId);
+export function VisitasPorEmpreendimento({ gestorId, onEmpreendimentoClick }: VisitasPorEmpreendimentoProps) {
+  const { data: visitas, isLoading } = useVisitasPorEmpreendimento(gestorId);
 
   if (isLoading) {
     return (

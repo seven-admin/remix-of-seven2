@@ -224,7 +224,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Funil de Temperatura</CardTitle>
             </CardHeader>
             <CardContent>
-              <FunilTemperatura empreendimentoId={gestorId} />
+              <FunilTemperatura gestorId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -257,7 +257,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Ranking de Corretores</CardTitle>
             </CardHeader>
             <CardContent>
-              <RankingCorretoresAtivos empreendimentoId={gestorId} />
+              <RankingCorretoresAtivos gestorId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -419,18 +419,18 @@ export default function Forecast() {
 
         {/* Primeira linha: Funil + Atividades por Tipo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FunilTemperatura empreendimentoId={gestorId} />
+          <FunilTemperatura gestorId={gestorId} />
           <AtividadesPorTipo gestorId={gestorId} />
         </div>
 
         {/* Segunda linha: Próximas Atividades + Visitas por Empreendimento */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ProximasAtividades gestorId={gestorId} />
-          <VisitasPorEmpreendimento empreendimentoId={gestorId} />
+          <VisitasPorEmpreendimento gestorId={gestorId} />
         </div>
 
         {/* Terceira linha: Ranking de Corretores */}
-        <RankingCorretoresAtivos empreendimentoId={gestorId} />
+        <RankingCorretoresAtivos gestorId={gestorId} />
 
         {/* Alertas de Follow-up */}
         <AlertasFollowup gestorId={gestorId} />

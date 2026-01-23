@@ -5,11 +5,11 @@ import { Activity, Trophy, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface RankingCorretoresAtivosProps {
-  empreendimentoId?: string;
+  gestorId?: string;
 }
 
-export function RankingCorretoresAtivos({ empreendimentoId }: RankingCorretoresAtivosProps) {
-  const { data: corretores, isLoading } = useAtividadesPorCorretor(empreendimentoId);
+export function RankingCorretoresAtivos({ gestorId }: RankingCorretoresAtivosProps) {
+  const { data: corretores, isLoading } = useAtividadesPorCorretor(gestorId);
 
   if (isLoading) {
     return (
