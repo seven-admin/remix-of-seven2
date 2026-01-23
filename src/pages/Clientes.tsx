@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Download, MoreVertical, Edit, Trash2, MessageSquare, UserX, RefreshCw, UserCheck, ClipboardList } from 'lucide-react';
+import { Plus, Search, Download, MoreVertical, Edit, Trash2, MessageSquare, UserX, RefreshCw, UserCheck, ClipboardList, AlertCircle, Loader2 } from 'lucide-react';
 import { useClientesPaginated, useDeleteCliente, useCreateCliente, useUpdateCliente, useClienteStats, useQualificarCliente, useMarcarPerdido, useReativarCliente, useCliente } from '@/hooks/useClientes';
 import { Cliente, ClienteFormData, ClienteFase, CLIENTE_FASE_LABELS, CLIENTE_FASE_COLORS, CLIENTE_TEMPERATURA_LABELS, CLIENTE_TEMPERATURA_COLORS, ClienteTemperatura } from '@/types/clientes.types';
 import { format } from 'date-fns';
@@ -74,7 +74,12 @@ const Clientes = () => {
   const totalPages = paginatedData?.totalPages ?? 1;
   const total = paginatedData?.total ?? 0;
   
-  const { data: clienteDetalhe, isLoading: isLoadingCliente } = useCliente(editingClienteId || undefined);
+  const {
+    data: clienteDetalhe,
+    isLoading: isLoadingCliente,
+    error: clienteDetalheError,
+    refetch: refetchClienteDetalhe,
+  } = useCliente(editingClienteId || undefined);
   const { data: stats } = useClienteStats();
   const deleteMutation = useDeleteCliente();
   const createMutation = useCreateCliente();
@@ -442,19 +447,53 @@ const Clientes = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
-            {editingClienteId && isLoadingCliente ? (
-              <div className="space-y-4 py-4">
-                <Skeleton className="h-10 w-full" />
-                <div className="grid grid-cols-2 gap-4">
+            {editingClienteId ? (
+              // Modo edição: só monta o formulário quando o detalhe estiver carregado
+              isLoadingCliente || !clienteDetalhe ? (
+                <div className="space-y-4 py-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Carregando cadastro completo…</span>
+                  </div>
+
                   <Skeleton className="h-10 w-full" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
                   <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-20 w-full" />
+
+                  {clienteDetalheError && (
+                    <div className="rounded-md border bg-card p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-destructive" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Não foi possível carregar os dados do cliente</p>
+                          <p className="text-sm text-muted-foreground">
+                            Tente novamente. Se persistir, verifique sua conexão ou permissões.
+                          </p>
+                          <div className="mt-3 flex justify-end">
+                            <Button type="button" variant="outline" onClick={() => refetchClienteDetalhe()}>
+                              Tentar novamente
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
+              ) : (
+                <ClienteForm
+                  initialData={clienteDetalhe}
+                  onSubmit={handleSubmit}
+                  isLoading={createMutation.isPending || updateMutation.isPending}
+                />
+              )
             ) : (
+              // Modo criação
               <ClienteForm
-                initialData={clienteDetalhe || undefined}
+                initialData={undefined}
                 onSubmit={handleSubmit}
                 isLoading={createMutation.isPending || updateMutation.isPending}
               />

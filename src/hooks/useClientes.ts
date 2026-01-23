@@ -187,6 +187,7 @@ export function useCliente(id: string | undefined) {
     queryFn: async () => {
       if (!id) return null;
 
+      // Tenta com join de cônjuge
       const { data, error } = await supabase
         .from('clientes')
         .select(`
@@ -199,19 +200,40 @@ export function useCliente(id: string | undefined) {
         .eq('id', id)
         .maybeSingle();
 
+      // Fallback: se erro de schema, tenta sem o join de cônjuge
+      if (error?.code === 'PGRST200') {
+        console.warn('Schema cache error, retrying without conjuge join (single)');
+        const fallback = await supabase
+          .from('clientes')
+          .select(`
+            *,
+            corretor:corretores(id, nome_completo),
+            imobiliaria:imobiliarias(id, nome),
+            gestor:profiles(id, full_name)
+          `)
+          .eq('id', id)
+          .maybeSingle();
+
+        if (fallback.error) throw fallback.error;
+
+        if (!fallback.data) return null;
+        return { ...(fallback.data as any), conjuge: null } as unknown as Cliente;
+      }
+
       if (error) throw error;
-      
+
       // Normalizar conjuge de array para objeto
       if (data) {
         const normalized = {
           ...data,
-          conjuge: Array.isArray((data as any).conjuge) ? (data as any).conjuge[0] || null : (data as any).conjuge
+          conjuge: Array.isArray((data as any).conjuge) ? (data as any).conjuge[0] || null : (data as any).conjuge,
         };
         return normalized as unknown as Cliente | null;
       }
+
       return null;
     },
-    enabled: !!id
+    enabled: !!id,
   });
 }
 
