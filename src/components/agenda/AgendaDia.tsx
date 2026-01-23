@@ -12,6 +12,7 @@ interface AgendaDiaProps {
   atividades: Atividade[];
   onAtividadeClick?: (atividade: Atividade) => void;
   onNovaAtividade?: () => void;
+  className?: string;
 }
 
 export function AgendaDia({
@@ -19,6 +20,7 @@ export function AgendaDia({
   atividades,
   onAtividadeClick,
   onNovaAtividade,
+  className,
 }: AgendaDiaProps) {
   // Agrupar por hora
   const atividadesPorHora = atividades.reduce((acc, ativ) => {
@@ -33,7 +35,7 @@ export function AgendaDia({
   const horas = Object.keys(atividadesPorHora).sort();
 
   return (
-    <div className="bg-card rounded-lg border h-full flex flex-col">
+    <div className={cn('bg-card rounded-lg border h-full flex flex-col min-h-0', className)}>
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-2">
@@ -56,7 +58,7 @@ export function AgendaDia({
       </div>
 
       {/* Timeline */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {atividades.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <CalendarDays className="h-12 w-12 mb-4 opacity-50" />

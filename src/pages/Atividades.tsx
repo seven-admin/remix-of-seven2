@@ -720,7 +720,7 @@ export default function Atividades() {
 
         {/* View: Calendário */}
         {view === 'calendario' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Calendário */}
             <div className="lg:col-span-2">
               {isLoadingMes ? (
@@ -740,12 +740,13 @@ export default function Atividades() {
             </div>
 
             {/* Lista do Dia Selecionado */}
-            <div>
+            <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-220px)] min-h-0">
               <AgendaDia 
                 data={selectedDate}
                 atividades={atividadesDia || []}
                 onAtividadeClick={handleEdit}
                 onNovaAtividade={handleNova}
+                className="h-full"
               />
             </div>
           </div>
