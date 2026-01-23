@@ -757,8 +757,8 @@ export default function Atividades() {
               </div>
             </div>
 
-            {/* Desktop: painel sobreposto */}
-            <div className="hidden lg:block lg:fixed lg:right-6 lg:top-24 lg:w-[420px] lg:h-[calc(100vh-120px)] z-20">
+            {/* Desktop: painel sobreposto (alinhado à altura do calendário) */}
+            <div className="hidden lg:block lg:absolute lg:right-0 lg:top-0 lg:bottom-0 lg:w-[420px] z-20">
               <AgendaDia
                 data={selectedDate}
                 atividades={atividadesDia || []}
