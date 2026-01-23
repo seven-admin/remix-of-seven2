@@ -35,9 +35,14 @@ export function AgendaDia({
   const horas = Object.keys(atividadesPorHora).sort();
 
   return (
-    <div className={cn('bg-card rounded-lg border h-full flex flex-col min-h-0', className)}>
+    <div
+      className={cn(
+        'bg-card rounded-lg border h-full flex flex-col min-h-0 overflow-hidden',
+        className,
+      )}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b">
+      <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
           <div>
@@ -58,7 +63,7 @@ export function AgendaDia({
       </div>
 
       {/* Timeline */}
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1 min-h-0 h-full">
         {atividades.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <CalendarDays className="h-12 w-12 mb-4 opacity-50" />
