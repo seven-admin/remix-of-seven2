@@ -22,10 +22,9 @@ import {
 } from '@/components/ui/select';
 import { useCorretores } from '@/hooks/useCorretores';
 import { Cliente, CLIENTE_ORIGENS, CLIENTE_TEMPERATURA_LABELS, ESTADOS_CIVIS, UFS_BRASIL, ClienteTemperatura } from '@/types/clientes.types';
-import { useImobiliarias } from '@/hooks/useImobiliarias';
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useCepLookup } from '@/hooks/useCepLookup';
-import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
+import { useEmpreendimentosSelect } from '@/hooks/useEmpreendimentosSelect';
 import { useGestorEmpreendimento } from '@/hooks/useGestorEmpreendimento';
 import { User, Phone, MapPin, Building, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -112,13 +111,14 @@ const STEPS = [
 ];
 
 export function ClienteForm({ initialData, onSubmit, isLoading }: ClienteFormProps) {
-  const { corretores } = useCorretores();
-  const { imobiliarias } = useImobiliarias();
-  const { data: gestores } = useGestoresProduto();
-  const { buscarCep, isLoading: isLoadingCep } = useCepLookup();
-  const { data: empreendimentos } = useEmpreendimentos();
-  const { user, role } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  const isStep4 = currentStep === 4;
+
+  const { corretores } = useCorretores(undefined, { enabled: isStep4 });
+  const { data: gestores } = useGestoresProduto({ enabled: isStep4 });
+  const { buscarCep, isLoading: isLoadingCep } = useCepLookup();
+  const { data: empreendimentos } = useEmpreendimentosSelect({ enabled: isStep4 });
+  const { user, role } = useAuth();
   const [selectedEmpreendimentoId, setSelectedEmpreendimentoId] = useState<string | undefined>(
     initialData?.empreendimento_id || undefined
   );
@@ -127,7 +127,7 @@ export function ClienteForm({ initialData, onSubmit, isLoading }: ClienteFormPro
   const isCorretor = role === 'corretor';
   
   // Buscar gestor vinculado ao empreendimento selecionado
-  const { data: gestorDoEmpreendimento } = useGestorEmpreendimento(selectedEmpreendimentoId);
+  const { data: gestorDoEmpreendimento } = useGestorEmpreendimento(isStep4 ? selectedEmpreendimentoId : undefined);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

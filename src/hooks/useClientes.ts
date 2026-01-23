@@ -8,6 +8,45 @@ import {
 } from '@/types/clientes.types';
 import { toast } from 'sonner';
 import { invalidateDashboards } from '@/lib/invalidateDashboards';
+import { perf } from '@/lib/perf';
+
+const upper = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return value as any;
+  const v = value.trim();
+  return v ? v.toUpperCase() : undefined;
+};
+
+const lower = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return value as any;
+  const v = value.trim();
+  return v ? v.toLowerCase() : undefined;
+};
+
+/**
+ * Normalização para salvar Cliente (escopo: somente clientes)
+ * - OPÇÃO A: campos de texto livres em caixa alta
+ * - email sempre lowercase
+ */
+function normalizeClienteForSave<T extends Partial<ClienteFormData>>(data: T): T {
+  const normalized: any = { ...data };
+
+  if ('email' in normalized) normalized.email = lower(normalized.email);
+
+  // OPÇÃO A
+  if ('nome' in normalized) normalized.nome = upper(normalized.nome);
+  if ('profissao' in normalized) normalized.profissao = upper(normalized.profissao);
+  if ('nacionalidade' in normalized) normalized.nacionalidade = upper(normalized.nacionalidade);
+  if ('nome_mae' in normalized) normalized.nome_mae = upper(normalized.nome_mae);
+  if ('nome_pai' in normalized) normalized.nome_pai = upper(normalized.nome_pai);
+
+  if ('endereco_logradouro' in normalized) normalized.endereco_logradouro = upper(normalized.endereco_logradouro);
+  if ('endereco_bairro' in normalized) normalized.endereco_bairro = upper(normalized.endereco_bairro);
+  if ('endereco_cidade' in normalized) normalized.endereco_cidade = upper(normalized.endereco_cidade);
+  if ('endereco_complemento' in normalized) normalized.endereco_complemento = upper(normalized.endereco_complemento);
+  if ('endereco_uf' in normalized) normalized.endereco_uf = upper(normalized.endereco_uf);
+
+  return normalized as T;
+}
 
 // Helper para aplicar filtros
 const applyFilters = (query: any, filters?: ClienteFilters) => {
@@ -187,6 +226,9 @@ export function useCliente(id: string | undefined) {
     queryFn: async () => {
       if (!id) return null;
 
+      const perfKey = `cliente:detail:${id}`;
+      perf.start(perfKey, { id });
+
       // Tenta com join de cônjuge
       const { data, error } = await supabase
         .from('clientes')
@@ -203,6 +245,7 @@ export function useCliente(id: string | undefined) {
       // Fallback: se erro de schema, tenta sem o join de cônjuge
       if (error?.code === 'PGRST200') {
         console.warn('Schema cache error, retrying without conjuge join (single)');
+        perf.start(`${perfKey}:fallback`, { id });
         const fallback = await supabase
           .from('clientes')
           .select(`
@@ -216,6 +259,9 @@ export function useCliente(id: string | undefined) {
 
         if (fallback.error) throw fallback.error;
 
+        perf.end(`${perfKey}:fallback`, { id, ok: true });
+        perf.end(perfKey, { id, ok: true, usedFallback: true });
+
         if (!fallback.data) return null;
         return { ...(fallback.data as any), conjuge: null } as unknown as Cliente;
       }
@@ -228,8 +274,12 @@ export function useCliente(id: string | undefined) {
           ...data,
           conjuge: Array.isArray((data as any).conjuge) ? (data as any).conjuge[0] || null : (data as any).conjuge,
         };
+
+        perf.end(perfKey, { id, ok: true, usedFallback: false });
         return normalized as unknown as Cliente | null;
       }
+
+      perf.end(perfKey, { id, ok: true, usedFallback: false });
 
       return null;
     },
@@ -275,7 +325,7 @@ export function useCreateCliente() {
   return useMutation({
     mutationFn: async (data: ClienteFormData) => {
       const insertData = {
-        ...data,
+        ...normalizeClienteForSave(data),
         fase: data.fase || 'prospecto',
         temperatura: data.temperatura || 'frio'
       };
@@ -307,9 +357,10 @@ export function useUpdateCliente() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<ClienteFormData> }) => {
+      const updateData = normalizeClienteForSave(data);
       const { data: cliente, error } = await supabase
         .from('clientes')
-        .update(data)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();

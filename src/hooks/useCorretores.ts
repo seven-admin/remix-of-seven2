@@ -3,9 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { Corretor, CorretorFormData } from '@/types/mercado.types';
 import { useToast } from '@/hooks/use-toast';
 
-export function useCorretores(imobiliariaId?: string) {
+type QueryOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  gcTime?: number;
+};
+
+export function useCorretores(imobiliariaId?: string, options: QueryOptions = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const {
+    enabled = true,
+    staleTime = 10 * 60 * 1000,
+    gcTime = 60 * 60 * 1000,
+  } = options;
 
   const { data: corretores = [], isLoading, error } = useQuery({
     queryKey: ['corretores', imobiliariaId],
@@ -47,7 +59,11 @@ export function useCorretores(imobiliariaId?: string) {
       }
       
       return corretoresData as Corretor[];
-    }
+    },
+    enabled,
+    staleTime,
+    gcTime,
+    refetchOnWindowFocus: false,
   });
 
   // Hook to fetch a single corretor by ID

@@ -3,9 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { Imobiliaria, ImobiliariaFormData } from '@/types/mercado.types';
 import { useToast } from '@/hooks/use-toast';
 
-export function useImobiliarias() {
+type QueryOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  gcTime?: number;
+};
+
+export function useImobiliarias(options: QueryOptions = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const {
+    enabled = true,
+    staleTime = 10 * 60 * 1000,
+    gcTime = 60 * 60 * 1000,
+  } = options;
 
   const { data: imobiliarias = [], isLoading, error } = useQuery({
     queryKey: ['imobiliarias'],
@@ -33,7 +45,11 @@ export function useImobiliarias() {
         ...imob,
         corretores_count: counts[imob.id] || 0
       }));
-    }
+    },
+    enabled,
+    staleTime,
+    gcTime,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({
