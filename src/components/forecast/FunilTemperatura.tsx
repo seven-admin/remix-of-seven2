@@ -6,9 +6,9 @@ import { CLIENTE_TEMPERATURA_LABELS, type ClienteTemperatura } from '@/types/cli
 import { ForecastBarChart, type ForecastChartDataItem } from './ForecastBarChart';
 
 const CORES_TEMPERATURA: Record<ClienteTemperatura, string> = {
-  frio: '#3B82F6',    // Azul
-  morno: '#F59E0B',   // Amarelo
-  quente: '#EF4444',  // Vermelho
+  frio: 'hsl(var(--chart-1))',
+  morno: 'hsl(var(--chart-3))',
+  quente: 'hsl(var(--destructive))',
 };
 
 interface FunilTemperaturaProps {

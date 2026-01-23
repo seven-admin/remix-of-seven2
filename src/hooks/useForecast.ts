@@ -8,14 +8,14 @@ interface FunilTemperaturaItem {
   percentual: number;
 }
 
-export function useFunilTemperatura(empreendimentoId?: string) {
+export function useFunilTemperatura(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'funil-temperatura', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'funil-temperatura', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<FunilTemperaturaItem[]> => {
-      // Se não há filtro por empreendimento, mantém a lógica atual (todos os clientes ativos)
-      if (!empreendimentoId) {
+      // Se não há filtro, mantém a lógica atual (todos os clientes ativos)
+      if (!gestorId) {
         const { data, error } = await supabase.from('clientes').select('temperatura').eq('is_active', true);
         if (error) throw error;
 
@@ -32,11 +32,11 @@ export function useFunilTemperatura(empreendimentoId?: string) {
         }));
       }
 
-      // Com filtro: considerar apenas clientes que possuem atividades no empreendimento.
+      // Com filtro (por gestor): considerar apenas clientes que possuem atividades do gestor.
       const { data: atividades, error: atividadesError } = await supabase
         .from('atividades' as any)
         .select('cliente_id')
-        .eq('empreendimento_id', empreendimentoId)
+        .eq('gestor_id', gestorId)
         .not('cliente_id', 'is', null)
         .neq('status', 'cancelada');
 
@@ -73,9 +73,9 @@ export function useFunilTemperatura(empreendimentoId?: string) {
   });
 }
 
-export function useVisitasPorEmpreendimento(empreendimentoId?: string) {
+export function useVisitasPorEmpreendimento(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'visitas-por-empreendimento', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'visitas-por-empreendimento', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -90,8 +90,8 @@ export function useVisitasPorEmpreendimento(empreendimentoId?: string) {
         .not('empreendimento_id', 'is', null)
         .neq('status', 'cancelada');
 
-      if (empreendimentoId) {
-        query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
       }
 
       const { data, error } = await query;
@@ -121,9 +121,9 @@ export function useVisitasPorEmpreendimento(empreendimentoId?: string) {
   });
 }
 
-export function useResumoAtividades(empreendimentoId?: string) {
+export function useResumoAtividades(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atividades', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'resumo-atividades', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -134,7 +134,7 @@ export function useResumoAtividades(empreendimentoId?: string) {
       let query = supabase
         .from('atividades' as any)
         .select('status, data_hora, requer_followup, data_followup');
-      if (empreendimentoId) query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) query = query.eq('gestor_id', gestorId);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -197,9 +197,9 @@ export interface AtividadeSemanaItem {
   atendimento: number;
 }
 
-export function useAtividadesPorTipoPorSemana(empreendimentoId?: string) {
+export function useAtividadesPorTipoPorSemana(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-tipo-semana', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'atividades-por-tipo-semana', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<AtividadeSemanaItem[]> => {
@@ -216,8 +216,8 @@ export function useAtividadesPorTipoPorSemana(empreendimentoId?: string) {
         .lte('data_hora', fimMes.toISOString())
         .neq('status', 'cancelada');
 
-      if (empreendimentoId) {
-        query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
       }
 
       const { data, error } = await query;
@@ -254,9 +254,9 @@ export function useAtividadesPorTipoPorSemana(empreendimentoId?: string) {
 }
 
 // Novo hook: Atividades por corretor
-export function useAtividadesPorCorretor(empreendimentoId?: string) {
+export function useAtividadesPorCorretor(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-corretor', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'atividades-por-corretor', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -266,8 +266,8 @@ export function useAtividadesPorCorretor(empreendimentoId?: string) {
         .not('corretor_id', 'is', null)
         .neq('status', 'cancelada');
 
-      if (empreendimentoId) {
-        query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
       }
 
       const { data, error } = await query;
@@ -329,9 +329,9 @@ export function useCalendarioAtividades(ano: number, mes: number) {
 }
 
 // Novo hook: Próximas atividades
-export function useProximasAtividades(limite: number = 10, empreendimentoId?: string) {
+export function useProximasAtividades(limite: number = 10, gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'proximas-atividades', limite, empreendimentoId || 'all'],
+    queryKey: ['forecast', 'proximas-atividades', limite, gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -349,8 +349,8 @@ export function useProximasAtividades(limite: number = 10, empreendimentoId?: st
         .gte('data_hora', agora)
         .order('data_hora', { ascending: true });
 
-      if (empreendimentoId) {
-        query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
       }
 
       const { data, error } = await query.limit(limite);
@@ -367,9 +367,9 @@ type ResumoAtendimentos = {
   retornos: { total: number; pendentes: number; concluidos: number };
 };
 
-export function useResumoAtendimentos(empreendimentoId?: string) {
+export function useResumoAtendimentos(gestorId?: string) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atendimentos', empreendimentoId || 'all'],
+    queryKey: ['forecast', 'resumo-atendimentos', gestorId || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<ResumoAtendimentos> => {
@@ -379,8 +379,8 @@ export function useResumoAtendimentos(empreendimentoId?: string) {
         .eq('tipo', 'atendimento')
         .neq('status', 'cancelada');
 
-      if (empreendimentoId) {
-        query = query.eq('empreendimento_id', empreendimentoId);
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
       }
 
       const { data, error } = await query;

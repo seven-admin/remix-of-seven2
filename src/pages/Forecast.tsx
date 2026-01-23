@@ -19,7 +19,7 @@ import { useTVLayoutConfig } from '@/hooks/useTVLayoutConfig';
 import { TVLayoutConfigDialog } from '@/components/tv-layout';
 import { useResumoAtividades } from '@/hooks/useForecast';
 import { useCreateAtividade, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
-import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
+import { useGestoresProduto } from '@/hooks/useGestores';
 import {
   Select,
   SelectContent,
@@ -33,9 +33,9 @@ import { ptBR } from 'date-fns/locale';
 import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeForm';
 
 export default function Forecast() {
-  const [empreendimentoId, setEmpreendimentoId] = useState<string | undefined>(undefined);
-  const { data: empreendimentos } = useEmpreendimentos();
-  const { data: resumo, isLoading, refetch } = useResumoAtividades(empreendimentoId);
+  const [gestorId, setGestorId] = useState<string | undefined>(undefined);
+  const { data: gestores } = useGestoresProduto();
+  const { data: resumo, isLoading, refetch } = useResumoAtividades(gestorId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modoTV, setModoTV] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
@@ -214,7 +214,7 @@ export default function Forecast() {
       case 'atendimentos-resumo':
         return (
           <div key={itemId}>
-            <AtendimentosResumo empreendimentoId={empreendimentoId} />
+            <AtendimentosResumo gestorId={gestorId} />
           </div>
         );
       case 'funil-temperatura':
@@ -224,7 +224,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Funil de Temperatura</CardTitle>
             </CardHeader>
             <CardContent>
-              <FunilTemperatura empreendimentoId={empreendimentoId} />
+              <FunilTemperatura empreendimentoId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -235,7 +235,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Atividades por Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <AtividadesPorTipo empreendimentoId={empreendimentoId} />
+              <AtividadesPorTipo gestorId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -246,7 +246,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Próximas Atividades</CardTitle>
             </CardHeader>
             <CardContent>
-              <ProximasAtividades empreendimentoId={empreendimentoId} />
+              <ProximasAtividades gestorId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -257,7 +257,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Ranking de Corretores</CardTitle>
             </CardHeader>
             <CardContent>
-              <RankingCorretoresAtivos empreendimentoId={empreendimentoId} />
+              <RankingCorretoresAtivos empreendimentoId={gestorId} />
             </CardContent>
           </Card>
         );
@@ -336,17 +336,17 @@ export default function Forecast() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <Select
-              value={empreendimentoId || 'all'}
-              onValueChange={(v) => setEmpreendimentoId(v === 'all' ? undefined : v)}
+              value={gestorId || 'all'}
+              onValueChange={(v) => setGestorId(v === 'all' ? undefined : v)}
             >
               <SelectTrigger className="w-full sm:w-[260px]">
-                <SelectValue placeholder="Todos os Empreendimentos" />
+                <SelectValue placeholder="Todos os Gestores" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Empreendimentos</SelectItem>
-                {(empreendimentos || []).map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.nome}
+                <SelectItem value="all">Todos os Gestores</SelectItem>
+                {(gestores || []).map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.full_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -415,25 +415,25 @@ export default function Forecast() {
         </div>
 
         {/* Atendimentos: Novo x Retorno */}
-        <AtendimentosResumo empreendimentoId={empreendimentoId} />
+        <AtendimentosResumo gestorId={gestorId} />
 
         {/* Primeira linha: Funil + Atividades por Tipo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FunilTemperatura empreendimentoId={empreendimentoId} />
-          <AtividadesPorTipo empreendimentoId={empreendimentoId} />
+          <FunilTemperatura empreendimentoId={gestorId} />
+          <AtividadesPorTipo gestorId={gestorId} />
         </div>
 
         {/* Segunda linha: Próximas Atividades + Visitas por Empreendimento */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ProximasAtividades empreendimentoId={empreendimentoId} />
-          <VisitasPorEmpreendimento empreendimentoId={empreendimentoId} />
+          <ProximasAtividades gestorId={gestorId} />
+          <VisitasPorEmpreendimento empreendimentoId={gestorId} />
         </div>
 
         {/* Terceira linha: Ranking de Corretores */}
-        <RankingCorretoresAtivos empreendimentoId={empreendimentoId} />
+        <RankingCorretoresAtivos empreendimentoId={gestorId} />
 
         {/* Alertas de Follow-up */}
-        <AlertasFollowup empreendimentoId={empreendimentoId} />
+        <AlertasFollowup gestorId={gestorId} />
       </div>
 
       {/* Dialog Nova Atividade */}

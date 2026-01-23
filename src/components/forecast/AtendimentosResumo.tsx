@@ -6,7 +6,7 @@ import { Headphones, RefreshCw } from 'lucide-react';
 import { useResumoAtendimentos } from '@/hooks/useForecast';
 
 interface AtendimentosResumoProps {
-  empreendimentoId?: string;
+  gestorId?: string;
 }
 
 function calcTaxa(concluidos: number, total: number) {
@@ -14,8 +14,8 @@ function calcTaxa(concluidos: number, total: number) {
   return Math.round((concluidos / total) * 100);
 }
 
-export function AtendimentosResumo({ empreendimentoId }: AtendimentosResumoProps) {
-  const { data, isLoading } = useResumoAtendimentos(empreendimentoId);
+export function AtendimentosResumo({ gestorId }: AtendimentosResumoProps) {
+  const { data, isLoading } = useResumoAtendimentos(gestorId);
 
   if (isLoading) {
     return (
