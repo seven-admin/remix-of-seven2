@@ -15,18 +15,18 @@ import {
 } from 'recharts';
 
 const TIPO_CORES: Record<string, string> = {
-  visita: '#3B82F6',
-  ligacao: '#EC4899',
-  reuniao: '#06B6D4',
-  atendimento: '#10B981',
+  visita: 'hsl(var(--chart-1))',
+  ligacao: 'hsl(var(--chart-5))',
+  reuniao: 'hsl(var(--chart-4))',
+  atendimento: 'hsl(var(--chart-2))',
 };
 
 interface AtividadesPorTipoProps {
-  empreendimentoId?: string;
+  gestorId?: string;
 }
 
-export function AtividadesPorTipo({ empreendimentoId }: AtividadesPorTipoProps) {
-  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(empreendimentoId);
+export function AtividadesPorTipo({ gestorId }: AtividadesPorTipoProps) {
+  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(gestorId);
 
   if (isLoading) {
     return (

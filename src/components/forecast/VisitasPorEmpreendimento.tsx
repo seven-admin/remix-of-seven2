@@ -5,11 +5,11 @@ import { useVisitasPorEmpreendimento } from '@/hooks/useForecast';
 import { ForecastBarChart, type ForecastChartDataItem } from './ForecastBarChart';
 
 const CORES_RANKING = [
-  '#F59E0B',  // Amarelo/Dourado (1º lugar)
-  '#94A3B8',  // Prata (2º)
-  '#F97316',  // Laranja/Bronze (3º)
-  '#3B82F6',  // Azul (4º)
-  '#EC4899',  // Rosa (5º)
+  'hsl(var(--chart-3))',  // 1º
+  'hsl(var(--muted-foreground))',  // 2º
+  'hsl(var(--chart-4))',  // 3º
+  'hsl(var(--chart-1))',  // 4º
+  'hsl(var(--chart-5))',  // 5º
 ];
 
 interface VisitasPorEmpreendimentoProps {

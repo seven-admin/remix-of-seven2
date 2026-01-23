@@ -12,6 +12,22 @@ import type {
 } from '@/types/financeiro.types';
 import { RECORRENCIA_MESES } from '@/types/financeiro.types';
 
+function normalizeUpper(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const trimmed = v.trim();
+  return trimmed ? trimmed.toUpperCase() : trimmed;
+}
+
+function normalizeLancamentoForSave<T extends Record<string, any>>(data: T): T {
+  return {
+    ...data,
+    descricao: normalizeUpper(data.descricao),
+    subcategoria: normalizeUpper(data.subcategoria),
+    observacoes: normalizeUpper(data.observacoes),
+    categoria_fluxo: normalizeUpper(data.categoria_fluxo),
+  };
+}
+
 interface LancamentoFilters {
   tipo?: TipoLancamento;
   status?: StatusLancamento;
@@ -142,15 +158,16 @@ export function useCreateLancamento() {
 
   return useMutation({
     mutationFn: async (formData: LancamentoFormData) => {
+      const normalized = normalizeLancamentoForSave(formData);
       const { data: user } = await supabase.auth.getUser();
       
       // Verificar se a categoria tem aprovação automática
       let statusConferencia = 'pendente';
-      if (formData.categoria_fluxo) {
+      if (normalized.categoria_fluxo) {
         const { data: categoria } = await supabase
           .from('categorias_fluxo')
           .select('aprovacao_automatica')
-          .eq('nome', formData.categoria_fluxo)
+          .eq('nome', normalized.categoria_fluxo)
           .single();
         
         if (categoria?.aprovacao_automatica) {
@@ -159,29 +176,29 @@ export function useCreateLancamento() {
       }
       
       // Se for recorrente, gerar múltiplos lançamentos
-      if (formData.is_recorrente && formData.recorrencia_frequencia) {
+      if (normalized.is_recorrente && normalized.recorrencia_frequencia) {
         const dates = generateRecurringDates(
-          formData.data_vencimento,
-          formData.recorrencia_frequencia
+          normalized.data_vencimento,
+          normalized.recorrencia_frequencia
         );
 
         // Criar o primeiro lançamento (pai)
         const { data: paiData, error: paiError } = await supabase
           .from('lancamentos_financeiros')
           .insert({
-            tipo: formData.tipo,
-            categoria_fluxo: formData.categoria_fluxo,
-            subcategoria: formData.subcategoria,
-            centro_custo_id: formData.centro_custo_id,
-            descricao: formData.descricao,
-            valor: formData.valor,
+            tipo: normalized.tipo,
+            categoria_fluxo: normalized.categoria_fluxo,
+            subcategoria: normalized.subcategoria,
+            centro_custo_id: normalized.centro_custo_id,
+            descricao: normalized.descricao,
+            valor: normalized.valor,
             data_vencimento: dates[0],
-            data_competencia: formData.data_competencia,
-            empreendimento_id: formData.empreendimento_id,
-            contrato_id: formData.contrato_id,
-            observacoes: formData.observacoes,
+            data_competencia: normalized.data_competencia,
+            empreendimento_id: normalized.empreendimento_id,
+            contrato_id: normalized.contrato_id,
+            observacoes: normalized.observacoes,
             is_recorrente: true,
-            recorrencia_frequencia: formData.recorrencia_frequencia,
+            recorrencia_frequencia: normalized.recorrencia_frequencia,
             status_conferencia: statusConferencia,
             created_by: user.user?.id
           })
@@ -193,20 +210,20 @@ export function useCreateLancamento() {
         // Criar os lançamentos filhos (a partir do segundo)
         if (dates.length > 1) {
           const filhos = dates.slice(1).map(date => ({
-            tipo: formData.tipo,
-            categoria_fluxo: formData.categoria_fluxo,
-            subcategoria: formData.subcategoria,
-            centro_custo_id: formData.centro_custo_id,
-            descricao: formData.descricao,
-            valor: formData.valor,
+            tipo: normalized.tipo,
+            categoria_fluxo: normalized.categoria_fluxo,
+            subcategoria: normalized.subcategoria,
+            centro_custo_id: normalized.centro_custo_id,
+            descricao: normalized.descricao,
+            valor: normalized.valor,
             data_vencimento: date,
-            data_competencia: formData.data_competencia,
-            empreendimento_id: formData.empreendimento_id,
-            contrato_id: formData.contrato_id,
-            observacoes: formData.observacoes,
+            data_competencia: normalized.data_competencia,
+            empreendimento_id: normalized.empreendimento_id,
+            contrato_id: normalized.contrato_id,
+            observacoes: normalized.observacoes,
             is_recorrente: true,
             recorrencia_pai_id: paiData.id,
-            recorrencia_frequencia: formData.recorrencia_frequencia,
+            recorrencia_frequencia: normalized.recorrencia_frequencia,
             status_conferencia: statusConferencia,
             created_by: user.user?.id
           }));
@@ -225,17 +242,17 @@ export function useCreateLancamento() {
       const { error } = await supabase
         .from('lancamentos_financeiros')
         .insert({
-          tipo: formData.tipo,
-          categoria_fluxo: formData.categoria_fluxo,
-          subcategoria: formData.subcategoria,
-          centro_custo_id: formData.centro_custo_id,
-          descricao: formData.descricao,
-          valor: formData.valor,
-          data_vencimento: formData.data_vencimento,
-          data_competencia: formData.data_competencia,
-          empreendimento_id: formData.empreendimento_id,
-          contrato_id: formData.contrato_id,
-          observacoes: formData.observacoes,
+          tipo: normalized.tipo,
+          categoria_fluxo: normalized.categoria_fluxo,
+          subcategoria: normalized.subcategoria,
+          centro_custo_id: normalized.centro_custo_id,
+          descricao: normalized.descricao,
+          valor: normalized.valor,
+          data_vencimento: normalized.data_vencimento,
+          data_competencia: normalized.data_competencia,
+          empreendimento_id: normalized.empreendimento_id,
+          contrato_id: normalized.contrato_id,
+          observacoes: normalized.observacoes,
           is_recorrente: false,
           status_conferencia: statusConferencia,
           created_by: user.user?.id
@@ -347,9 +364,10 @@ export function useUpdateLancamento() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<LancamentoFinanceiro> }) => {
+      const payload = normalizeLancamentoForSave(data);
       const { error } = await supabase
         .from('lancamentos_financeiros')
-        .update(data)
+        .update(payload)
         .eq('id', id);
 
       if (error) throw error;

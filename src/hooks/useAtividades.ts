@@ -11,6 +11,21 @@ import type {
   ConfiguracoesAtividades,
 } from '@/types/atividades.types';
 
+function normalizeUpper(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const trimmed = v.trim();
+  return trimmed ? trimmed.toUpperCase() : trimmed;
+}
+
+function normalizeAtividadeForSave<T extends Record<string, any>>(data: T): T {
+  return {
+    ...data,
+    titulo: normalizeUpper(data.titulo),
+    observacoes: normalizeUpper(data.observacoes),
+    resultado: normalizeUpper(data.resultado),
+  };
+}
+
 export interface UseAtividadesOptions {
   filters?: AtividadeFilters;
   page?: number;
@@ -143,7 +158,8 @@ export function useCreateAtividade() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (formData: AtividadeFormData) => {
-      const { data, error } = await supabase.from('atividades').insert(formData).select().single();
+      const payload = normalizeAtividadeForSave(formData);
+      const { data, error } = await supabase.from('atividades').insert(payload).select().single();
       if (error) throw error;
       return data;
     },
@@ -164,7 +180,7 @@ export function useCreateAtividadesParaGestores() {
     mutationFn: async ({ formData, gestorIds }: { formData: Omit<AtividadeFormData, 'gestor_id'>; gestorIds: string[] }) => {
       // Criar uma atividade para cada gestor
       const atividadesParaInserir = gestorIds.map(gestorId => ({
-        ...formData,
+        ...(normalizeAtividadeForSave(formData) as Omit<AtividadeFormData, 'gestor_id'>),
         gestor_id: gestorId,
       }));
 
@@ -186,7 +202,8 @@ export function useUpdateAtividade() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<AtividadeFormData> }) => {
-      const { data: result, error } = await supabase.from('atividades').update(data).eq('id', id).select().single();
+      const payload = normalizeAtividadeForSave(data);
+      const { data: result, error } = await supabase.from('atividades').update(payload).eq('id', id).select().single();
       if (error) throw error;
       return result;
     },
@@ -204,9 +221,10 @@ export function useConcluirAtividade() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ConcluirAtividadeData }) => {
+      const resultadoUpper = normalizeUpper(data.resultado) as string;
       const { data: result, error } = await supabase
         .from('atividades')
-        .update({ status: 'concluida', resultado: data.resultado, temperatura_cliente: data.temperatura_cliente, requer_followup: data.requer_followup, data_followup: data.data_followup })
+        .update({ status: 'concluida', resultado: resultadoUpper, temperatura_cliente: data.temperatura_cliente, requer_followup: data.requer_followup, data_followup: data.data_followup })
         .eq('id', id)
         .select()
         .single();
@@ -228,7 +246,7 @@ export function useConcluirAtividadesEmLote() {
     mutationFn: async (ids: string[]) => {
       const { error } = await supabase
         .from('atividades')
-        .update({ status: 'concluida', resultado: 'Atividade concluída (lote)' })
+        .update({ status: 'concluida', resultado: normalizeUpper('Atividade concluída (lote)') as string })
         .in('id', ids);
       if (error) throw error;
     },
@@ -309,11 +327,11 @@ export function useConfiguracoesAtividades() {
   });
 }
 
-export function useAtividadesPendentesFollowup() {
+export function useAtividadesPendentesFollowup(gestorId?: string) {
   return useQuery({
-    queryKey: ['atividades-pendentes-followup'],
+    queryKey: ['atividades-pendentes-followup', gestorId || 'all'],
     queryFn: async (): Promise<Atividade[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo)`)
         .eq('requer_followup', true)
@@ -321,6 +339,10 @@ export function useAtividadesPendentesFollowup() {
         .not('data_followup', 'is', null)
         .lte('data_followup', new Date().toISOString())
         .order('data_followup', { ascending: true });
+
+      if (gestorId) query = query.eq('gestor_id', gestorId);
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as Atividade[];
     },
@@ -396,16 +418,20 @@ export function useAtividadesHoje() {
   });
 }
 
-export function useAtividadesVencidas() {
+export function useAtividadesVencidas(gestorId?: string) {
   return useQuery({
-    queryKey: ['atividades-vencidas'],
+    queryKey: ['atividades-vencidas', gestorId || 'all'],
     queryFn: async (): Promise<Atividade[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo)`)
         .eq('status', 'pendente')
         .lt('data_hora', new Date().toISOString())
         .order('data_hora', { ascending: true });
+
+      if (gestorId) query = query.eq('gestor_id', gestorId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data || []) as unknown as Atividade[];
