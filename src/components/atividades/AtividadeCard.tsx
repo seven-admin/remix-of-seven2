@@ -32,11 +32,12 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
   const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
 
   if (compact) {
+    const data = new Date(atividade.data_hora);
     return (
       <div
         onClick={onClick}
         className={cn(
-          'flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
+          'flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors',
           'hover:bg-accent/50',
           isVencida && 'border-l-2 border-destructive'
         )}
@@ -45,10 +46,32 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
           <Icon className="h-3 w-3 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{atividade.titulo}</p>
-          <p className="text-xs text-muted-foreground">
-            {format(new Date(atividade.data_hora), 'HH:mm')}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground truncate">
+              {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
+            </p>
+            <p className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {format(data, "dd/MM 'às' HH:mm", { locale: ptBR })}
+            </p>
+          </div>
+
+          <p className="text-[13px] font-normal leading-snug truncate">{atividade.titulo}</p>
+
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 min-w-0">
+              <Building2 className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground truncate">
+                {atividade.empreendimento?.nome || '—'}
+              </span>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn('text-[10px] px-1.5 py-0 shrink-0', ATIVIDADE_STATUS_COLORS[atividade.status])}
+            >
+              {atividade.status === 'pendente' ? (isVencida ? 'Vencida' : 'Pendente') :
+               atividade.status === 'concluida' ? 'Concluída' : 'Cancelada'}
+            </Badge>
+          </div>
         </div>
       </div>
     );

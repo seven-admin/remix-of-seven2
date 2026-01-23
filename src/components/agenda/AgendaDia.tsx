@@ -35,14 +35,14 @@ export function AgendaDia({
   return (
     <div className="bg-card rounded-lg border h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
           <div>
-            <h3 className="font-semibold capitalize">
+            <h3 className="font-medium capitalize text-sm">
               {format(data, "EEEE, d 'de' MMMM", { locale: ptBR })}
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {atividades.length} {atividades.length === 1 ? 'atividade' : 'atividades'}
             </p>
           </div>
@@ -68,12 +68,12 @@ export function AgendaDia({
             )}
           </div>
         ) : (
-          <div className="p-4 space-y-4">
+          <div className="p-3 space-y-3">
             {horas.map((hora) => (
               <div key={hora} className="flex gap-3">
                 {/* Hora */}
-                <div className="w-14 flex-shrink-0">
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <div className="w-12 flex-shrink-0">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     <span>{hora}</span>
                   </div>
@@ -85,11 +85,12 @@ export function AgendaDia({
                 </div>
 
                 {/* Atividades */}
-                <div className="flex-1 space-y-2 pb-4">
+                <div className="flex-1 space-y-1.5 pb-3">
                   {atividadesPorHora[hora].map((atividade) => (
                     <AtividadeCard
                       key={atividade.id}
                       atividade={atividade}
+                      compact
                       onClick={() => onAtividadeClick?.(atividade)}
                     />
                   ))}

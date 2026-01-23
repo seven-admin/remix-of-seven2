@@ -455,8 +455,8 @@ export default function Atividades() {
                               </Badge>
                             )}
                           </div>
-                          <h4 className="font-medium truncate">{atividade.titulo}</h4>
-                          <p className="text-sm text-muted-foreground truncate">
+                          <h4 className="font-normal text-sm truncate">{atividade.titulo}</h4>
+                          <p className="text-xs text-muted-foreground truncate">
                             {atividade.cliente?.nome || 'Sem cliente'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -601,7 +601,7 @@ export default function Atividades() {
                                   {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="font-medium">{atividade.titulo}</TableCell>
+                              <TableCell className="font-normal">{atividade.titulo}</TableCell>
                               <TableCell>{atividade.cliente?.nome || '-'}</TableCell>
                               <TableCell className="hidden lg:table-cell">{atividade.corretor?.nome_completo || '-'}</TableCell>
                               <TableCell className="hidden lg:table-cell">{atividade.gestor?.full_name || '-'}</TableCell>
@@ -765,8 +765,8 @@ export default function Atividades() {
                 {atividadesVencidas.map((atividade) => (
                   <div key={atividade.id} className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg">
                     <div>
-                      <p className="font-medium text-foreground">{atividade.titulo}</p>
-                      <p className="text-sm text-muted-foreground">
+                       <p className="font-normal text-sm text-foreground">{atividade.titulo}</p>
+                       <p className="text-xs text-muted-foreground">
                         {atividade.cliente?.nome} • {atividade.corretor?.nome_completo}
                       </p>
                     </div>

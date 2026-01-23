@@ -67,7 +67,8 @@ export function useAtividades(options: UseAtividadesOptions = {}) {
       if (countError) throw countError;
 
       dataQuery = dataQuery
-        .order('data_hora', { ascending: true })
+        // Lista em /atividades: sempre mais recentes primeiro
+        .order('data_hora', { ascending: false })
         .range(from, to);
 
       const { data, error } = await dataQuery;
