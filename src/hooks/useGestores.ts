@@ -10,7 +10,19 @@ interface GestorProduto {
   percentual_comissao?: number | null;
 }
 
-export function useGestoresProduto() {
+type QueryOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  gcTime?: number;
+};
+
+export function useGestoresProduto(options: QueryOptions = {}) {
+  // Uso principal: selects/listas (mudam pouco) -> cache mais agressivo.
+  const {
+    enabled = true,
+    staleTime = 10 * 60 * 1000,
+    gcTime = 60 * 60 * 1000,
+  } = options;
   return useQuery({
     queryKey: ['gestores-produto'],
     queryFn: async () => {
@@ -38,7 +50,11 @@ export function useGestoresProduto() {
       if (profilesError) throw profilesError;
 
       return (profiles || []) as GestorProduto[];
-    }
+    },
+    enabled,
+    staleTime,
+    gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
