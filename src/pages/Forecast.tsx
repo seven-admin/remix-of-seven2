@@ -37,10 +37,30 @@ export default function Forecast() {
   const [competencia, setCompetencia] = useState(new Date());
   const { data: gestores } = useGestoresProduto();
   
+  // Período atual
   const dataInicio = useMemo(() => startOfMonth(competencia), [competencia]);
   const dataFim = useMemo(() => endOfMonth(competencia), [competencia]);
   
+  // Período anterior (mês anterior ao selecionado)
+  const dataInicioAnterior = useMemo(() => startOfMonth(subMonths(competencia, 1)), [competencia]);
+  const dataFimAnterior = useMemo(() => endOfMonth(subMonths(competencia, 1)), [competencia]);
+  
   const { data: resumo, isLoading, refetch } = useResumoAtividades(gestorId, dataInicio, dataFim);
+  const { data: resumoAnterior } = useResumoAtividades(gestorId, dataInicioAnterior, dataFimAnterior);
+  
+  // Funções de cálculo de variação
+  const calcularVariacao = (atual: number, anterior: number): number | undefined => {
+    if (anterior === 0) {
+      return atual > 0 ? 100 : undefined;
+    }
+    return ((atual - anterior) / anterior) * 100;
+  };
+  
+  // Para métricas onde aumento é negativo (pendentes, vencidas)
+  const calcularVariacaoInversa = (atual: number, anterior: number): number | undefined => {
+    const variacao = calcularVariacao(atual, anterior);
+    return variacao !== undefined ? -variacao : undefined;
+  };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modoTV, setModoTV] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
@@ -429,6 +449,11 @@ export default function Forecast() {
                 title="Pendentes"
                 value={resumo?.pendentes || 0}
                 icon={Activity}
+                variacao={calcularVariacaoInversa(
+                  resumo?.pendentes || 0,
+                  resumoAnterior?.pendentes || 0
+                )}
+                subtitle="vs mês anterior"
               />
               <KPICardCompact
                 title="Hoje"
@@ -440,24 +465,44 @@ export default function Forecast() {
                 value={resumo?.concluidasMes || 0}
                 icon={TrendingUp}
                 iconColor="text-chart-2"
+                variacao={calcularVariacao(
+                  resumo?.concluidasMes || 0,
+                  resumoAnterior?.concluidasMes || 0
+                )}
+                subtitle="vs mês anterior"
               />
               <KPICardCompact
                 title="Vencidas"
                 value={resumo?.vencidas || 0}
                 icon={AlertTriangle}
                 iconColor={resumo?.vencidas ? "text-destructive" : "text-primary"}
+                variacao={calcularVariacaoInversa(
+                  resumo?.vencidas || 0,
+                  resumoAnterior?.vencidas || 0
+                )}
+                subtitle="vs mês anterior"
               />
               <KPICardCompact
                 title="Follow-ups"
                 value={resumo?.followupsPendentes || 0}
                 icon={BarChart3}
                 iconColor={resumo?.followupsPendentes ? "text-warning" : "text-primary"}
+                variacao={calcularVariacao(
+                  resumo?.followupsPendentes || 0,
+                  resumoAnterior?.followupsPendentes || 0
+                )}
+                subtitle="vs mês anterior"
               />
               <KPICardCompact
                 title="Taxa Conclusão"
                 value={`${resumo?.taxaConclusao || 0}%`}
                 icon={Percent}
                 iconColor="text-chart-2"
+                variacao={calcularVariacao(
+                  resumo?.taxaConclusao || 0,
+                  resumoAnterior?.taxaConclusao || 0
+                )}
+                subtitle="vs mês anterior"
               />
             </>
           )}
