@@ -139,13 +139,23 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       data_previsao?: string;
       is_interno?: boolean;
     }) => {
+      // Buscar a primeira etapa ativa (Triagem) para novos tickets
+      const { data: primeiraEtapa } = await supabase
+        .from('ticket_etapas')
+        .select('id')
+        .eq('is_active', true)
+        .order('ordem', { ascending: true })
+        .limit(1)
+        .single();
+
       const { data: result, error } = await supabase
         .from('projetos_marketing')
         .insert({
           ...data,
           codigo: '', // Será gerado pelo trigger
           status: 'briefing' as StatusProjetoDB, // aguardando_analise maps to briefing
-          is_interno: data.is_interno ?? false
+          is_interno: data.is_interno ?? false,
+          ticket_etapa_id: primeiraEtapa?.id || null
         })
         .select()
         .single();
