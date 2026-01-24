@@ -78,9 +78,6 @@ export default function Atividades() {
   const { data: atividadesDia } = useAgendaDia(selectedDate);
   const { data: atividadesHoje } = useAtividadesHoje();
   const { data: atividadesVencidas, isLoading: isLoadingVencidas } = useAtividadesVencidas();
-  
-  // DEBUG: Verificar dados do VencidasCard
-  console.log('DEBUG VencidasCard:', { view, atividadesVencidasCount: atividadesVencidas?.length, isLoadingVencidas });
   const { data: gestores } = useGestoresProduto();
   const { data: empreendimentos } = useEmpreendimentos();
   const { data: clientes } = useClientes();
@@ -771,34 +768,7 @@ export default function Atividades() {
           </div>
         )}
 
-        {/* Atividades Vencidas */}
-        {view !== 'calendario' && atividadesVencidas && atividadesVencidas.length > 0 && (
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                Atividades Vencidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {atividadesVencidas.map((atividade) => (
-                  <div key={atividade.id} className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg">
-                    <div>
-                       <p className="font-normal text-sm text-foreground">{atividade.titulo}</p>
-                       <p className="text-xs text-muted-foreground">
-                        {atividade.cliente?.nome} • {atividade.corretor?.nome_completo}
-                      </p>
-                    </div>
-                    <Badge variant="destructive">
-                      {format(new Date(atividade.data_hora), 'dd/MM/yyyy', { locale: ptBR })}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* VencidasCard agora está nos cards de resumo no topo */}
       </div>
 
       {/* Dialog Nova/Editar Atividade */}

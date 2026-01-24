@@ -424,7 +424,6 @@ export function useAtividadesVencidas(gestorId?: string) {
     refetchOnMount: true,
     staleTime: 30000,
     queryFn: async (): Promise<Atividade[]> => {
-      console.log('DEBUG useAtividadesVencidas: Fetching...');
       let query = supabase
         .from('atividades')
         .select(`
@@ -441,8 +440,6 @@ export function useAtividadesVencidas(gestorId?: string) {
       if (gestorId) query = query.eq('gestor_id', gestorId);
 
       const { data, error } = await query;
-      
-      console.log('DEBUG useAtividadesVencidas: Result', { count: data?.length, error });
 
       if (error) throw error;
       return (data || []) as unknown as Atividade[];

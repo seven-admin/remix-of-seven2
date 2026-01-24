@@ -92,7 +92,7 @@ export function AgendaDia({
                 </div>
 
                 {/* Atividades */}
-                <div className="flex-1 space-y-1.5 pb-3">
+                <div className="flex-1 min-w-0 space-y-1.5 pb-3">
                   {atividadesPorHora[hora].map((atividade) => (
                     <AtividadeCard
                       key={atividade.id}

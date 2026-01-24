@@ -122,7 +122,7 @@ export function VencidasCard({
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         <span className="text-destructive font-medium">{tempoVencida}</span>
-                        {atividade.cliente && (
+                        {atividade.cliente?.nome && (
                           <>
                             <span className="text-muted-foreground/50">•</span>
                             <span className="truncate">{atividade.cliente.nome}</span>
@@ -134,10 +134,10 @@ export function VencidasCard({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="flex-shrink-0 h-7 px-2 text-primary hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="flex-shrink-0 h-7 px-2 text-primary hover:text-primary hover:bg-primary/10 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       onClick={(e) => handleConcluirClick(e, atividade)}
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" />
+                      <CheckCircle className="h-4 w-4 sm:mr-1" />
                       <span className="hidden sm:inline">Concluir</span>
                     </Button>
                   </div>
