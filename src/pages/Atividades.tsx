@@ -78,6 +78,9 @@ export default function Atividades() {
   const { data: atividadesDia } = useAgendaDia(selectedDate);
   const { data: atividadesHoje } = useAtividadesHoje();
   const { data: atividadesVencidas, isLoading: isLoadingVencidas } = useAtividadesVencidas();
+  
+  // DEBUG: Verificar dados do VencidasCard
+  console.log('DEBUG VencidasCard:', { view, atividadesVencidasCount: atividadesVencidas?.length, isLoadingVencidas });
   const { data: gestores } = useGestoresProduto();
   const { data: empreendimentos } = useEmpreendimentos();
   const { data: clientes } = useClientes();
