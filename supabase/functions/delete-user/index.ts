@@ -43,10 +43,10 @@ Deno.serve(async (req) => {
 
     console.log('Authenticated user:', user.id, user.email);
 
-    // Check if user is admin or super_admin
-    const { data: userRole, error: roleError } = await supabaseClient
+    // Check if user is admin or super_admin (using role_id + roles table)
+    const { data: userRoleData, error: roleError } = await supabaseClient
       .from('user_roles')
-      .select('role')
+      .select('role_id, roles!inner(name)')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -58,9 +58,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    const userRoleName = (userRoleData?.roles as any)?.name;
     const allowedRoles = ['admin', 'super_admin'];
-    if (!userRole || !allowedRoles.includes(userRole.role)) {
-      console.error('User does not have permission:', userRole?.role);
+    if (!userRoleName || !allowedRoles.includes(userRoleName)) {
+      console.error('User does not have permission:', userRoleName);
       return new Response(
         JSON.stringify({ error: 'Apenas administradores podem excluir usuários' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

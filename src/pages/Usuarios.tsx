@@ -95,20 +95,24 @@ export default function Usuarios() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all user roles
+      // Fetch all user roles with role_id + roles table join
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('user_id, role_id, roles!inner(name)');
 
       if (rolesError) throw rolesError;
 
-      // Merge profiles with roles
-      const usersWithRoles: UserWithRole[] = (profiles || []).map(profile => ({
-        ...profile as Profile,
-        role: roles?.find(r => r.user_id === profile.id)?.role as AppRole | null ?? null,
-        tipo_vinculo: (profile as any).tipo_vinculo as 'funcionario_seven' | 'terceiro' | null,
-        cargo: (profile as any).cargo as string | null
-      }));
+      // Merge profiles with roles (using roles.name from joined table)
+      const usersWithRoles: UserWithRole[] = (profiles || []).map(profile => {
+        const userRole = roles?.find(r => r.user_id === profile.id);
+        const roleName = (userRole?.roles as any)?.name as AppRole | null;
+        return {
+          ...profile as Profile,
+          role: roleName ?? null,
+          tipo_vinculo: (profile as any).tipo_vinculo as 'funcionario_seven' | 'terceiro' | null,
+          cargo: (profile as any).cargo as string | null
+        };
+      });
 
       setUsers(usersWithRoles);
     } catch (error) {
@@ -161,19 +165,34 @@ export default function Usuarios() {
         .eq('user_id', editingUser.id)
         .maybeSingle();
 
+      // Get role_id from roles table based on role name
+      const { data: roleData, error: roleQueryError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', editRole)
+        .single();
+
+      if (roleQueryError || !roleData) {
+        throw new Error('Perfil não encontrado: ' + editRole);
+      }
+
       if (existingRole) {
-        // Update existing role
+        // Update existing role with role_id
         const { error: roleError } = await supabase
           .from('user_roles')
-          .update({ role: editRole as any })
+          .update({ role_id: roleData.id })
           .eq('user_id', editingUser.id);
 
         if (roleError) throw roleError;
       } else {
-        // Insert new role
+        // Insert new role with role_id (keeping role column for backward compatibility until removed)
         const { error: roleError } = await supabase
           .from('user_roles')
-          .insert({ user_id: editingUser.id, role: editRole as any });
+          .insert({ 
+            user_id: editingUser.id, 
+            role_id: roleData.id,
+            role: editRole as any  // Temporary: keep enum column populated for backward compatibility
+          });
 
         if (roleError) throw roleError;
       }
