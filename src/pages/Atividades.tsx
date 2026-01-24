@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AtividadeForm } from '@/components/atividades/AtividadeForm';
 import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtividadeDialog';
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
+import { VencidasCard } from '@/components/atividades/VencidasCard';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
 import { useAtividade, useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
@@ -76,7 +77,7 @@ export default function Atividades() {
   const { data: atividadesMes, isLoading: isLoadingMes } = useAgendaMensal(ano, mes);
   const { data: atividadesDia } = useAgendaDia(selectedDate);
   const { data: atividadesHoje } = useAtividadesHoje();
-  const { data: atividadesVencidas } = useAtividadesVencidas();
+  const { data: atividadesVencidas, isLoading: isLoadingVencidas } = useAtividadesVencidas();
   const { data: gestores } = useGestoresProduto();
   const { data: empreendimentos } = useEmpreendimentos();
   const { data: clientes } = useClientes();
@@ -264,17 +265,14 @@ export default function Atividades() {
             </CardContent>
           </Card>
 
-          <Card className={atividadesVencidas?.length ? 'border-destructive/50 bg-destructive/5' : ''}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                <AlertCircle className="h-4 w-4 text-destructive" />
-                Vencidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-destructive">{atividadesVencidas?.length || 0}</div>
-            </CardContent>
-          </Card>
+          {view === 'lista' && (
+            <VencidasCard
+              atividades={atividadesVencidas || []}
+              isLoading={isLoadingVencidas}
+              onAtividadeClick={handleOpenDetalheById}
+              onConcluir={handleConcluir}
+            />
+          )}
         </div>
 
         {/* View: Lista */}
