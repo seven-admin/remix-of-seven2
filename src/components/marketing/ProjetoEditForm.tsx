@@ -165,15 +165,15 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
                 <User className="h-3.5 w-3.5" />
                 Responsável
               </label>
-              <Select 
-                value={formData.supervisor_id} 
-                onValueChange={(v) => setFormData(prev => ({ ...prev, supervisor_id: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sem responsável</SelectItem>
+          <Select 
+            value={formData.supervisor_id || 'none'} 
+            onValueChange={(v) => setFormData(prev => ({ ...prev, supervisor_id: v === 'none' ? '' : v }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem responsável</SelectItem>
                   {funcionarios?.map((func) => (
                     <SelectItem key={func.id} value={func.id}>
                       {func.full_name}

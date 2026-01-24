@@ -50,6 +50,7 @@ import DashboardExecutivo from "./pages/DashboardExecutivo";
 import Solicitacoes from "./pages/Solicitacoes";
 import Simulador from "./pages/Simulador";
 import DashboardMarketing from "./pages/DashboardMarketing";
+import EquipeMarketing from "./pages/EquipeMarketing";
 import TermosUso from "./pages/TermosUso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import PortalClientes from "./pages/PortalClientes";
@@ -213,6 +214,11 @@ const App = () => (
             <Route path="/marketing" element={
               <ProtectedRoute moduleName="projetos_marketing">
                 <Marketing />
+              </ProtectedRoute>
+            } />
+            <Route path="/marketing/equipe" element={
+              <ProtectedRoute moduleName="projetos_marketing">
+                <EquipeMarketing />
               </ProtectedRoute>
             } />
             <Route path="/marketing/etapas" element={
