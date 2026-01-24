@@ -8,15 +8,43 @@ interface FunilTemperaturaItem {
   percentual: number;
 }
 
-export function useFunilTemperatura(gestorId?: string) {
+export function useFunilTemperatura(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'funil-temperatura', gestorId || 'all'],
+    queryKey: ['forecast', 'funil-temperatura', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<FunilTemperaturaItem[]> => {
-      // Se não há filtro, mantém a lógica atual (todos os clientes ativos)
+      // Definir período padrão (mês atual)
+      const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const fimMes = dataFim || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+      
+      // Se não há filtro, considerar clientes que possuem atividades no período
       if (!gestorId) {
-        const { data, error } = await supabase.from('clientes').select('temperatura').eq('is_active', true);
+        // Buscar clientes que têm atividades no período
+        const { data: atividades, error: atividadesError } = await supabase
+          .from('atividades' as any)
+          .select('cliente_id')
+          .gte('data_hora', inicioMes.toISOString())
+          .lte('data_hora', fimMes.toISOString())
+          .not('cliente_id', 'is', null)
+          .neq('status', 'cancelada');
+        
+        if (atividadesError) throw atividadesError;
+        
+        const clienteIds = Array.from(new Set((atividades || []).map((a: any) => a.cliente_id).filter(Boolean)));
+        if (clienteIds.length === 0) {
+          return (['frio', 'morno', 'quente'] as ClienteTemperatura[]).map((temp) => ({
+            temperatura: temp,
+            quantidade: 0,
+            percentual: 0,
+          }));
+        }
+        
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('temperatura')
+          .eq('is_active', true)
+          .in('id', clienteIds);
         if (error) throw error;
 
         const contagem: Record<ClienteTemperatura, number> = { frio: 0, morno: 0, quente: 0 };
@@ -32,11 +60,13 @@ export function useFunilTemperatura(gestorId?: string) {
         }));
       }
 
-      // Com filtro (por gestor): considerar apenas clientes que possuem atividades do gestor.
+      // Com filtro (por gestor): considerar apenas clientes que possuem atividades do gestor no período.
       const { data: atividades, error: atividadesError } = await supabase
         .from('atividades' as any)
         .select('cliente_id')
         .eq('gestor_id', gestorId)
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString())
         .not('cliente_id', 'is', null)
         .neq('status', 'cancelada');
 
@@ -73,22 +103,24 @@ export function useFunilTemperatura(gestorId?: string) {
   });
 }
 
-export function useVisitasPorEmpreendimento(gestorId?: string) {
+export function useVisitasPorEmpreendimento(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'visitas-por-empreendimento', gestorId || 'all'],
+    queryKey: ['forecast', 'visitas-por-empreendimento', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
-      const inicioMes = new Date();
-      inicioMes.setDate(1);
-      inicioMes.setHours(0, 0, 0, 0);
+      // Usar período passado ou mês atual como padrão
+      const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const fimMes = dataFim || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
 
       let query = supabase
         .from('atividades' as any)
         .select(`id, empreendimento_id, data_hora, empreendimento:empreendimentos(id, nome)`)
         .eq('tipo', 'visita')
         .not('empreendimento_id', 'is', null)
-        .neq('status', 'cancelada');
+        .neq('status', 'cancelada')
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString());
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
@@ -102,16 +134,15 @@ export function useVisitasPorEmpreendimento(gestorId?: string) {
       (data || []).forEach((ativ: any) => {
         if (!ativ.empreendimento_id || !ativ.empreendimento) return;
         const existing = agrupado.get(ativ.empreendimento_id);
-        const isMesAtual = new Date(ativ.data_hora) >= inicioMes;
         if (existing) {
           existing.total_visitas++;
-          if (isMesAtual) existing.visitas_mes_atual++;
+          existing.visitas_mes_atual++;
         } else {
           agrupado.set(ativ.empreendimento_id, {
             empreendimento_id: ativ.empreendimento_id,
             empreendimento_nome: ativ.empreendimento.nome,
             total_visitas: 1,
-            visitas_mes_atual: isMesAtual ? 1 : 0,
+            visitas_mes_atual: 1,
           });
         }
       });
@@ -121,19 +152,24 @@ export function useVisitasPorEmpreendimento(gestorId?: string) {
   });
 }
 
-export function useResumoAtividades(gestorId?: string) {
+export function useResumoAtividades(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atividades', gestorId || 'all'],
+    queryKey: ['forecast', 'resumo-atividades', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
-      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      
+      // Usar período passado ou mês atual como padrão
+      const inicioMes = dataInicio || new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fimMes = dataFim || new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
 
       let query = supabase
         .from('atividades' as any)
-        .select('status, data_hora, requer_followup, data_followup');
+        .select('status, data_hora, requer_followup, data_followup')
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString());
       if (gestorId) query = query.eq('gestor_id', gestorId);
 
       const { data, error } = await query;
@@ -150,7 +186,7 @@ export function useResumoAtividades(gestorId?: string) {
         }
         if (ativ.status === 'concluida') {
           concluidas++;
-          if (dataAtiv >= inicioMes) concluidasMes++;
+          concluidasMes++;
         }
         if (ativ.requer_followup && ativ.data_followup && new Date(ativ.data_followup) <= hoje && ativ.status === 'concluida') followupsPendentes++;
       });
@@ -197,17 +233,17 @@ export interface AtividadeSemanaItem {
   atendimento: number;
 }
 
-export function useAtividadesPorTipoPorSemana(gestorId?: string) {
+export function useAtividadesPorTipoPorSemana(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-tipo-semana', gestorId || 'all'],
+    queryKey: ['forecast', 'atividades-por-tipo-semana', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<AtividadeSemanaItem[]> => {
-      const inicioMes = new Date();
-      inicioMes.setDate(1);
+      // Usar período passado ou mês atual como padrão
+      const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       inicioMes.setHours(0, 0, 0, 0);
       
-      const fimMes = new Date(inicioMes.getFullYear(), inicioMes.getMonth() + 1, 0, 23, 59, 59);
+      const fimMes = dataFim || new Date(inicioMes.getFullYear(), inicioMes.getMonth() + 1, 0, 23, 59, 59);
       
       let query = supabase
         .from('atividades' as any)
@@ -243,28 +279,40 @@ export function useAtividadesPorTipoPorSemana(gestorId?: string) {
         }
       });
       
-      // Retornar apenas semanas com dados ou até a semana atual
+      // Retornar todas as semanas que têm dados ou até a semana atual do mês selecionado
       const hoje = new Date();
-      const diaAtual = hoje.getDate();
-      const semanaAtual = Math.min(Math.floor((diaAtual - 1) / 7), 4);
+      const isPeriodoAtual = inicioMes.getMonth() === hoje.getMonth() && inicioMes.getFullYear() === hoje.getFullYear();
       
-      return semanas.slice(0, semanaAtual + 1);
+      if (isPeriodoAtual) {
+        const diaAtual = hoje.getDate();
+        const semanaAtual = Math.min(Math.floor((diaAtual - 1) / 7), 4);
+        return semanas.slice(0, semanaAtual + 1);
+      }
+      
+      // Para meses passados, retornar todas as semanas com dados
+      return semanas.filter((s, i) => s.visita + s.ligacao + s.reuniao + s.atendimento > 0 || i < 4);
     },
   });
 }
 
 // Novo hook: Atividades por corretor
-export function useAtividadesPorCorretor(gestorId?: string) {
+export function useAtividadesPorCorretor(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-corretor', gestorId || 'all'],
+    queryKey: ['forecast', 'atividades-por-corretor', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
+      // Usar período passado ou mês atual como padrão
+      const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const fimMes = dataFim || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+      
       let query = supabase
         .from('atividades' as any)
         .select('corretor_id, status, corretor:corretores(id, nome_completo)')
         .not('corretor_id', 'is', null)
-        .neq('status', 'cancelada');
+        .neq('status', 'cancelada')
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString());
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
@@ -367,17 +415,23 @@ type ResumoAtendimentos = {
   retornos: { total: number; pendentes: number; concluidos: number };
 };
 
-export function useResumoAtendimentos(gestorId?: string) {
+export function useResumoAtendimentos(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atendimentos', gestorId || 'all'],
+    queryKey: ['forecast', 'resumo-atendimentos', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<ResumoAtendimentos> => {
+      // Usar período passado ou mês atual como padrão
+      const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const fimMes = dataFim || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+      
       let query = supabase
         .from('atividades' as any)
         .select('categoria, status')
         .eq('tipo', 'atendimento')
-        .neq('status', 'cancelada');
+        .neq('status', 'cancelada')
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString());
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
