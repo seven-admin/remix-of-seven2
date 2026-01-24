@@ -4,6 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import { Phone, Users, MapPin, Headphones, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -22,13 +23,19 @@ interface PendenciasTabProps {
   isLoading: boolean;
   onAtividadeClick: (id: string) => void;
   onConcluir: (atividade: Atividade) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
 }
 
 export function PendenciasTab({ 
   atividades, 
   isLoading, 
   onAtividadeClick, 
-  onConcluir 
+  onConcluir,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll
 }: PendenciasTabProps) {
   const atividadesOrdenadas = useMemo(() => {
     return [...atividades].sort((a, b) => {
@@ -68,11 +75,18 @@ export function PendenciasTab({
   return (
     <div className="space-y-4">
       {/* Resumo */}
-      <div className="flex items-center gap-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
-        <AlertTriangle className="h-4 w-4 text-destructive" />
-        <span className="text-sm text-destructive font-medium">
-          {atividades.length} pendência{atividades.length !== 1 ? 's' : ''}
-        </span>
+      <div className="flex items-center justify-between gap-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <span className="text-sm text-destructive font-medium">
+            {atividades.length} pendência{atividades.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        {selectedIds.size > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {/* Mobile View */}
@@ -88,13 +102,20 @@ export function PendenciasTab({
               key={atividade.id}
               className={cn(
                 'p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/30',
-                diasVencida > 7 && 'bg-destructive/10 border-destructive/30',
-                diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 border-destructive/20',
-                diasVencida <= 3 && 'bg-warning/5 border-warning/20'
+                selectedIds.has(atividade.id) && 'bg-primary/5 border-primary/30',
+                !selectedIds.has(atividade.id) && diasVencida > 7 && 'bg-destructive/10 border-destructive/30',
+                !selectedIds.has(atividade.id) && diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 border-destructive/20',
+                !selectedIds.has(atividade.id) && diasVencida <= 3 && 'bg-warning/5 border-warning/20'
               )}
               onClick={() => onAtividadeClick(atividade.id)}
             >
               <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={selectedIds.has(atividade.id)}
+                  onCheckedChange={() => onToggleSelect(atividade.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <Badge variant="outline" className="text-xs gap-1">
@@ -132,6 +153,13 @@ export function PendenciasTab({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={atividades.length > 0 && selectedIds.size === atividades.length}
+                  onCheckedChange={onToggleSelectAll}
+                  aria-label="Selecionar todas"
+                />
+              </TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Título</TableHead>
               <TableHead>Cliente</TableHead>
@@ -154,12 +182,20 @@ export function PendenciasTab({
                   key={atividade.id}
                   className={cn(
                     'cursor-pointer',
-                    diasVencida > 7 && 'bg-destructive/10 hover:bg-destructive/15',
-                    diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 hover:bg-destructive/10',
-                    diasVencida <= 3 && 'bg-warning/5 hover:bg-warning/10'
+                    selectedIds.has(atividade.id) && 'bg-primary/5 hover:bg-primary/10',
+                    !selectedIds.has(atividade.id) && diasVencida > 7 && 'bg-destructive/10 hover:bg-destructive/15',
+                    !selectedIds.has(atividade.id) && diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 hover:bg-destructive/10',
+                    !selectedIds.has(atividade.id) && diasVencida <= 3 && 'bg-warning/5 hover:bg-warning/10'
                   )}
                   onClick={() => onAtividadeClick(atividade.id)}
                 >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(atividade.id)}
+                      onCheckedChange={() => onToggleSelect(atividade.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="gap-1">
                       <TipoIcon className="h-3 w-3" />
