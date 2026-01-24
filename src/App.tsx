@@ -49,6 +49,7 @@ import AssinarContrato from "./pages/AssinarContrato";
 import DashboardExecutivo from "./pages/DashboardExecutivo";
 import Solicitacoes from "./pages/Solicitacoes";
 import Simulador from "./pages/Simulador";
+import DashboardMarketing from "./pages/DashboardMarketing";
 import TermosUso from "./pages/TermosUso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import PortalClientes from "./pages/PortalClientes";
@@ -204,6 +205,11 @@ const App = () => (
               </ProtectedRoute>
             } />
             {/* Marketing e Criação */}
+            <Route path="/marketing/dashboard" element={
+              <ProtectedRoute moduleName="projetos_marketing">
+                <DashboardMarketing />
+              </ProtectedRoute>
+            } />
             <Route path="/marketing" element={
               <ProtectedRoute moduleName="projetos_marketing">
                 <Marketing />
