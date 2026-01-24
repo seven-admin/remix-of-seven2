@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, AppRole, ROLE_LABELS, ROLE_DESCRIPTIONS } from '@/types/auth.types';
 import { Button } from '@/components/ui/button';
+import { useRoles } from '@/hooks/useRoles';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,18 @@ export default function Usuarios() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  
+  // Buscar roles dinâmicos do banco
+  const { data: rolesFromDb = [] } = useRoles();
+  
+  // Helper para obter display_name do role
+  const getRoleDisplayName = useMemo(() => {
+    return (roleName: string | null | undefined): string => {
+      if (!roleName) return 'Sem perfil';
+      const role = rolesFromDb.find(r => r.name === roleName);
+      return role?.display_name || ROLE_LABELS[roleName] || roleName;
+    };
+  }, [rolesFromDb]);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [activeTab, setActiveTab] = useState('dados');
   const [pageTab, setPageTab] = useState('usuarios');
@@ -455,7 +468,7 @@ export default function Usuarios() {
                       </div>
                       <div className="flex gap-2 mt-3 flex-wrap">
                         <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {user.role ? ROLE_LABELS[user.role] : 'Sem perfil'}
+                          {getRoleDisplayName(user.role)}
                         </Badge>
                         <Badge variant={user.tipo_vinculo === 'funcionario_seven' ? 'default' : 'outline'}>
                           {user.tipo_vinculo === 'funcionario_seven' ? 'Seven' : 'Terceiro'}
@@ -514,7 +527,7 @@ export default function Usuarios() {
                           </TableCell>
                           <TableCell>
                             <Badge variant={getRoleBadgeVariant(user.role)}>
-                              {user.role ? ROLE_LABELS[user.role] : 'Sem perfil'}
+                              {getRoleDisplayName(user.role)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -620,13 +633,15 @@ export default function Usuarios() {
                       <SelectValue placeholder="Selecione um perfil" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.keys(ROLE_LABELS) as AppRole[]).map((role) => (
-                        <SelectItem key={role} value={role}>
+                      {rolesFromDb.map((role) => (
+                        <SelectItem key={role.name} value={role.name}>
                           <div className="flex flex-col">
-                            <span>{ROLE_LABELS[role]}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {ROLE_DESCRIPTIONS[role]}
-                            </span>
+                            <span>{role.display_name}</span>
+                            {role.description && (
+                              <span className="text-xs text-muted-foreground">
+                                {role.description}
+                              </span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
@@ -812,13 +827,15 @@ export default function Usuarios() {
                     <SelectValue placeholder="Selecione um perfil" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(ROLE_LABELS) as AppRole[]).map((role) => (
-                      <SelectItem key={role} value={role}>
+                    {rolesFromDb.map((role) => (
+                      <SelectItem key={role.name} value={role.name}>
                         <div className="flex flex-col">
-                          <span>{ROLE_LABELS[role]}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {ROLE_DESCRIPTIONS[role]}
-                          </span>
+                          <span>{role.display_name}</span>
+                          {role.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {role.description}
+                            </span>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
