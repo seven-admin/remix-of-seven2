@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useCreateBriefing } from '@/hooks/useBriefings';
 import { CATEGORIA_LABELS, PRIORIDADE_LABELS, type CategoriaProjeto, type PrioridadeProjeto } from '@/types/marketing.types';
-import { Loader2, ChevronLeft, ChevronRight, FileEdit, FileText, Check } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, FileEdit, FileText, Check, Building2 } from 'lucide-react';
 
 const STEPS = [
   { id: 1, title: 'Dados do Ticket', icon: FileEdit },
@@ -20,6 +21,7 @@ const STEPS = [
 
 const formSchema = z.object({
   // Step 1: Ticket data
+  is_interno: z.boolean().default(false),
   titulo: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
   descricao: z.string().optional(),
   categoria: z.enum(['render_3d', 'design_grafico', 'video_animacao', 'evento', 'pedido_orcamento']),
@@ -52,6 +54,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      is_interno: false,
       titulo: '',
       descricao: '',
       categoria: 'design_grafico',
@@ -66,6 +69,21 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
       briefing_observacoes: '',
     }
   });
+
+  const isInterno = form.watch('is_interno');
+
+  // Auto-preencher cliente quando for ticket interno
+  useEffect(() => {
+    if (isInterno) {
+      form.setValue('briefing_cliente', 'SEVEN (Interno)');
+    } else {
+      // Limpar apenas se estava preenchido com valor interno
+      const currentValue = form.getValues('briefing_cliente');
+      if (currentValue === 'SEVEN (Interno)') {
+        form.setValue('briefing_cliente', '');
+      }
+    }
+  }, [isInterno, form]);
 
   const validateStep1 = async () => {
     const result = await form.trigger(['titulo', 'categoria', 'prioridade']);
@@ -97,6 +115,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
       empreendimento_id: data.empreendimento_id || undefined,
       data_previsao: data.data_previsao || undefined,
       briefing_id: newBriefing.id,
+      is_interno: data.is_interno,
     });
     
     onSuccess();
@@ -141,6 +160,31 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Etapa 1: Dados do Ticket</h3>
+            
+            {/* Switch Ticket Interno */}
+            <FormField
+              control={form.control}
+              name="is_interno"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/50">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <FormLabel className="text-base font-medium">Ticket Interno</FormLabel>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Marque se este ticket é para uso interno da empresa SEVEN
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
             
             <FormField
               control={form.control}
@@ -281,7 +325,12 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
                   <FormItem>
                     <FormLabel>Cliente *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nome do cliente" {...field} />
+                      <Input 
+                        placeholder="Nome do cliente" 
+                        {...field} 
+                        disabled={isInterno}
+                        className={isInterno ? 'bg-muted' : ''}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

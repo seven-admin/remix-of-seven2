@@ -3897,6 +3897,7 @@ export type Database = {
           empreendimento_id: string | null
           id: string
           is_active: boolean | null
+          is_interno: boolean
           ordem_kanban: number | null
           prioridade: Database["public"]["Enums"]["prioridade_projeto"] | null
           status: Database["public"]["Enums"]["status_projeto"] | null
@@ -3921,6 +3922,7 @@ export type Database = {
           empreendimento_id?: string | null
           id?: string
           is_active?: boolean | null
+          is_interno?: boolean
           ordem_kanban?: number | null
           prioridade?: Database["public"]["Enums"]["prioridade_projeto"] | null
           status?: Database["public"]["Enums"]["status_projeto"] | null
@@ -3945,6 +3947,7 @@ export type Database = {
           empreendimento_id?: string | null
           id?: string
           is_active?: boolean | null
+          is_interno?: boolean
           ordem_kanban?: number | null
           prioridade?: Database["public"]["Enums"]["prioridade_projeto"] | null
           status?: Database["public"]["Enums"]["status_projeto"] | null

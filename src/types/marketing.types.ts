@@ -27,6 +27,7 @@ export interface Ticket {
   briefing_texto: string | null;
   briefing_anexos: string[];
   ordem_kanban: number;
+  is_interno: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
