@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AtividadeForm } from '@/components/atividades/AtividadeForm';
 import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtividadeDialog';
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
-import { VencidasCard } from '@/components/atividades/VencidasCard';
+import { PendenciasTab } from '@/components/atividades/PendenciasTab';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
 import { useAtividade, useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
@@ -51,7 +51,7 @@ const TIPO_COLORS: Record<AtividadeTipo, string> = {
 };
 
 export default function Atividades() {
-  const [view, setView] = useState<'lista' | 'calendario'>('lista');
+  const [view, setView] = useState<'lista' | 'calendario' | 'pendencias'>('lista');
   const [filters, setFilters] = useState<AtividadeFilters>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -213,7 +213,7 @@ export default function Atividades() {
       <div className="space-y-6">
         {/* Header com toggle de visualização */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={view} onValueChange={(v) => setView(v as 'lista' | 'calendario')}>
+        <Tabs value={view} onValueChange={(v) => setView(v as 'lista' | 'calendario' | 'pendencias')}>
             <TabsList>
               <TabsTrigger value="lista" className="gap-2">
                 <List className="h-4 w-4" />
@@ -222,6 +222,15 @@ export default function Atividades() {
               <TabsTrigger value="calendario" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 <span className="hidden sm:inline">Calendário</span>
+              </TabsTrigger>
+              <TabsTrigger value="pendencias" className="gap-2 relative">
+                <AlertCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Pendências</span>
+                {(atividadesVencidas?.length || 0) > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-[10px]">
+                    {atividadesVencidas?.length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -245,35 +254,38 @@ export default function Atividades() {
           </div>
         </div>
 
-        {/* Resumo (visível em ambas as views) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Atividades Hoje</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{atividadesHoje?.length || 0}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Este Mês</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{atividadesMes?.length || 0}</div>
-            </CardContent>
-          </Card>
+        {/* Resumo (visível em lista e calendário) */}
+        {view !== 'pendencias' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Atividades Hoje</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">{atividadesHoje?.length || 0}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Este Mês</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{atividadesMes?.length || 0}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          {view === 'lista' && (
-            <VencidasCard
-              atividades={atividadesVencidas || []}
-              isLoading={isLoadingVencidas}
-              onAtividadeClick={handleOpenDetalheById}
-              onConcluir={handleConcluir}
-            />
-          )}
-        </div>
+        {/* View: Pendências */}
+        {view === 'pendencias' && (
+          <PendenciasTab
+            atividades={atividadesVencidas || []}
+            isLoading={isLoadingVencidas}
+            onAtividadeClick={handleOpenDetalheById}
+            onConcluir={handleConcluir}
+          />
+        )}
 
         {/* View: Lista */}
         {view === 'lista' && (
