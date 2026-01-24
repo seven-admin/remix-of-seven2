@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
+import { useFuncionariosSeven } from '@/hooks/useFuncionariosSeven';
 import { 
   ProjetoMarketing, 
   CategoriaProjeto, 
@@ -25,6 +26,7 @@ import {
   PRIORIDADE_LABELS,
   STATUS_LABELS
 } from '@/types/marketing.types';
+import { User } from 'lucide-react';
 
 interface ProjetoEditFormProps {
   open: boolean;
@@ -36,6 +38,7 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
   { open, onOpenChange, projeto },
   ref
 ) {
+  const { data: funcionarios } = useFuncionariosSeven();
   const { updateProjeto } = useProjetosMarketing();
 
   const [formData, setFormData] = useState({
@@ -46,6 +49,7 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
     prioridade: projeto.prioridade,
     status: projeto.status,
     data_previsao: projeto.data_previsao || '',
+    supervisor_id: projeto.supervisor_id || '',
   });
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
         prioridade: projeto.prioridade,
         status: projeto.status,
         data_previsao: projeto.data_previsao || '',
+        supervisor_id: projeto.supervisor_id || '',
       });
     }
   }, [projeto]);
@@ -73,6 +78,7 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
       prioridade: formData.prioridade,
       status: formData.status,
       data_previsao: formData.data_previsao || undefined,
+      supervisor_id: formData.supervisor_id || null,
     });
     onOpenChange(false);
   };
@@ -134,7 +140,7 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium">Prioridade</label>
               <Select 
@@ -148,6 +154,29 @@ export const ProjetoEditForm = forwardRef<HTMLDivElement, ProjetoEditFormProps>(
                   {(Object.keys(PRIORIDADE_LABELS) as PrioridadeProjeto[]).map((prio) => (
                     <SelectItem key={prio} value={prio}>
                       {PRIORIDADE_LABELS[prio]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium flex items-center gap-1">
+                <User className="h-3.5 w-3.5" />
+                Responsável
+              </label>
+              <Select 
+                value={formData.supervisor_id} 
+                onValueChange={(v) => setFormData(prev => ({ ...prev, supervisor_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem responsável</SelectItem>
+                  {funcionarios?.map((func) => (
+                    <SelectItem key={func.id} value={func.id}>
+                      {func.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
