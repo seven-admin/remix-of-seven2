@@ -40,7 +40,7 @@ export default function EquipeMarketing() {
               <Users className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Equipe de Marketing</h1>
+              <h1 className="text-2xl font-bold">Equipe de Criação</h1>
               <p className="text-sm text-muted-foreground">
                 Gestão de carga de trabalho e produtividade
               </p>

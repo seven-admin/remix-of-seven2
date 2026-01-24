@@ -6,6 +6,7 @@ export interface MembroEquipe {
   id: string;
   nome: string;
   avatar_url: string | null;
+  cargo: string | null;
   emProducao: number;
   aguardando: number;
   revisao: number;
@@ -47,9 +48,56 @@ export function useEquipeMarketing(filters?: Filters) {
   const periodoFim = filters?.periodoFim || endOfMonth(new Date());
 
   return useQuery({
-    queryKey: ['equipe-marketing', periodoInicio.toISOString(), periodoFim.toISOString()],
+    queryKey: ['equipe-criacao', periodoInicio.toISOString(), periodoFim.toISOString()],
     queryFn: async (): Promise<EquipeMarketingData> => {
-      // Buscar todos os tickets ativos com supervisor
+      // Buscar o ID do módulo projetos_marketing
+      const { data: moduloMarketing } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('name', 'projetos_marketing')
+        .single();
+
+      if (!moduloMarketing) {
+        return { membros: [], kpis: { totalMembros: 0, totalEmProducao: 0, totalConcluidos: 0, tempoMedioGeral: null, taxaNoPrazoGeral: 0 }, ticketsRecentes: [] };
+      }
+
+      // Buscar usuários com permissão específica no módulo (excluindo admin/super_admin)
+      const { data: permissoes } = await supabase
+        .from('user_module_permissions')
+        .select(`
+          user_id,
+          profiles!inner(
+            id,
+            full_name,
+            avatar_url,
+            cargo
+          )
+        `)
+        .eq('module_id', moduloMarketing.id)
+        .eq('can_view', true);
+
+      // Buscar usuários que são admin/super_admin para excluí-los
+      const { data: admins } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['admin', 'super_admin']);
+
+      const adminIds = new Set(admins?.map(a => a.user_id) || []);
+
+      // Filtrar membros da equipe (excluir admins)
+      const membrosEquipe = (permissoes || [])
+        .filter(p => !adminIds.has(p.user_id))
+        .map(p => {
+          const profile = p.profiles as { id: string; full_name: string; avatar_url: string | null; cargo: string | null };
+          return {
+            id: profile.id,
+            nome: profile.full_name || 'Sem nome',
+            avatar_url: profile.avatar_url,
+            cargo: profile.cargo
+          };
+        });
+
+      // Buscar todos os tickets ativos
       const { data: tickets, error } = await supabase
         .from('projetos_marketing')
         .select(`
@@ -68,46 +116,30 @@ export function useEquipeMarketing(filters?: Filters) {
             avatar_url
           )
         `)
-        .eq('is_active', true)
-        .not('supervisor_id', 'is', null);
+        .eq('is_active', true);
 
       if (error) throw error;
 
-      // Agrupar tickets por supervisor
-      const membroMap = new Map<string, {
-        id: string;
-        nome: string;
-        avatar_url: string | null;
-        tickets: typeof tickets;
-      }>();
-
+      // Criar mapa de tickets por supervisor
+      const ticketsPorSupervisor = new Map<string, typeof tickets>();
       tickets?.forEach(ticket => {
-        if (!ticket.supervisor_id || !ticket.supervisor) return;
-        
-        const supervisor = ticket.supervisor as { id: string; full_name: string; avatar_url: string | null };
-        
-        if (!membroMap.has(ticket.supervisor_id)) {
-          membroMap.set(ticket.supervisor_id, {
-            id: ticket.supervisor_id,
-            nome: supervisor.full_name || 'Sem nome',
-            avatar_url: supervisor.avatar_url,
-            tickets: []
-          });
+        if (!ticket.supervisor_id) return;
+        if (!ticketsPorSupervisor.has(ticket.supervisor_id)) {
+          ticketsPorSupervisor.set(ticket.supervisor_id, []);
         }
-        
-        membroMap.get(ticket.supervisor_id)!.tickets.push(ticket);
+        ticketsPorSupervisor.get(ticket.supervisor_id)!.push(ticket);
       });
 
-      // Calcular métricas por membro
-      const membros: MembroEquipe[] = [];
-      
-      membroMap.forEach(membro => {
-        const emProducao = membro.tickets.filter(t => t.status === 'em_producao').length;
-        const aguardando = membro.tickets.filter(t => t.status === 'briefing' || t.status === 'triagem').length;
-        const revisao = membro.tickets.filter(t => t.status === 'revisao' || t.status === 'aprovacao_cliente').length;
+      // Calcular métricas para cada membro da equipe (baseado em permissões)
+      const membros: MembroEquipe[] = membrosEquipe.map(membro => {
+        const ticketsMembro = ticketsPorSupervisor.get(membro.id) || [];
+        
+        const emProducao = ticketsMembro.filter(t => t.status === 'em_producao').length;
+        const aguardando = ticketsMembro.filter(t => t.status === 'briefing' || t.status === 'triagem').length;
+        const revisao = ticketsMembro.filter(t => t.status === 'revisao' || t.status === 'aprovacao_cliente').length;
         
         // Tickets concluídos no período
-        const ticketsConcluidos = membro.tickets.filter(t => {
+        const ticketsConcluidos = ticketsMembro.filter(t => {
           if (t.status !== 'concluido' || !t.data_entrega) return false;
           const dataEntrega = parseISO(t.data_entrega);
           return dataEntrega >= periodoInicio && dataEntrega <= periodoFim;
@@ -141,18 +173,19 @@ export function useEquipeMarketing(filters?: Filters) {
           taxaNoPrazo = Math.round((noPrazo.length / comPrazo.length) * 100);
         }
 
-        membros.push({
+        return {
           id: membro.id,
           nome: membro.nome,
           avatar_url: membro.avatar_url,
+          cargo: membro.cargo,
           emProducao,
           aguardando,
           revisao,
           concluidos,
           tempoMedio,
           taxaNoPrazo,
-          totalTickets: membro.tickets.length
-        });
+          totalTickets: ticketsMembro.length
+        };
       });
 
       // Ordenar por total de tickets em andamento (maior carga primeiro)

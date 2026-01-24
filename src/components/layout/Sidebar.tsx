@@ -143,7 +143,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: BarChart2, label: 'Dashboard', path: '/marketing/dashboard', moduleName: 'projetos_marketing' },
       { icon: Palette, label: 'Tickets', path: '/marketing', moduleName: 'projetos_marketing' },
-      { icon: Users, label: 'Equipe', path: '/marketing/equipe', moduleName: 'projetos_marketing' },
+      { icon: Users, label: 'Equipe de Criação', path: '/marketing/equipe', moduleName: 'projetos_marketing' },
       { icon: Calendar, label: 'Calendário', path: '/marketing/calendario', moduleName: 'projetos_marketing' },
       { icon: Kanban, label: 'Etapas de Tickets', path: '/marketing/etapas', moduleName: 'projetos_marketing_config', adminOnly: true },
     ],
