@@ -125,7 +125,7 @@ export function useDashboardMarketing(filters?: Filters) {
           is_interno,
           created_at,
           supervisor_id,
-          cliente:cliente_id(id, nome),
+          cliente:cliente_id(id, full_name),
           supervisor:supervisor_id(id, full_name)
         `)
         .eq('is_active', true);
@@ -152,7 +152,7 @@ export function useDashboardMarketing(filters?: Filters) {
         ...t,
         status: STATUS_DB_TO_UI[t.status] || t.status as StatusTicket,
         supervisor_nome: t.supervisor?.full_name || null,
-        cliente_nome: t.cliente?.nome || null,
+        cliente_nome: t.cliente?.full_name || null,
         data_conclusao: t.data_entrega,
       }));
       
