@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { format, formatDistanceToNow, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, Phone, Users, MapPin, Headphones, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Phone, Users, MapPin, Headphones, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import type { Atividade, AtividadeTipo } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS } from '@/types/atividades.types';
@@ -30,12 +30,11 @@ export function PendenciasTab({
   onAtividadeClick, 
   onConcluir 
 }: PendenciasTabProps) {
-  // Ordenar por urgência (mais antigas primeiro)
   const atividadesOrdenadas = useMemo(() => {
     return [...atividades].sort((a, b) => {
       const dateA = new Date(a.data_hora).getTime();
       const dateB = new Date(b.data_hora).getTime();
-      return dateA - dateB; // Mais antigas primeiro
+      return dateA - dateB;
     });
   }, [atividades]);
 
@@ -46,172 +45,161 @@ export function PendenciasTab({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
-          ))}
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
     );
   }
 
   if (atividades.length === 0) {
     return (
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <CheckCircle className="h-12 w-12 text-primary mb-4" />
-          <h3 className="text-lg font-medium text-foreground">Tudo em dia!</h3>
-          <p className="text-muted-foreground text-center mt-1">
-            Não há atividades vencidas ou atrasadas no momento.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <CheckCircle className="h-12 w-12 text-primary mb-4" />
+        <h3 className="text-lg font-medium text-foreground">Tudo em dia!</h3>
+        <p className="text-muted-foreground mt-1">
+          Não há atividades vencidas ou atrasadas no momento.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
       {/* Resumo */}
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <span className="font-medium text-destructive">
-                {atividades.length} pendência{atividades.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <span className="text-sm text-muted-foreground">
-              Atividades que já passaram da data/hora agendada
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+        <AlertTriangle className="h-4 w-4 text-destructive" />
+        <span className="text-sm text-destructive font-medium">
+          {atividades.length} pendência{atividades.length !== 1 ? 's' : ''}
+        </span>
+      </div>
 
-      {/* Lista de atividades */}
-      <div className="space-y-3">
+      {/* Mobile View */}
+      <div className="md:hidden space-y-2">
         {atividadesOrdenadas.map((atividade) => {
           const TipoIcon = TIPO_ICONS[atividade.tipo];
           const dataHora = new Date(atividade.data_hora);
           const diasVencida = differenceInDays(new Date(), dataHora);
-          const tempoVencida = formatDistanceToNow(dataHora, { 
-            addSuffix: true, 
-            locale: ptBR 
-          });
-          
-          // Determinar cor baseado na urgência
-          const urgencyClass = diasVencida > 7 
-            ? 'border-l-4 border-l-destructive bg-destructive/10' 
-            : diasVencida > 3 
-              ? 'border-l-4 border-l-destructive/70 bg-destructive/5' 
-              : 'border-l-4 border-l-warning bg-warning/5';
+          const tempoVencida = formatDistanceToNow(dataHora, { addSuffix: true, locale: ptBR });
 
           return (
-            <Card
+            <div
               key={atividade.id}
               className={cn(
-                'cursor-pointer transition-all hover:shadow-md',
-                urgencyClass
+                'p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/30',
+                diasVencida > 7 && 'bg-destructive/10 border-destructive/30',
+                diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 border-destructive/20',
+                diasVencida <= 3 && 'bg-warning/5 border-warning/20'
               )}
               onClick={() => onAtividadeClick(atividade.id)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  {/* Ícone do tipo */}
-                  <div className="flex-shrink-0 p-2 rounded-lg bg-background border">
-                    <TipoIcon className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <TipoIcon className="h-3 w-3" />
+                      {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
+                    </Badge>
+                    <Badge variant="destructive" className="text-xs">
+                      {tempoVencida}
+                    </Badge>
                   </div>
-
-                  {/* Conteúdo principal */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* Título e tipo */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h4 className="font-medium text-foreground truncate">
-                          {atividade.titulo}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
-                          </Badge>
-                          <Badge 
-                            variant="destructive" 
-                            className={cn(
-                              'text-xs',
-                              diasVencida > 7 && 'bg-destructive',
-                              diasVencida <= 7 && diasVencida > 3 && 'bg-destructive/80',
-                              diasVencida <= 3 && 'bg-warning text-warning-foreground'
-                            )}
-                          >
-                            {tempoVencida}
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      {/* Botão concluir */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-shrink-0 text-primary border-primary/30 hover:bg-primary/10"
-                        onClick={(e) => handleConcluirClick(e, atividade)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1.5" />
-                        Concluir
-                      </Button>
-                    </div>
-
-                    {/* Detalhes */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
-                      {/* Data/hora original */}
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="truncate">
-                          {format(dataHora, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                        </span>
-                      </div>
-
-                      {/* Cliente */}
-                      {atividade.cliente?.nome && (
-                        <div className="flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{atividade.cliente.nome}</span>
-                        </div>
-                      )}
-
-                      {/* Empreendimento */}
-                      {atividade.empreendimento?.nome && (
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{atividade.empreendimento.nome}</span>
-                        </div>
-                      )}
-
-                      {/* Corretor */}
-                      {atividade.corretor?.nome_completo && (
-                        <div className="flex items-center gap-1.5">
-                          <Headphones className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{atividade.corretor.nome_completo}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Prazo se existir */}
-                    {atividade.deadline_date && (
-                      <div className="flex items-center gap-1.5 text-xs text-destructive/80">
-                        <Clock className="h-3 w-3" />
-                        Prazo: {format(new Date(`${atividade.deadline_date}T00:00:00`), 'dd/MM/yyyy', { locale: ptBR })}
-                      </div>
-                    )}
-                  </div>
+                  <h4 className="font-normal text-sm truncate">{atividade.titulo}</h4>
+                  {atividade.cliente?.nome && (
+                    <p className="text-xs text-muted-foreground truncate">{atividade.cliente.nome}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {format(dataHora, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-shrink-0"
+                  onClick={(e) => handleConcluirClick(e, atividade)}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           );
         })}
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Título</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Corretor</TableHead>
+              <TableHead>Responsável</TableHead>
+              <TableHead>Data/Hora</TableHead>
+              <TableHead>Vencida há</TableHead>
+              <TableHead className="w-[80px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {atividadesOrdenadas.map((atividade) => {
+              const TipoIcon = TIPO_ICONS[atividade.tipo];
+              const dataHora = new Date(atividade.data_hora);
+              const diasVencida = differenceInDays(new Date(), dataHora);
+              const tempoVencida = formatDistanceToNow(dataHora, { addSuffix: true, locale: ptBR });
+
+              return (
+                <TableRow
+                  key={atividade.id}
+                  className={cn(
+                    'cursor-pointer',
+                    diasVencida > 7 && 'bg-destructive/10 hover:bg-destructive/15',
+                    diasVencida > 3 && diasVencida <= 7 && 'bg-destructive/5 hover:bg-destructive/10',
+                    diasVencida <= 3 && 'bg-warning/5 hover:bg-warning/10'
+                  )}
+                  onClick={() => onAtividadeClick(atividade.id)}
+                >
+                  <TableCell>
+                    <Badge variant="outline" className="gap-1">
+                      <TipoIcon className="h-3 w-3" />
+                      {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate">
+                    {atividade.titulo}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {atividade.cliente?.nome || '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {atividade.corretor?.nome_completo || '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {atividade.gestor?.full_name || '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {format(dataHora, "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="destructive" className="text-xs">
+                      {tempoVencida}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleConcluirClick(e, atividade)}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
