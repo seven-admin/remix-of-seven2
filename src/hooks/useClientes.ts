@@ -76,6 +76,9 @@ const applyFilters = (query: any, filters?: ClienteFilters) => {
   if (filters?.origem) {
     query = query.eq('origem', filters.origem);
   }
+  if (filters?.gestor_id) {
+    query = query.eq('gestor_id', filters.gestor_id);
+  }
   return query;
 };
 

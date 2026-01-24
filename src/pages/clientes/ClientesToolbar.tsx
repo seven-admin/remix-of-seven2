@@ -1,6 +1,18 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Download, Edit, Plus, Search } from 'lucide-react';
+
+type GestorOption = {
+  id: string;
+  full_name: string;
+};
 
 type Props = {
   search: string;
@@ -8,6 +20,9 @@ type Props = {
   onNew: () => void;
   selectedCount: number;
   onOpenAcaoEmLote: () => void;
+  gestorId: string;
+  onGestorChange: (value: string) => void;
+  gestores: GestorOption[];
 };
 
 export function ClientesToolbar({ 
@@ -16,11 +31,14 @@ export function ClientesToolbar({
   onNew,
   selectedCount,
   onOpenAcaoEmLote,
+  gestorId,
+  onGestorChange,
+  gestores,
 }: Props) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-      <div className="flex items-center gap-3 w-full sm:w-auto">
-        <div className="relative flex-1 sm:w-80">
+      <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+        <div className="relative flex-1 sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar cliente..."
@@ -29,6 +47,19 @@ export function ClientesToolbar({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
+        <Select value={gestorId} onValueChange={onGestorChange}>
+          <SelectTrigger className="w-48 bg-card">
+            <SelectValue placeholder="Gestor de Produto" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os gestores</SelectItem>
+            {gestores.map((g) => (
+              <SelectItem key={g.id} value={g.id}>
+                {g.full_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center gap-3">
         {selectedCount > 0 && (

@@ -253,4 +253,5 @@ export interface ClienteFilters {
   origem?: string;
   corretor_id?: string;
   imobiliaria_id?: string;
+  gestor_id?: string;
 }
