@@ -5145,6 +5145,7 @@ export type Database = {
         | "supervisor_video"
         | "equipe_marketing"
         | "super_admin"
+        | "diretor_de_marketing"
       aprovacao_status: "pendente" | "aprovado" | "reprovado" | "em_revisao"
       aprovador_tipo:
         | "corretor"
@@ -5378,6 +5379,7 @@ export const Constants = {
         "supervisor_video",
         "equipe_marketing",
         "super_admin",
+        "diretor_de_marketing",
       ],
       aprovacao_status: ["pendente", "aprovado", "reprovado", "em_revisao"],
       aprovador_tipo: [
