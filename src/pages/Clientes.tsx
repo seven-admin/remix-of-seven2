@@ -3,6 +3,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useClientesPaginated, useDeleteCliente, useCreateCliente, useUpdateCliente, useClienteStats, useQualificarCliente, useMarcarPerdido, useReativarCliente, useCliente, useUpdateClientesEmLote } from '@/hooks/useClientes';
+import { useGestoresProduto } from '@/hooks/useGestores';
 import { Cliente, ClienteFormData, ClienteFase, CLIENTE_FASE_LABELS, CLIENTE_FASE_COLORS, CLIENTE_TEMPERATURA_LABELS, CLIENTE_TEMPERATURA_COLORS, ClienteTemperatura } from '@/types/clientes.types';
 import { perf } from '@/lib/perf';
 import {
@@ -39,6 +40,7 @@ import { ClientesTable } from '@/pages/clientes/ClientesTable';
 const Clientes = () => {
   const [search, setSearch] = useState('');
   const [selectedFase, setSelectedFase] = useState<ClienteFase | 'todos'>('todos');
+  const [selectedGestor, setSelectedGestor] = useState<string>('todos');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -52,9 +54,12 @@ const Clientes = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [acaoEmLoteDialogOpen, setAcaoEmLoteDialogOpen] = useState(false);
   
+  const { data: gestores = [] } = useGestoresProduto();
+  
   const filters = {
     search: search || undefined,
     fase: selectedFase !== 'todos' ? selectedFase : undefined,
+    gestor_id: selectedGestor !== 'todos' ? selectedGestor : undefined,
     page,
     pageSize: 20
   };
@@ -83,12 +88,12 @@ const Clientes = () => {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, selectedFase]);
+  }, [search, selectedFase, selectedGestor]);
 
   // Clear selection when page/filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [page, search, selectedFase]);
+  }, [page, search, selectedFase, selectedGestor]);
 
   const handleDelete = async () => {
     if (selectedCliente) {
@@ -190,6 +195,9 @@ const Clientes = () => {
         onNew={handleOpenNew}
         selectedCount={selectedIds.size}
         onOpenAcaoEmLote={() => setAcaoEmLoteDialogOpen(true)}
+        gestorId={selectedGestor}
+        onGestorChange={setSelectedGestor}
+        gestores={gestores}
       />
 
       {/* Tabs Mobile */}
