@@ -284,6 +284,16 @@ export default function Atividades() {
             isLoading={isLoadingVencidas}
             onAtividadeClick={handleOpenDetalheById}
             onConcluir={handleConcluir}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={() => {
+              const pendenciasIds = (atividadesVencidas || []).map(a => a.id);
+              if (selectedIds.size === pendenciasIds.length && pendenciasIds.every(id => selectedIds.has(id))) {
+                setSelectedIds(new Set());
+              } else {
+                setSelectedIds(new Set(pendenciasIds));
+              }
+            }}
           />
         )}
 
