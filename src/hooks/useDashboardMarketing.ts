@@ -15,6 +15,7 @@ export interface DashboardMarketingData {
   
   // Distribuições
   porStatus: { status: string; label: string; count: number; color: string }[];
+  porEtapa: { etapaId: string; nome: string; count: number; color: string; ordem: number }[];
   porCategoria: { categoria: string; label: string; count: number; interno: number; externo: number }[];
   internoVsExterno: { name: string; value: number; color: string }[];
   
@@ -111,6 +112,13 @@ export function useDashboardMarketing(filters?: Filters) {
       const periodoInicio = filters?.periodoInicio || subWeeks(hoje, 4);
       const periodoFim = filters?.periodoFim || hoje;
       
+      // Buscar etapas de tickets
+      const { data: etapas } = await supabase
+        .from('ticket_etapas')
+        .select('id, nome, cor, ordem')
+        .eq('is_active', true)
+        .order('ordem', { ascending: true });
+      
       // Buscar todos os tickets
       let query = supabase
         .from('projetos_marketing')
@@ -120,6 +128,7 @@ export function useDashboardMarketing(filters?: Filters) {
           titulo,
           categoria,
           status,
+          ticket_etapa_id,
           data_previsao,
           data_entrega,
           is_interno,
@@ -234,6 +243,38 @@ export function useDashboardMarketing(filters?: Filters) {
           count,
           color: STATUS_COLORS_MAP[status as StatusTicket],
         }));
+      
+      // Distribuição por etapa dinâmica
+      const etapaCountMap = new Map<string, number>();
+      let semEtapaCount = 0;
+      
+      allTickets.forEach(t => {
+        if (t.ticket_etapa_id) {
+          const current = etapaCountMap.get(t.ticket_etapa_id) || 0;
+          etapaCountMap.set(t.ticket_etapa_id, current + 1);
+        } else {
+          semEtapaCount++;
+        }
+      });
+      
+      const porEtapa = (etapas || []).map(etapa => ({
+        etapaId: etapa.id,
+        nome: etapa.nome,
+        count: etapaCountMap.get(etapa.id) || 0,
+        color: etapa.cor || '#6b7280',
+        ordem: etapa.ordem,
+      }));
+      
+      // Adicionar "Sem etapa" se houver tickets órfãos
+      if (semEtapaCount > 0) {
+        porEtapa.push({
+          etapaId: 'sem-etapa',
+          nome: 'Sem etapa definida',
+          count: semEtapaCount,
+          color: '#9ca3af',
+          ordem: 999,
+        });
+      }
       
       // Distribuição por categoria
       const categoriaCounts: Record<CategoriaTicket, { total: number; interno: number; externo: number }> = {
@@ -401,6 +442,7 @@ export function useDashboardMarketing(filters?: Filters) {
         atrasados,
         tempoMedioDias,
         porStatus,
+        porEtapa,
         porCategoria,
         internoVsExterno,
         ticketsAtrasados,
