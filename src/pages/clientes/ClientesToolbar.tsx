@@ -1,14 +1,22 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Plus, Search } from 'lucide-react';
+import { Download, Edit, Plus, Search } from 'lucide-react';
 
 type Props = {
   search: string;
   onSearchChange: (value: string) => void;
   onNew: () => void;
+  selectedCount: number;
+  onOpenAcaoEmLote: () => void;
 };
 
-export function ClientesToolbar({ search, onSearchChange, onNew }: Props) {
+export function ClientesToolbar({ 
+  search, 
+  onSearchChange, 
+  onNew,
+  selectedCount,
+  onOpenAcaoEmLote,
+}: Props) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
       <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -23,6 +31,16 @@ export function ClientesToolbar({ search, onSearchChange, onNew }: Props) {
         </div>
       </div>
       <div className="flex items-center gap-3">
+        {selectedCount > 0 && (
+          <Button 
+            variant="outline" 
+            onClick={onOpenAcaoEmLote}
+            className="border-primary/30 text-primary"
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Editar {selectedCount} selecionado(s)
+          </Button>
+        )}
         <Button variant="outline">
           <Download className="h-4 w-4 mr-2" />
           Exportar

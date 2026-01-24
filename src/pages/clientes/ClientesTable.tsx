@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -27,6 +28,9 @@ type Props = {
   onQualificar: (id: string) => void;
   onMarcarPerdido: (id: string) => void;
   onReativar: (id: string) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
 };
 
 export function ClientesTable({
@@ -39,12 +43,30 @@ export function ClientesTable({
   onQualificar,
   onMarcarPerdido,
   onReativar,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: Props) {
+  const allSelected = clientes.length > 0 && selectedIds.size === clientes.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < clientes.length;
+
   return (
     <div className="rounded-lg border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">
+              <Checkbox
+                checked={allSelected}
+                ref={(ref) => {
+                  if (ref) {
+                    (ref as any).indeterminate = someSelected;
+                  }
+                }}
+                onCheckedChange={onToggleSelectAll}
+                aria-label="Selecionar todos"
+              />
+            </TableHead>
             <TableHead>Nome</TableHead>
             <TableHead>Telefone</TableHead>
             <TableHead>WhatsApp</TableHead>
@@ -61,6 +83,13 @@ export function ClientesTable({
               className="cursor-pointer hover:bg-muted/50"
               onClick={() => onOpenQuickView(cliente)}
             >
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={selectedIds.has(cliente.id)}
+                  onCheckedChange={() => onToggleSelect(cliente.id)}
+                  aria-label={`Selecionar ${cliente.nome}`}
+                />
+              </TableCell>
               <TableCell>
                 <p className="text-[13px]">{cliente.nome}</p>
               </TableCell>
