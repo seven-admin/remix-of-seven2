@@ -424,7 +424,13 @@ export function useAtividadesVencidas(gestorId?: string) {
     queryFn: async (): Promise<Atividade[]> => {
       let query = supabase
         .from('atividades')
-        .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo)`)
+        .select(`
+          *, 
+          cliente:clientes(id, nome, temperatura), 
+          corretor:corretores(id, nome_completo),
+          empreendimento:empreendimentos(id, nome),
+          gestor:profiles(id, full_name)
+        `)
         .eq('status', 'pendente')
         .lt('data_hora', new Date().toISOString())
         .order('data_hora', { ascending: true });
