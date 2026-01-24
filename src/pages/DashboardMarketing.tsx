@@ -166,10 +166,10 @@ export default function DashboardMarketing() {
   }
 
   // Prepare chart data
-  const statusChartData = data?.porStatus.map(s => ({
-    name: s.label,
-    value: s.count,
-    fill: s.color,
+  const etapasChartData = data?.porEtapa.map(e => ({
+    name: e.nome,
+    value: e.count,
+    fill: e.color,
   })) || [];
 
   const categoriaChartData = data?.porCategoria.map(c => ({
@@ -259,19 +259,19 @@ export default function DashboardMarketing() {
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Status Distribution */}
+            {/* Etapas Distribution */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Tickets por Status</CardTitle>
+                <CardTitle className="text-base">Tickets por Etapa</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={statusChartData} layout="vertical">
+                  <BarChart data={etapasChartData} layout="vertical">
                     <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                    <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {statusChartData.map((entry, index) => (
+                      {etapasChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
@@ -468,19 +468,19 @@ export default function DashboardMarketing() {
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Status Distribution */}
+        {/* Etapas Distribution */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Tickets por Status</CardTitle>
+            <CardTitle className="text-base">Tickets por Etapa</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={statusChartData} layout="vertical">
+              <BarChart data={etapasChartData} layout="vertical">
                 <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {statusChartData.map((entry, index) => (
+                  {etapasChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Bar>
