@@ -67,10 +67,10 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', caller.id, caller.email)
 
-    // Check if caller is admin or super_admin
-    const { data: callerRole, error: roleError } = await supabaseAdmin
+    // Check if caller is admin or super_admin (using role_id + roles table)
+    const { data: callerRoleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
-      .select('role')
+      .select('role_id, roles!inner(name)')
       .eq('user_id', caller.id)
       .single()
 
@@ -78,8 +78,9 @@ Deno.serve(async (req) => {
       console.error('Error fetching role:', roleError)
     }
 
-    if (!callerRole || !['admin', 'super_admin'].includes(callerRole.role)) {
-      console.error('Caller is not admin:', callerRole)
+    const callerRoleName = (callerRoleData?.roles as any)?.name
+    if (!callerRoleName || !['admin', 'super_admin'].includes(callerRoleName)) {
+      console.error('Caller is not admin:', callerRoleName)
       return new Response(
         JSON.stringify({ error: 'Only admins can create users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -138,12 +139,28 @@ Deno.serve(async (req) => {
       console.error('Error updating profile:', profileError)
     }
 
-    // Insert user role
+    // Get the role_id from the roles table based on role name
+    const { data: roleData, error: roleQueryError } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('name', role)
+      .single()
+
+    if (roleQueryError || !roleData) {
+      console.error('Error finding role:', roleQueryError)
+      return new Response(
+        JSON.stringify({ error: 'Role not found: ' + role }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Insert user role with role_id (keeping role column for backward compatibility)
     const { error: insertRoleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: newUserId,
-        role: role
+        role_id: roleData.id,
+        role: role  // Keep enum column populated for backward compatibility until removed
       })
 
     if (insertRoleError) {

@@ -27,10 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string): Promise<void> => {
     try {
-      // Fetch profile and role in parallel
+      // Fetch profile and role in parallel (using role_id + roles table)
       const [profileResult, roleResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle()
+        supabase.from('user_roles').select('role_id, roles!inner(name)').eq('user_id', userId).maybeSingle()
       ]);
       
       if (profileResult.data) {
@@ -38,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (roleResult.data) {
-        setRole(roleResult.data.role as AppRole);
+        // Get role name from the joined roles table
+        const roleName = (roleResult.data.roles as any)?.name as AppRole;
+        setRole(roleName || null);
       } else {
         // Set a default role if none found to prevent indefinite loading
         setRole(null);

@@ -43,15 +43,16 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if caller is admin or super_admin
-    const { data: callerRole } = await supabaseAdmin
+    // Check if caller is admin or super_admin (using role_id + roles table)
+    const { data: callerRoleData } = await supabaseAdmin
       .from('user_roles')
-      .select('role')
+      .select('role_id, roles!inner(name)')
       .eq('user_id', caller.id)
       .single()
 
-    if (!callerRole || !['admin', 'super_admin'].includes(callerRole.role)) {
-      console.error('Caller is not admin:', callerRole)
+    const callerRoleName = (callerRoleData?.roles as any)?.name
+    if (!callerRoleName || !['admin', 'super_admin'].includes(callerRoleName)) {
+      console.error('Caller is not admin:', callerRoleName)
       return new Response(
         JSON.stringify({ error: 'Only admins can reset passwords' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
