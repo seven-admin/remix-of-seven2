@@ -40,6 +40,9 @@ export function MembroEquipeCard({ membro }: MembroEquipeCardProps) {
           </Avatar>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground truncate">{membro.nome}</h3>
+            {membro.cargo && (
+              <p className="text-xs text-muted-foreground truncate">{membro.cargo}</p>
+            )}
             <p className="text-sm text-muted-foreground">
               {membro.totalTickets} tickets atribuídos
             </p>
