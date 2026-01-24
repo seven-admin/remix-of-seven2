@@ -14,19 +14,21 @@ import {
   Building2,
   Users,
   Palette,
+  RefreshCw,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { KPICardCompact } from '@/components/dashboard-executivo/KPICardCompact';
 import { TrendChart } from '@/components/dashboard-executivo/TrendChart';
 import { DonutChart } from '@/components/dashboard-executivo/DonutChart';
 import { TicketsAtrasadosList } from '@/components/marketing/TicketsAtrasadosList';
 import { ProximasEntregasList } from '@/components/marketing/ProximasEntregasList';
 import { ProdutividadeEquipeTable } from '@/components/marketing/ProdutividadeEquipeTable';
+import { DashboardMarketingSkeleton } from '@/components/marketing/DashboardMarketingSkeleton';
 import { TVLayoutConfigDialog } from '@/components/tv-layout/TVLayoutConfigDialog';
 import { useDashboardMarketing } from '@/hooks/useDashboardMarketing';
 import { useTVLayoutConfig } from '@/hooks/useTVLayoutConfig';
@@ -43,6 +45,8 @@ import {
   PieChart,
   Pie,
 } from 'recharts';
+
+const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
 type PeriodoFilter = '7d' | '30d' | '90d' | 'all';
 type TipoFilter = 'all' | 'interno' | 'externo';
@@ -99,7 +103,8 @@ export default function DashboardMarketing() {
     };
   }, [periodo, categoria, tipo]);
 
-  const { data, isLoading, refetch } = useDashboardMarketing(filters);
+  const { data, isLoading, isFetching, refetch } = useDashboardMarketing(filters);
+  const [countdown, setCountdown] = useState(AUTO_REFRESH_INTERVAL / 1000);
 
   // Fullscreen toggle
   const toggleModoTV = async () => {
@@ -123,32 +128,39 @@ export default function DashboardMarketing() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Auto-refresh in TV mode
+  // Auto-refresh every 30 seconds (always active, not just TV mode)
   useEffect(() => {
-    if (modoTV) {
-      const interval = setInterval(() => {
-        refetch();
-        setLastUpdate(new Date());
-      }, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [modoTV, refetch]);
+    const interval = setInterval(() => {
+      refetch();
+      setLastUpdate(new Date());
+      setCountdown(AUTO_REFRESH_INTERVAL / 1000);
+    }, AUTO_REFRESH_INTERVAL);
+    
+    return () => clearInterval(interval);
+  }, [refetch]);
 
-  // Loading state
+  // Countdown timer for visual feedback
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev <= 1 ? AUTO_REFRESH_INTERVAL / 1000 : prev - 1));
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
+
+  // Manual refresh handler
+  const handleManualRefresh = () => {
+    refetch();
+    setLastUpdate(new Date());
+    setCountdown(AUTO_REFRESH_INTERVAL / 1000);
+  };
+
+  // Loading state with detailed skeletons
   if (isLoading) {
     return (
       <MainLayout>
-        <PageHeader title="Dashboard Marketing" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-80" />
-          ))}
-        </div>
+        <PageHeader title="Dashboard Marketing" subtitle="Carregando dados..." />
+        <DashboardMarketingSkeleton />
       </MainLayout>
     );
   }
@@ -180,11 +192,23 @@ export default function DashboardMarketing() {
           <div className="flex items-center gap-4">
             <Palette className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">Dashboard Marketing</h1>
-            <span className="text-sm text-muted-foreground">
-              Atualizado: {format(lastUpdate, "HH:mm", { locale: ptBR })}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Atualizado: {format(lastUpdate, "HH:mm:ss", { locale: ptBR })}
+              </span>
+              {isFetching && (
+                <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+              )}
+              <Badge variant="outline" className="text-xs font-mono">
+                {countdown}s
+              </Badge>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleManualRefresh} disabled={isFetching}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setConfigOpen(true)}>
               <Settings className="h-4 w-4" />
             </Button>
@@ -326,8 +350,31 @@ export default function DashboardMarketing() {
       <PageHeader
         title="Dashboard Marketing"
         subtitle="Visão consolidada de tickets, prazos e produtividade"
+        metadata={
+          <div className="flex items-center gap-2">
+            <span className="text-xs">
+              Atualizado: {format(lastUpdate, "HH:mm:ss", { locale: ptBR })}
+            </span>
+            {isFetching && (
+              <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+            )}
+            <Badge variant="outline" className="text-xs font-mono h-5">
+              {countdown}s
+            </Badge>
+          </div>
+        }
         actions={
           <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleManualRefresh} 
+              disabled={isFetching}
+              className="gap-1"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
+
             <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoFilter)}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
