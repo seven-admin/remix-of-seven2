@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
@@ -18,9 +29,16 @@ import { ProjetoEditForm } from '@/components/marketing/ProjetoEditForm';
 
 export default function MarketingDetalhe() {
   const { id } = useParams<{ id: string }>();
-  const { useProjeto } = useProjetosMarketing();
+  const navigate = useNavigate();
+  const { useProjeto, deleteProjeto } = useProjetosMarketing();
   const { data: projeto, isLoading } = useProjeto(id || '');
   const [editOpen, setEditOpen] = useState(false);
+
+  const handleDelete = async () => {
+    if (!projeto) return;
+    await deleteProjeto.mutateAsync(projeto.id);
+    navigate('/marketing');
+  };
 
   if (isLoading) {
     return (
@@ -71,10 +89,40 @@ export default function MarketingDetalhe() {
       backLabel="Marketing"
       badge={headerBadges}
       actions={
-        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Editar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir Ticket</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir o ticket "{projeto.titulo}"? 
+                  Esta ação não pode ser desfeita e removerá todas as tarefas, 
+                  comentários e histórico associados.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleteProjeto.isPending ? 'Excluindo...' : 'Excluir'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       }
     >
       {/* Edit Form Dialog */}

@@ -228,7 +228,7 @@ export default function DashboardMarketing() {
             />
             <KPICardCompact
               title="Tempo Médio"
-              value={data?.tempoMedioDias !== null ? `${data.tempoMedioDias}d` : '-'}
+              value={data && data.tempoMedioDias != null ? `${data.tempoMedioDias}d` : '-'}
               icon={Timer}
             />
           </div>
@@ -414,7 +414,7 @@ export default function DashboardMarketing() {
         />
         <KPICardCompact
           title="Tempo Médio"
-          value={data?.tempoMedioDias !== null ? `${data.tempoMedioDias}d` : '-'}
+          value={data && data.tempoMedioDias != null ? `${data.tempoMedioDias}d` : '-'}
           icon={Timer}
         />
       </div>

@@ -9,9 +9,11 @@ import {
   addMonths,
   subMonths,
   isToday,
+  isBefore,
+  startOfDay,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +31,13 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Helper to check if ticket is overdue
+function isTicketOverdue(ticket: Ticket): boolean {
+  if (!ticket.data_previsao) return false;
+  if (['concluido', 'arquivado'].includes(ticket.status)) return false;
+  return isBefore(new Date(ticket.data_previsao), startOfDay(new Date()));
 }
 
 interface TicketsCalendarioProps {
@@ -161,26 +170,44 @@ export function TicketsCalendario({
                     {format(day, 'd')}
                   </span>
                   {hasTickets && (
-                    <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                      {dayTickets.length}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                        {dayTickets.length}
+                      </Badge>
+                      {dayTickets.some(isTicketOverdue) && (
+                        <Badge variant="destructive" className="text-xs h-5 px-1.5">
+                          {dayTickets.filter(isTicketOverdue).length} <AlertTriangle className="h-3 w-3 ml-0.5" />
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 {/* Preview dos tickets */}
                 <div className="mt-1 space-y-0.5 overflow-hidden">
-                  {dayTickets.slice(0, 3).map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="text-xs truncate px-1 py-0.5 rounded"
-                      style={{
-                        backgroundColor: hexToRgba(STATUS_COLORS[ticket.status] || '#6b7280', 0.2),
-                        color: STATUS_COLORS[ticket.status] || '#374151',
-                      }}
-                    >
-                      {ticket.titulo}
-                    </div>
-                  ))}
+                  {dayTickets.slice(0, 3).map((ticket) => {
+                    const overdue = isTicketOverdue(ticket);
+                    return (
+                      <div
+                        key={ticket.id}
+                        className={cn(
+                          "text-xs truncate px-1 py-0.5 rounded flex items-center gap-1",
+                          overdue && "ring-1 ring-destructive"
+                        )}
+                        style={{
+                          backgroundColor: overdue 
+                            ? 'rgba(239, 68, 68, 0.15)' 
+                            : hexToRgba(STATUS_COLORS[ticket.status] || '#6b7280', 0.2),
+                          color: overdue 
+                            ? '#dc2626' 
+                            : STATUS_COLORS[ticket.status] || '#374151',
+                        }}
+                      >
+                        {overdue && <AlertTriangle className="h-3 w-3 shrink-0" />}
+                        <span className="truncate">{ticket.titulo}</span>
+                      </div>
+                    );
+                  })}
                   {dayTickets.length > 3 && (
                     <div className="text-xs text-muted-foreground px-1">
                       +{dayTickets.length - 3} mais
@@ -206,48 +233,60 @@ export function TicketsCalendario({
                         </Badge>
                       </div>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {dayTickets.map((ticket) => (
-                          <div
-                            key={ticket.id}
-                            className="p-2 rounded-lg border bg-card"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-muted-foreground font-mono">
-                                  {ticket.codigo}
-                                </p>
-                                <p className="font-medium text-sm truncate">
-                                  {ticket.titulo}
-                                </p>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {CATEGORIA_LABELS[ticket.categoria]}
+                        {dayTickets.map((ticket) => {
+                          const overdue = isTicketOverdue(ticket);
+                          return (
+                            <div
+                              key={ticket.id}
+                              className={cn(
+                                "p-2 rounded-lg border bg-card",
+                                overdue && "border-destructive"
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-muted-foreground font-mono">
+                                    {ticket.codigo}
+                                  </p>
+                                  <p className="font-medium text-sm truncate">
+                                    {ticket.titulo}
+                                  </p>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    <Badge variant="outline" className="text-xs">
+                                      {CATEGORIA_LABELS[ticket.categoria]}
+                                    </Badge>
+                                    {overdue && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        <AlertTriangle className="h-3 w-3 mr-1" />
+                                        Atrasado
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <Badge
+                                    className="text-xs"
+                                    style={{
+                                      backgroundColor: hexToRgba(STATUS_COLORS[ticket.status] || '#6b7280', 0.2),
+                                      color: STATUS_COLORS[ticket.status] || '#374151',
+                                    }}
+                                  >
+                                    {STATUS_LABELS[ticket.status]}
+                                  </Badge>
+                                  <Badge
+                                    className="text-xs"
+                                    style={{
+                                      backgroundColor: hexToRgba(PRIORIDADE_COLORS[ticket.prioridade] || '#6b7280', 0.2),
+                                      color: PRIORIDADE_COLORS[ticket.prioridade] || '#374151',
+                                    }}
+                                  >
+                                    {PRIORIDADE_LABELS[ticket.prioridade]}
                                   </Badge>
                                 </div>
                               </div>
-                              <div className="flex flex-col items-end gap-1">
-                                <Badge
-                                  className="text-xs"
-                                  style={{
-                                    backgroundColor: hexToRgba(STATUS_COLORS[ticket.status] || '#6b7280', 0.2),
-                                    color: STATUS_COLORS[ticket.status] || '#374151',
-                                  }}
-                                >
-                                  {STATUS_LABELS[ticket.status]}
-                                </Badge>
-                                <Badge
-                                  className="text-xs"
-                                  style={{
-                                    backgroundColor: hexToRgba(PRIORIDADE_COLORS[ticket.prioridade] || '#6b7280', 0.2),
-                                    color: PRIORIDADE_COLORS[ticket.prioridade] || '#374151',
-                                  }}
-                                >
-                                  {PRIORIDADE_LABELS[ticket.prioridade]}
-                                </Badge>
-                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </HoverCardContent>
@@ -261,6 +300,10 @@ export function TicketsCalendario({
 
         {/* Legenda */}
         <div className="flex flex-wrap items-center gap-3 pt-4 mt-4 border-t text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="h-3 w-3 rounded-sm bg-destructive" />
+            <span className="text-muted-foreground">Atrasado</span>
+          </div>
           {(Object.entries(STATUS_LABELS) as [StatusTicket, string][]).map(([key, label]) => (
             <div key={key} className="flex items-center gap-1.5">
               <div
