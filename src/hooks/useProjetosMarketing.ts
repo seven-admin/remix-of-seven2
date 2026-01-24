@@ -40,6 +40,7 @@ interface ProjetoFilters {
   status?: StatusTicket;
   supervisor_id?: string;
   cliente_id?: string;
+  is_interno?: boolean;
 }
 
 // Helper functions to convert between DB and UI status
@@ -78,6 +79,9 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       }
       if (filters?.cliente_id) {
         query = query.eq('cliente_id', filters.cliente_id);
+      }
+      if (typeof filters?.is_interno === 'boolean') {
+        query = query.eq('is_interno', filters.is_interno);
       }
 
       const { data, error } = await query;
@@ -132,13 +136,15 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       briefing_texto?: string;
       briefing_id?: string;
       data_previsao?: string;
+      is_interno?: boolean;
     }) => {
       const { data: result, error } = await supabase
         .from('projetos_marketing')
         .insert({
           ...data,
           codigo: '', // Será gerado pelo trigger
-          status: 'briefing' as StatusProjetoDB // aguardando_analise maps to briefing
+          status: 'briefing' as StatusProjetoDB, // aguardando_analise maps to briefing
+          is_interno: data.is_interno ?? false
         })
         .select()
         .single();

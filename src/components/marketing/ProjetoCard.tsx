@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Calendar } from 'lucide-react';
+import { Calendar, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -73,6 +73,14 @@ const ProjetoCardInner = forwardRef<HTMLDivElement, ProjetoCardProps>(function P
         <div className="flex items-center gap-1.5">
           <span className="text-sm flex-shrink-0">{getCategoriaIcon()}</span>
           <p className="font-medium text-xs truncate flex-1">{projeto.titulo}</p>
+          {projeto.is_interno && (
+            <Badge 
+              variant="secondary" 
+              className="text-[10px] px-1 py-0 h-4 flex-shrink-0 gap-0.5"
+            >
+              <Building2 className="h-2.5 w-2.5" />
+            </Badge>
+          )}
           <Badge 
             className="text-[10px] px-1.5 py-0 h-4 text-white flex-shrink-0"
             style={{ backgroundColor: PRIORIDADE_COLORS[projeto.prioridade] }}
