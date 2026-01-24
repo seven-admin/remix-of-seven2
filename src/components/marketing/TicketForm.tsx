@@ -11,8 +11,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useCreateBriefing } from '@/hooks/useBriefings';
+import { useFuncionariosSeven } from '@/hooks/useFuncionariosSeven';
 import { CATEGORIA_LABELS, PRIORIDADE_LABELS, type CategoriaProjeto, type PrioridadeProjeto } from '@/types/marketing.types';
-import { Loader2, ChevronLeft, ChevronRight, FileEdit, FileText, Check, Building2 } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, FileEdit, FileText, Check, Building2, User } from 'lucide-react';
 
 const STEPS = [
   { id: 1, title: 'Dados do Ticket', icon: FileEdit },
@@ -28,6 +29,7 @@ const formSchema = z.object({
   prioridade: z.enum(['baixa', 'media', 'alta', 'urgente']),
   empreendimento_id: z.string().optional(),
   data_previsao: z.string().optional(),
+  supervisor_id: z.string().optional(),
   // Step 2: Briefing data
   briefing_cliente: z.string().min(1, 'Cliente é obrigatório'),
   briefing_tema: z.string().min(1, 'Tema é obrigatório'),
@@ -49,6 +51,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const { createProjeto } = useProjetosMarketing();
   const { data: empreendimentos } = useEmpreendimentos();
+  const { data: funcionarios } = useFuncionariosSeven();
   const createBriefing = useCreateBriefing();
 
   const form = useForm<FormData>({
@@ -114,6 +117,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
       prioridade: data.prioridade as PrioridadeProjeto,
       empreendimento_id: data.empreendimento_id || undefined,
       data_previsao: data.data_previsao || undefined,
+      supervisor_id: data.supervisor_id || undefined,
       briefing_id: newBriefing.id,
       is_interno: data.is_interno,
     });
@@ -271,19 +275,49 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="data_previsao"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Data de Previsão (Deadline)</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="data_previsao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Previsão (Deadline)</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="supervisor_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5" />
+                      Responsável
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Atribuir responsável" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {funcionarios?.map((func) => (
+                          <SelectItem key={func.id} value={func.id}>
+                            {func.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

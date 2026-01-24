@@ -132,6 +132,7 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       categoria: CategoriaProjeto;
       prioridade?: PrioridadeProjeto;
       cliente_id?: string;
+      supervisor_id?: string;
       empreendimento_id?: string;
       briefing_texto?: string;
       briefing_id?: string;
