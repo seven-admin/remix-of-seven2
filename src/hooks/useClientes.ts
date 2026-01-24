@@ -87,7 +87,7 @@ export function useClientes(filters?: ClienteFilters) {
           conjuge:clientes!clientes_conjuge_id_fkey(id, nome)
         `)
         .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      .order('nome', { ascending: true });
 
       query = applyFilters(query, filters);
 
@@ -106,7 +106,7 @@ export function useClientes(filters?: ClienteFilters) {
             empreendimento:empreendimentos(id, nome)
           `)
           .eq('is_active', true)
-          .order('created_at', { ascending: false });
+          .order('nome', { ascending: true });
 
         fallbackQuery = applyFilters(fallbackQuery, filters);
         const fallback = await fallbackQuery;
@@ -166,7 +166,7 @@ export function useClientesPaginated(filters?: ClienteFilters & { page?: number;
           conjuge:clientes!clientes_conjuge_id_fkey(id, nome)
         `)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      .order('nome', { ascending: true })
         .range((page - 1) * pageSize, page * pageSize - 1);
 
       query = applyFilters(query, filters);
@@ -186,7 +186,7 @@ export function useClientesPaginated(filters?: ClienteFilters & { page?: number;
             empreendimento:empreendimentos(id, nome)
           `)
           .eq('is_active', true)
-          .order('created_at', { ascending: false })
+          .order('nome', { ascending: true })
           .range((page - 1) * pageSize, page * pageSize - 1);
 
         fallbackQuery = applyFilters(fallbackQuery, filters);

@@ -62,7 +62,7 @@ export function ClientesTable({
               onClick={() => onOpenQuickView(cliente)}
             >
               <TableCell>
-                <p className="font-medium">{cliente.nome}</p>
+                <p className="text-[13px]">{cliente.nome}</p>
               </TableCell>
               <TableCell>{cliente.telefone || '-'}</TableCell>
               <TableCell>{cliente.whatsapp || '-'}</TableCell>

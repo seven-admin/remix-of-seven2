@@ -65,7 +65,7 @@ export function ClientesMobileCards({
               <button
                 type="button"
                 onClick={() => onOpenQuickView(cliente)}
-                className="font-medium text-left hover:underline"
+                className="text-left hover:underline"
               >
                 {cliente.nome}
               </button>
