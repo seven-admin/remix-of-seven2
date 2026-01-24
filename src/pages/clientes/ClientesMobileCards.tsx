@@ -8,6 +8,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Cliente, ClienteFase, ClienteTemperatura } from '@/types/clientes.types';
 import {
   CLIENTE_FASE_COLORS,
@@ -28,6 +29,8 @@ type Props = {
   onQualificar: (id: string) => void;
   onMarcarPerdido: (id: string) => void;
   onReativar: (id: string) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
 };
 
 const getFaseBadge = (fase: ClienteFase) => (
@@ -55,26 +58,36 @@ export function ClientesMobileCards({
   onQualificar,
   onMarcarPerdido,
   onReativar,
+  selectedIds,
+  onToggleSelect,
 }: Props) {
   return (
     <div className="space-y-3">
       {clientes.map((cliente) => (
         <Card key={cliente.id} className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <button
-                type="button"
-                onClick={() => onOpenQuickView(cliente)}
-                className="text-left hover:underline"
-              >
-                {cliente.nome}
-              </button>
-              <p className="text-sm text-muted-foreground">{cliente.email || '-'}</p>
-              <p className="text-sm text-muted-foreground">{cliente.telefone || '-'}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1">
+              <Checkbox
+                checked={selectedIds.has(cliente.id)}
+                onCheckedChange={() => onToggleSelect(cliente.id)}
+                aria-label={`Selecionar ${cliente.nome}`}
+                className="mt-1"
+              />
+              <div className="flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenQuickView(cliente)}
+                  className="text-left hover:underline truncate block"
+                >
+                  {cliente.nome}
+                </button>
+                <p className="text-sm text-muted-foreground truncate">{cliente.email || '-'}</p>
+                <p className="text-sm text-muted-foreground">{cliente.telefone || '-'}</p>
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -121,7 +134,7 @@ export function ClientesMobileCards({
             </DropdownMenu>
           </div>
 
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <div className="flex items-center gap-2 mt-3 flex-wrap ml-8">
             {getFaseBadge(cliente.fase)}
             {getTemperaturaBadge(cliente.temperatura)}
             {cliente.origem && (

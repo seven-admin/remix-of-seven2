@@ -4,11 +4,19 @@ import {
   Cliente, 
   ClienteFormData, 
   ClienteFilters,
-  ClienteFase 
+  ClienteFase,
+  ClienteTemperatura
 } from '@/types/clientes.types';
 import { toast } from 'sonner';
 import { invalidateDashboards } from '@/lib/invalidateDashboards';
 import { perf } from '@/lib/perf';
+
+// Interface for bulk update data
+export interface ClienteUpdateEmLoteData {
+  gestor_id?: string | null;
+  fase?: ClienteFase;
+  temperatura?: ClienteTemperatura | null;
+}
 
 const upper = (value: unknown): string | undefined => {
   if (typeof value !== 'string') return value as any;
@@ -529,6 +537,55 @@ export function useReativarCliente() {
     },
     onError: (error: Error) => {
       toast.error('Erro ao reativar cliente: ' + error.message);
+    }
+  });
+}
+
+// Atualização em lote de clientes
+export function useUpdateClientesEmLote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, data }: { ids: string[]; data: ClienteUpdateEmLoteData }) => {
+      if (ids.length === 0) {
+        throw new Error('Nenhum cliente selecionado');
+      }
+
+      // Build update object only with provided fields
+      const updateData: Record<string, any> = {};
+      
+      if ('gestor_id' in data) {
+        updateData.gestor_id = data.gestor_id;
+      }
+      if ('fase' in data) {
+        updateData.fase = data.fase;
+      }
+      if ('temperatura' in data) {
+        updateData.temperatura = data.temperatura;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        throw new Error('Nenhum campo para atualizar');
+      }
+
+      const { error } = await supabase
+        .from('clientes')
+        .update(updateData)
+        .in('id', ids);
+
+      if (error) throw error;
+
+      return { updated: ids.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['clientes-paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+      invalidateDashboards(queryClient);
+      toast.success(`${result.updated} cliente(s) atualizado(s) com sucesso!`);
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao atualizar clientes: ' + error.message);
     }
   });
 }

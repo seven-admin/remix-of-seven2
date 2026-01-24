@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useClientesPaginated, useDeleteCliente, useCreateCliente, useUpdateCliente, useClienteStats, useQualificarCliente, useMarcarPerdido, useReativarCliente, useCliente } from '@/hooks/useClientes';
+import { useClientesPaginated, useDeleteCliente, useCreateCliente, useUpdateCliente, useClienteStats, useQualificarCliente, useMarcarPerdido, useReativarCliente, useCliente, useUpdateClientesEmLote } from '@/hooks/useClientes';
 import { Cliente, ClienteFormData, ClienteFase, CLIENTE_FASE_LABELS, CLIENTE_FASE_COLORS, CLIENTE_TEMPERATURA_LABELS, CLIENTE_TEMPERATURA_COLORS, ClienteTemperatura } from '@/types/clientes.types';
 import { perf } from '@/lib/perf';
 import {
@@ -27,6 +27,7 @@ import { ClienteForm } from '@/components/clientes/ClienteForm';
 import { ClienteInteracoesDialog } from '@/components/clientes/ClienteInteracoesDialog';
 import { ClienteHistoricoAtividadesDialog } from '@/components/clientes/ClienteHistoricoAtividadesDialog';
 import { ClienteQuickViewDialog } from '@/components/clientes/ClienteQuickViewDialog';
+import { AcaoEmLoteDialog, AcaoEmLoteData } from '@/components/clientes/AcaoEmLoteDialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,6 +47,10 @@ const Clientes = () => {
   const [historicoCliente, setHistoricoCliente] = useState<Cliente | null>(null);
   const [quickViewCliente, setQuickViewCliente] = useState<Cliente | null>(null);
   const [page, setPage] = useState(1);
+  
+  // State for batch selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [acaoEmLoteDialogOpen, setAcaoEmLoteDialogOpen] = useState(false);
   
   const filters = {
     search: search || undefined,
@@ -72,12 +77,18 @@ const Clientes = () => {
   const qualificarMutation = useQualificarCliente();
   const marcarPerdidoMutation = useMarcarPerdido();
   const reativarMutation = useReativarCliente();
+  const updateEmLoteMutation = useUpdateClientesEmLote();
   const isMobile = useIsMobile();
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [search, selectedFase]);
+
+  // Clear selection when page/filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, search, selectedFase]);
 
   const handleDelete = async () => {
     if (selectedCliente) {
@@ -117,6 +128,43 @@ const Clientes = () => {
     }
   }, [createMutation, editingClienteId, handleDialogOpenChange, updateMutation]);
 
+  // Toggle individual selection
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Toggle select all on current page
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === clientes.length) {
+        return new Set();
+      } else {
+        return new Set(clientes.map((c) => c.id));
+      }
+    });
+  }, [clientes]);
+
+  // Handle batch update
+  const handleAcaoEmLote = useCallback((data: AcaoEmLoteData) => {
+    updateEmLoteMutation.mutate(
+      { ids: Array.from(selectedIds), data },
+      {
+        onSuccess: () => {
+          setSelectedIds(new Set());
+          setAcaoEmLoteDialogOpen(false);
+        }
+      }
+    );
+  }, [selectedIds, updateEmLoteMutation]);
+
   // Perf mark: quando o detalhe chega e o formulário pode montar.
   useEffect(() => {
     if (!isDialogOpen || !editingClienteId) return;
@@ -136,7 +184,13 @@ const Clientes = () => {
     >
       <ClientesStats selectedFase={selectedFase} onSelectFase={setSelectedFase} stats={stats ?? null} />
 
-      <ClientesToolbar search={search} onSearchChange={setSearch} onNew={handleOpenNew} />
+      <ClientesToolbar 
+        search={search} 
+        onSearchChange={setSearch} 
+        onNew={handleOpenNew}
+        selectedCount={selectedIds.size}
+        onOpenAcaoEmLote={() => setAcaoEmLoteDialogOpen(true)}
+      />
 
       {/* Tabs Mobile */}
       {isMobile && (
@@ -173,6 +227,8 @@ const Clientes = () => {
           onQualificar={(id) => qualificarMutation.mutate(id)}
           onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
           onReativar={(id) => reativarMutation.mutate(id)}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
         />
       ) : (
         <ClientesTable
@@ -188,6 +244,9 @@ const Clientes = () => {
           onQualificar={(id) => qualificarMutation.mutate(id)}
           onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
           onReativar={(id) => reativarMutation.mutate(id)}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
         />
       )}
       
@@ -278,6 +337,14 @@ const Clientes = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AcaoEmLoteDialog
+        open={acaoEmLoteDialogOpen}
+        onOpenChange={setAcaoEmLoteDialogOpen}
+        selectedCount={selectedIds.size}
+        onConfirm={handleAcaoEmLote}
+        isLoading={updateEmLoteMutation.isPending}
+      />
 
       <ClienteQuickViewDialog
         cliente={quickViewCliente}
