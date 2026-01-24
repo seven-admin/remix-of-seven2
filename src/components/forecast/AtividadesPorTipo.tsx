@@ -23,10 +23,12 @@ const TIPO_CORES: Record<string, string> = {
 
 interface AtividadesPorTipoProps {
   gestorId?: string;
+  dataInicio?: Date;
+  dataFim?: Date;
 }
 
-export function AtividadesPorTipo({ gestorId }: AtividadesPorTipoProps) {
-  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(gestorId);
+export function AtividadesPorTipo({ gestorId, dataInicio, dataFim }: AtividadesPorTipoProps) {
+  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(gestorId, dataInicio, dataFim);
 
   if (isLoading) {
     return (

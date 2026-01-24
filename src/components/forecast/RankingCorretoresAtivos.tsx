@@ -6,10 +6,12 @@ import { cn } from '@/lib/utils';
 
 interface RankingCorretoresAtivosProps {
   gestorId?: string;
+  dataInicio?: Date;
+  dataFim?: Date;
 }
 
-export function RankingCorretoresAtivos({ gestorId }: RankingCorretoresAtivosProps) {
-  const { data: corretores, isLoading } = useAtividadesPorCorretor(gestorId);
+export function RankingCorretoresAtivos({ gestorId, dataInicio, dataFim }: RankingCorretoresAtivosProps) {
+  const { data: corretores, isLoading } = useAtividadesPorCorretor(gestorId, dataInicio, dataFim);
 
   if (isLoading) {
     return (

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, BarChart3, Plus, ClipboardList, Calendar, Percent, Monitor, X, TrendingUp, Settings } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, Plus, ClipboardList, Calendar, Percent, Monitor, X, TrendingUp, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,14 +28,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeForm';
 
 export default function Forecast() {
   const [gestorId, setGestorId] = useState<string | undefined>(undefined);
+  const [competencia, setCompetencia] = useState(new Date());
   const { data: gestores } = useGestoresProduto();
-  const { data: resumo, isLoading, refetch } = useResumoAtividades(gestorId);
+  
+  const dataInicio = useMemo(() => startOfMonth(competencia), [competencia]);
+  const dataFim = useMemo(() => endOfMonth(competencia), [competencia]);
+  
+  const { data: resumo, isLoading, refetch } = useResumoAtividades(gestorId, dataInicio, dataFim);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modoTV, setModoTV] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
@@ -214,7 +219,7 @@ export default function Forecast() {
       case 'atendimentos-resumo':
         return (
           <div key={itemId}>
-            <AtendimentosResumo gestorId={gestorId} />
+            <AtendimentosResumo gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
           </div>
         );
       case 'funil-temperatura':
@@ -224,7 +229,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Funil de Temperatura</CardTitle>
             </CardHeader>
             <CardContent>
-              <FunilTemperatura gestorId={gestorId} />
+              <FunilTemperatura gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
             </CardContent>
           </Card>
         );
@@ -235,7 +240,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Atividades por Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <AtividadesPorTipo gestorId={gestorId} />
+              <AtividadesPorTipo gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
             </CardContent>
           </Card>
         );
@@ -257,7 +262,7 @@ export default function Forecast() {
               <CardTitle className="text-foreground text-lg">Ranking de Corretores</CardTitle>
             </CardHeader>
             <CardContent>
-              <RankingCorretoresAtivos gestorId={gestorId} />
+              <RankingCorretoresAtivos gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
             </CardContent>
           </Card>
         );
@@ -274,6 +279,9 @@ export default function Forecast() {
         <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-foreground">FORECAST</h1>
+            <span className="text-sm font-medium text-primary uppercase">
+              {format(competencia, "MMM/yyyy", { locale: ptBR })}
+            </span>
             <span className="text-muted-foreground text-sm">
               Última atualização: {format(ultimaAtualizacao, "HH:mm", { locale: ptBR })}
             </span>
@@ -334,12 +342,53 @@ export default function Forecast() {
             <h1 className="text-3xl font-bold text-foreground">Forecast</h1>
             <p className="text-muted-foreground">Previsão de vendas e indicadores comerciais</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center flex-wrap">
+            {/* Seletor de Período */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCompetencia(subMonths(competencia, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-[140px] text-center font-medium text-sm capitalize">
+                {format(competencia, "MMMM 'de' yyyy", { locale: ptBR })}
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCompetencia(addMonths(competencia, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Atalhos rápidos */}
+            <div className="flex gap-1">
+              <Button 
+                variant={format(competencia, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setCompetencia(new Date())}
+              >
+                Este mês
+              </Button>
+              <Button 
+                variant={format(competencia, 'yyyy-MM') === format(subMonths(new Date(), 1), 'yyyy-MM') ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setCompetencia(subMonths(new Date(), 1))}
+              >
+                Mês anterior
+              </Button>
+            </div>
+
             <Select
               value={gestorId || 'all'}
               onValueChange={(v) => setGestorId(v === 'all' ? undefined : v)}
             >
-              <SelectTrigger className="w-full sm:w-[260px]">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue placeholder="Todos os Gestores" />
               </SelectTrigger>
               <SelectContent>
@@ -415,22 +464,22 @@ export default function Forecast() {
         </div>
 
         {/* Atendimentos: Novo x Retorno */}
-        <AtendimentosResumo gestorId={gestorId} />
+        <AtendimentosResumo gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
 
         {/* Primeira linha: Funil + Atividades por Tipo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FunilTemperatura gestorId={gestorId} />
-          <AtividadesPorTipo gestorId={gestorId} />
+          <FunilTemperatura gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
+          <AtividadesPorTipo gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
         </div>
 
         {/* Segunda linha: Próximas Atividades + Visitas por Empreendimento */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ProximasAtividades gestorId={gestorId} />
-          <VisitasPorEmpreendimento gestorId={gestorId} />
+          <VisitasPorEmpreendimento gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
         </div>
 
         {/* Terceira linha: Ranking de Corretores */}
-        <RankingCorretoresAtivos gestorId={gestorId} />
+        <RankingCorretoresAtivos gestorId={gestorId} dataInicio={dataInicio} dataFim={dataFim} />
 
         {/* Alertas de Follow-up */}
         <AlertasFollowup gestorId={gestorId} />
