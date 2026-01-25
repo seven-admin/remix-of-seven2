@@ -351,12 +351,12 @@ export function useAtividadesPendentesFollowup(gestorId?: string) {
 
 // ============ AGENDA HOOKS (consolidados de useAgenda.ts) ============
 
-export function useAgendaMensal(ano: number, mes: number, gestorId?: string) {
+export function useAgendaMensal(ano: number, mes: number, gestorId?: string, filters?: AtividadeFilters) {
   const dataInicio = startOfMonth(new Date(ano, mes - 1));
   const dataFim = endOfMonth(new Date(ano, mes - 1));
 
   return useQuery({
-    queryKey: ['agenda', 'mensal', ano, mes, gestorId],
+    queryKey: ['agenda', 'mensal', ano, mes, gestorId, filters],
     queryFn: async (): Promise<Atividade[]> => {
       let query = supabase
         .from('atividades')
@@ -367,6 +367,12 @@ export function useAgendaMensal(ano: number, mes: number, gestorId?: string) {
         .order('data_hora', { ascending: true });
 
       if (gestorId) query = query.eq('gestor_id', gestorId);
+
+      // Aplicar filtros opcionais (exceto data, já aplicada acima)
+      if (filters) {
+        const { data_inicio, data_fim, ...otherFilters } = filters;
+        query = applyAtividadesFilters(query, otherFilters);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -398,13 +404,13 @@ export function useAgendaDia(data: Date, gestorId?: string) {
   });
 }
 
-export function useAtividadesHoje() {
+export function useAtividadesHoje(filters?: AtividadeFilters) {
   const hoje = format(new Date(), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['agenda', 'hoje'],
+    queryKey: ['agenda', 'hoje', filters],
     queryFn: async (): Promise<Atividade[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo)`)
         .gte('data_hora', `${hoje}T00:00:00`)
@@ -412,6 +418,13 @@ export function useAtividadesHoje() {
         .neq('status', 'cancelada')
         .order('data_hora', { ascending: true });
 
+      // Aplicar filtros opcionais (exceto data, já aplicada acima)
+      if (filters) {
+        const { data_inicio, data_fim, ...otherFilters } = filters;
+        query = applyAtividadesFilters(query, otherFilters);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as Atividade[];
     },
