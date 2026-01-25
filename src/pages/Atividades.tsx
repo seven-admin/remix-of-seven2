@@ -74,9 +74,9 @@ export default function Atividades() {
   const totalItems = atividadesData?.count || 0;
 
   const { data: resumoStatus } = useAtividadesStatusResumo({ filters });
-  const { data: atividadesMes, isLoading: isLoadingMes } = useAgendaMensal(ano, mes);
+  const { data: atividadesMes, isLoading: isLoadingMes } = useAgendaMensal(ano, mes, undefined, filters);
   const { data: atividadesDia } = useAgendaDia(selectedDate);
-  const { data: atividadesHoje } = useAtividadesHoje();
+  const { data: atividadesHoje } = useAtividadesHoje(filters);
   const { data: atividadesVencidas, isLoading: isLoadingVencidas } = useAtividadesVencidas();
   const { data: gestores } = useGestoresProduto();
   const { data: empreendimentos } = useEmpreendimentos();
