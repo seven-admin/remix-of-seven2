@@ -1,92 +1,69 @@
 
 
-# Plano: Corrigir Acesso do Diretor de Marketing aos Tickets
+# Plano: Criar Pasta INSTALL com Configuração de Deploy
 
-## Problema Identificado
+## Objetivo
 
-Os tickets sumiram para Jéssica porque as políticas de RLS (Row Level Security) não reconhecem o role `diretor_de_marketing` como alguém com permissão de visualização.
+Criar uma pasta `INSTALL` contendo arquivos de configuração e documentação para deploy no EasyPanel com Nixpacks.
 
-### Políticas Atuais da Tabela `projetos_marketing`
+## Arquivos a Criar
 
-| Política | Condição | Jéssica passa? |
-|----------|----------|----------------|
-| Admins can manage | `is_admin(auth.uid())` | **Não** (ela não é admin) |
-| Clientes can view own | `cliente_id = auth.uid()` | **Não** (ela não é cliente) |
-| Supervisores can manage | `is_marketing_supervisor(auth.uid())` | **Não** (role não incluído) |
+### 1. `INSTALL/nixpacks.toml`
 
-### Função `is_marketing_supervisor()` (atual)
+Configuração do Nixpacks para usar Node.js 20:
 
-```sql
-SELECT EXISTS (
-  SELECT 1 FROM user_roles ur
-  JOIN roles r ON r.id = ur.role_id
-  WHERE ur.user_id = _user_id
-  AND r.name IN (
-    'supervisor_relacionamento',
-    'supervisor_render', 
-    'supervisor_criacao',
-    'supervisor_video',
-    'equipe_marketing'
-  )  -- ← 'diretor_de_marketing' NÃO ESTÁ AQUI!
-  AND r.is_active = true
-)
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.build]
+cmds = ["npm ci", "npm run build"]
+
+[start]
+cmd = "npx serve dist -s -l 3000"
 ```
 
-## Solução
+### 2. `INSTALL/README.md`
 
-Atualizar a função `is_marketing_supervisor()` para incluir o role `diretor_de_marketing`.
+Documentação de deploy com instruções para EasyPanel:
 
-### Migração SQL
+```markdown
+# Guia de Deploy - EasyPanel com Nixpacks
 
-```sql
-CREATE OR REPLACE FUNCTION public.is_marketing_supervisor(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1 
-    FROM public.user_roles ur
-    JOIN public.roles r ON r.id = ur.role_id
-    WHERE ur.user_id = _user_id
-    AND r.name IN (
-      'supervisor_relacionamento', 
-      'supervisor_render', 
-      'supervisor_criacao', 
-      'supervisor_video', 
-      'equipe_marketing',
-      'diretor_de_marketing'  -- ← ADICIONAR ESTE ROLE
-    )
-    AND r.is_active = true
-  )
-$$;
+## Requisitos
+- Node.js 20.x (configurado automaticamente via nixpacks.toml)
+
+## Configuração no EasyPanel
+
+### Opção 1: Usando nixpacks.toml (Recomendado)
+1. Copie o arquivo `nixpacks.toml` para a raiz do projeto
+2. O EasyPanel detectará automaticamente a configuração
+
+### Opção 2: Variável de Ambiente
+Adicione nas configurações do serviço:
+- `NIXPACKS_NODE_VERSION=20`
+
+### Opção 3: Pacote Nix Específico
+Altere o pacote de `nodejs` para `nodejs_20`
+
+## Comandos de Build
+- Install: `npm ci`
+- Build: `npm run build`
+- Start: `npx serve dist -s -l 3000`
+
+## Portas
+- Aplicação: 3000
 ```
 
-## Fluxo Após Correção
+## Estrutura Final
 
-```text
-Jéssica (diretor_de_marketing) → SELECT projetos_marketing
-                                        ↓
-                            RLS verifica políticas
-                                        ↓
-                     is_marketing_supervisor(jéssica_id)
-                                        ↓
-              role 'diretor_de_marketing' IN lista? → SIM ✓
-                                        ↓
-                              Retorna TRUE → ACESSO LIBERADO
+```
+INSTALL/
+├── nixpacks.toml    # Configuração para Nixpacks/EasyPanel
+└── README.md        # Instruções de deploy
 ```
 
-## Resultado Esperado
+## Uso
 
-Após a migração:
-- Jéssica verá todos os tickets no Kanban de Marketing
-- Poderá criar, editar e mover tickets normalmente
-- Outros usuários com roles de marketing continuarão funcionando
-
-## Resumo das Alterações
-
-| Tipo | Descrição |
-|------|-----------|
-| Migração SQL | Atualizar função `is_marketing_supervisor()` para incluir `diretor_de_marketing` |
+Quando for fazer deploy, basta copiar o `nixpacks.toml` para a raiz do projeto ou seguir as instruções do README.
 
