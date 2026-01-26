@@ -4,6 +4,7 @@ import { usePermissions } from './usePermissions';
 // portal_corretor primeiro para evitar flash de "Acesso Negado" para corretores
 const routePriority = [
   { path: '/portal-corretor', module: 'portal_corretor' },
+  { path: '/marketing', module: 'projetos_marketing' },
   { path: '/', module: 'dashboard' },
   { path: '/empreendimentos', module: 'empreendimentos' },
   { path: '/clientes', module: 'clientes' },
