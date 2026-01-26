@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, forwardRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +69,11 @@ export default function Financeiro() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [editingLancamento, setEditingLancamento] = useState<any | null>(null);
   
+  // Filtros e paginação
+  const [tipoFilter, setTipoFilter] = useState<'todos' | 'receber' | 'pagar'>('todos');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  
   // Estado para ordenação da tabela
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -121,8 +126,14 @@ export default function Financeiro() {
 
   const { data: lancamentos = [], isLoading } = useLancamentos({
     data_inicio: startDate,
-    data_fim: endDate
+    data_fim: endDate,
+    tipo: tipoFilter !== 'todos' ? tipoFilter : undefined
   });
+  
+  // Reset page quando filtros mudam
+  React.useEffect(() => {
+    setPage(1);
+  }, [selectedMonth, tipoFilter]);
   const { data: stats } = useFinanceiroStats({
     data_inicio: startDate,
     data_fim: endDate
@@ -206,8 +217,20 @@ export default function Financeiro() {
     });
   };
 
-  const SortableHeader = ({ column, label, className }: { column: string; label: string; className?: string }) => (
+  // Paginação
+  const paginatedLancamentos = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedLancamentos.slice(start, start + pageSize);
+  }, [sortedLancamentos, page, pageSize]);
+
+  const totalPages = Math.ceil(sortedLancamentos.length / pageSize);
+
+  const SortableHeader = forwardRef<
+    HTMLTableCellElement,
+    { column: string; label: string; className?: string }
+  >(({ column, label, className }, ref) => (
     <TableHead 
+      ref={ref}
       className={`cursor-pointer select-none hover:bg-muted/50 transition-colors ${className || ''}`}
       onClick={() => handleSort(column)}
     >
@@ -222,7 +245,8 @@ export default function Financeiro() {
         )}
       </div>
     </TableHead>
-  );
+  ));
+  SortableHeader.displayName = 'SortableHeader';
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -459,14 +483,29 @@ export default function Financeiro() {
         </TabsContent>
 
         <TabsContent value="movimentacoes">
-          <div className="flex justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="receber">Entradas</SelectItem>
+                  <SelectItem value="pagar">Saídas</SelectItem>
+                </SelectContent>
+              </Select>
+              
               {selectedForPayment.length > 0 && (
                 <Button onClick={handlePaySelected} variant="default">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Pagar Selecionados ({selectedForPayment.length}) - {formatCurrency(totalSelecionadoPagamento)}
                 </Button>
               )}
+              
+              <span className="text-sm text-muted-foreground">
+                {sortedLancamentos.length} registro(s)
+              </span>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => openFormWithType('entrada')}>
@@ -507,7 +546,7 @@ export default function Financeiro() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedLancamentos.map((lancamento) => {
+                  {paginatedLancamentos.map((lancamento) => {
                     const isEntrada = (lancamento as any).tipo === 'receber';
                     const isPendente = lancamento.status === 'pendente';
                     return (
@@ -566,8 +605,44 @@ export default function Financeiro() {
                       </TableRow>
                     );
                   })}
+                  {paginatedLancamentos.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        Nenhum lançamento encontrado
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
+              
+              {/* Paginação */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Página {page} de {totalPages} • {sortedLancamentos.length} registros
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      Próxima
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
