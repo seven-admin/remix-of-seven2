@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { formatarMoedaCompacta } from '@/lib/formatters';
 
 const Funil = () => {
+  const navigate = useNavigate();
   const [formOpen, setFormOpen] = useState(false);
   const [filters, setFilters] = useState<{
     empreendimento_id?: string;
@@ -138,7 +140,7 @@ const Funil = () => {
             </Select>
           </div>
         </div>
-        <Button onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
+        <Button onClick={() => navigate('/negociacoes/nova')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nova Ficha de Proposta
         </Button>
