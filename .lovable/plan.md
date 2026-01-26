@@ -1,70 +1,65 @@
 
-# Plano: Corrigir Criação de Usuários com Roles Dinâmicos
+
+# Plano: Corrigir Atualização de Usuários com Roles Dinâmicos
 
 ## Problema Identificado
 
-A tabela `user_roles` possui duas colunas para armazenar o role:
-1. **`role_id`** (UUID, nullable) → Referência à tabela dinâmica `roles`
-2. **`role`** (ENUM `app_role`, NOT NULL) → Sistema legado com valores fixos
+Na página `src/pages/Usuarios.tsx`, a função `handleSaveUser` apresenta dois cenários:
 
-Quando o usuário tenta criar um novo usuário com role `supervisão_de_criação`:
-- Este role existe na tabela `roles` (dinâmica)
-- **NÃO existe** no enum `app_role` (legado)
-- O Edge Function tenta preencher ambas as colunas, mas falha no enum
+1. **Usuário já possui role** (linhas 179-186): Atualiza corretamente usando apenas `role_id`
+2. **Usuário não possui role** (linhas 187-198): Tenta inserir **ambas** as colunas `role_id` e `role` (enum legado)
+
+O segundo cenário falha porque roles dinâmicos como `supervisão_de_criação` não existem no enum fixo `app_role`.
+
+### Código Problemático (linha 191-195):
+```typescript
+.insert({ 
+  user_id: editingUser.id, 
+  role_id: roleData.id,
+  role: editRole as any  // ← PROBLEMA: tenta inserir valor fora do enum
+});
+```
 
 ## Solução
 
-Remover a obrigatoriedade da coluna `role` (enum) e permitir que apenas `role_id` seja usado para novos registros.
+Remover a inserção da coluna `role` (enum) e usar apenas `role_id`, seguindo o mesmo padrão já aplicado no Edge Function `create-user`.
 
-### Alteração 1: Tornar coluna `role` nullable
+## Alteração Necessária
 
-```sql
-ALTER TABLE user_roles ALTER COLUMN role DROP NOT NULL;
-```
+**Arquivo:** `src/pages/Usuarios.tsx`
 
-### Alteração 2: Atualizar Edge Function
-
-Modificar `supabase/functions/create-user/index.ts` para:
-- Inserir apenas `role_id` (não mais a coluna `role`)
-- Remover a dependência do enum legado
-
-**Antes:**
+**Antes (linhas 188-195):**
 ```typescript
-const { error: insertRoleError } = await supabaseAdmin
+// Insert new role with role_id (keeping role column for backward compatibility until removed)
+const { error: roleError } = await supabase
   .from('user_roles')
-  .insert({
-    user_id: newUserId,
+  .insert({ 
+    user_id: editingUser.id, 
     role_id: roleData.id,
-    role: role  // ← PROBLEMA: tenta inserir valor fora do enum
-  })
+    role: editRole as any  // Temporary: keep enum column populated
+  });
 ```
 
 **Depois:**
 ```typescript
-const { error: insertRoleError } = await supabaseAdmin
+// Insert new role with role_id only (enum column now optional)
+const { error: roleError } = await supabase
   .from('user_roles')
-  .insert({
-    user_id: newUserId,
+  .insert({ 
+    user_id: editingUser.id, 
     role_id: roleData.id
-    // role removido - usando apenas role_id
-  })
+  });
 ```
 
-## Benefícios
+## Resumo da Alteração
 
-1. **Compatibilidade**: Roles existentes no enum continuam funcionando
-2. **Flexibilidade**: Novos roles dinâmicos podem ser criados sem alterar o banco
-3. **Migração gradual**: Código existente que usa `role` continua funcionando
-
-## Arquivos a Modificar
-
-| Arquivo | Ação |
-|---------|------|
-| Nova migration SQL | Tornar coluna `role` nullable |
-| `supabase/functions/create-user/index.ts` | Remover inserção da coluna `role` |
+| Arquivo | Linha | Ação |
+|---------|-------|------|
+| `src/pages/Usuarios.tsx` | 191-195 | Remover inserção da coluna `role` |
 
 ## Resultado Esperado
 
-- Criação de usuários com qualquer role da tabela `roles` funcionará
+- Atualização de usuários funcionará com qualquer role da tabela `roles`
 - Roles com caracteres especiais (acentos) serão aceitos
-- Sistema 100% baseado em `role_id` para novos registros
+- Compatibilidade com o sistema dinâmico de permissões
+
