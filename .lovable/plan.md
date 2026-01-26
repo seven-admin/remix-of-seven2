@@ -1,126 +1,114 @@
 
-# Plano: Correções da Página Financeiro
+# Plano: Corrigir Atualização dos Cards na Aba Visão Geral
 
-## Problemas Identificados
+## Problema Identificado
 
-1. **Filtro por Tipo inexistente** - Não há seletor para filtrar Entradas/Saídas na aba Movimentações
-2. **Filtro automático não funciona** - O hook `useLancamentos` aceita filtro `tipo`, mas a página não utiliza
-3. **Paginação incorreta/inexistente** - Todos os lançamentos do mês são carregados de uma vez
-4. **Warning de forwardRef** - O componente `SortableHeader` precisa ser convertido para `forwardRef`
+Os contadores dos cards na aba **Visão Geral** da página Financeiro não estão sendo atualizados após operações como criar, editar, excluir lançamentos ou registrar pagamentos.
 
-## Solução Proposta
+### Causa Raiz
 
-### 1. Adicionar Filtro por Tipo (Entrada/Saída/Todos)
+A query `financeiro-stats` que alimenta os dados dos cards **não está sendo invalidada** após a maioria das mutações no hook `useFinanceiro.ts`.
 
-Criar um estado e seletor na toolbar da aba Movimentações:
+**Situação Atual:**
+| Mutation | Invalida `lancamentos` | Invalida `financeiro-stats` |
+|----------|------------------------|-----------------------------|
+| useCreateLancamento | Sim | **NÃO** |
+| useUpdateLancamento | Sim | **NÃO** |
+| useRegistrarPagamentoLancamento | Sim | **NÃO** |
+| useRegistrarPagamentoEmLote | Sim | Sim |
+| useDeleteLancamento | Sim | **NÃO** |
+| useAprovarLancamentos | Sim | **NÃO** |
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  [Todos ▼]  [Centro Custo ▼]  [Status ▼]     [Nova Entrada] [+] │
-│                                                                  │
-│  Tabela de lançamentos...                                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+Apenas `useRegistrarPagamentoEmLote` invalida a query `financeiro-stats`, por isso os cards só atualizam quando um pagamento em lote é registrado.
 
-Opções do filtro:
-- **Todos** - Mostra entradas e saídas
-- **Entradas** - Filtra por `tipo = 'receber'`
-- **Saídas** - Filtra por `tipo = 'pagar'`
+## Solução
 
-### 2. Integrar Filtro com Hook useLancamentos
+Adicionar `queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] })` no callback `onSuccess` de todas as mutations que afetam dados financeiros.
 
-Passar o parâmetro `tipo` para o hook quando filtro estiver ativo:
+## Alterações Necessárias
 
+### Arquivo: `src/hooks/useFinanceiro.ts`
+
+Adicionar invalidação da query `financeiro-stats` nas seguintes mutations:
+
+**1. useCreateLancamento (linha 265)**
 ```typescript
-const [tipoFilter, setTipoFilter] = useState<'todos' | 'receber' | 'pagar'>('todos');
-
-const { data: lancamentos = [] } = useLancamentos({
-  data_inicio: startDate,
-  data_fim: endDate,
-  tipo: tipoFilter !== 'todos' ? tipoFilter : undefined,
-});
+onSuccess: (result) => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  // ...
+}
 ```
 
-### 3. Implementar Paginação Client-Side
-
-Adicionar paginação com controles usando o componente existente `PaginationControls`:
-
+**2. useUpdateLancamento (linha 376)**
 ```typescript
-const [page, setPage] = useState(1);
-const pageSize = 20;
-
-const paginatedLancamentos = useMemo(() => {
-  const start = (page - 1) * pageSize;
-  return sortedLancamentos.slice(start, start + pageSize);
-}, [sortedLancamentos, page]);
-
-const totalPages = Math.ceil(sortedLancamentos.length / pageSize);
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Lançamento atualizado');
+}
 ```
 
-### 4. Corrigir Warning do SortableHeader
-
-Converter para `forwardRef` para evitar o warning do React:
-
+**3. useRegistrarPagamentoLancamento (linha 413)**
 ```typescript
-const SortableHeader = React.forwardRef<
-  HTMLTableCellElement,
-  { column: string; label: string; className?: string }
->(({ column, label, className }, ref) => (
-  <TableHead 
-    ref={ref}
-    className={`cursor-pointer select-none hover:bg-muted/50 ${className || ''}`}
-    onClick={() => handleSort(column)}
-  >
-    <div className="flex items-center gap-1">
-      {label}
-      {sortConfig?.key === column ? (
-        sortConfig.direction === 'asc' 
-          ? <ChevronUp className="h-4 w-4" />
-          : <ChevronDown className="h-4 w-4" />
-      ) : (
-        <ArrowUpDown className="h-3 w-3 opacity-30" />
-      )}
-    </div>
-  </TableHead>
-));
-SortableHeader.displayName = 'SortableHeader';
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Pagamento registrado');
+}
 ```
 
-## Alterações de Arquivos
+**4. useDeleteLancamento (linha 502)**
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Lançamento excluído');
+}
+```
 
-### `src/pages/Financeiro.tsx`
+**5. useAprovarLancamentos (linha 444)**
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Lançamentos aprovados com sucesso');
+}
+```
 
-**Novos estados:**
-- `tipoFilter` - Filtro de tipo (todos/receber/pagar)
-- `page` - Página atual da paginação
+**6. useUpdateRecurringSeries (linha 315)**
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Série recorrente atualizada');
+}
+```
 
-**Modificações:**
-1. Adicionar import do `React` para `forwardRef`
-2. Converter `SortableHeader` para usar `forwardRef`
-3. Adicionar Select de filtro por tipo na toolbar
-4. Passar filtro `tipo` para o hook `useLancamentos`
-5. Implementar lógica de paginação com `useMemo`
-6. Adicionar componente `PaginationControls` abaixo da tabela
-7. Resetar página ao mudar filtros
+**7. useDeleteRecurringSeries (linha 351)**
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
+  toast.success('Série recorrente excluída');
+}
+```
 
 ## Resultado Esperado
 
-- Filtro por tipo funcionando corretamente
-- Paginação com 20 itens por página
-- Warning de console eliminado
-- Interface mais organizada para gerenciar grandes volumes de dados
+Após implementar as alterações:
+- Os cards de **Saldo Inicial**, **Entradas**, **Saídas** e **Saldo Atual** serão atualizados automaticamente após qualquer operação
+- Os gráficos da aba Visão Geral refletirão as mudanças em tempo real
+- A experiência do usuário será consistente em toda a página
 
 ## Seção Técnica
 
-### Dependências
-- Usar `PaginationControls` de `@/components/ui/pagination-controls`
-- Manter compatibilidade com ordenação existente (`sortedLancamentos`)
+### Query Keys Afetadas
+- `lancamentos` - Lista de lançamentos filtrados por período
+- `financeiro-stats` - Estatísticas agregadas (totais, saldos)
 
-### Reset de Página
-A página deve resetar para 1 quando:
-- O mês selecionado mudar
-- O filtro de tipo mudar
-- O filtro de status mudar (se adicionado)
+### Padrão de Invalidação
+O React Query mantém as queries em cache. Ao chamar `invalidateQueries`, a query é marcada como "stale" e será refetchada quando acessada novamente ou imediatamente se estiver sendo observada por um componente ativo.
 
-### Filtros no Hook
-O hook `useLancamentos` já suporta o parâmetro `tipo` (linhas 55-57 do useFinanceiro.ts), então basta passar o valor quando não for "todos".
+### Impacto de Performance
+Mínimo - a query `financeiro-stats` é leve e retorna apenas agregações. A invalidação ocorre apenas após mutações bem-sucedidas.
