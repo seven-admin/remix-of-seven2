@@ -65,7 +65,7 @@ const menuGroups: MenuGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     items: [
-      { icon: BarChart2, label: 'Executivo', path: '/dashboard-executivo', moduleName: 'dashboard' },
+      { icon: BarChart2, label: 'Executivo', path: '/dashboard-executivo', moduleName: 'dashboard', adminOnly: true },
     ],
   },
   // Empreendimentos
