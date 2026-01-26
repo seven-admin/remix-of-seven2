@@ -54,6 +54,7 @@ import EquipeMarketing from "./pages/EquipeMarketing";
 import TermosUso from "./pages/TermosUso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import PortalClientes from "./pages/PortalClientes";
+import NovaPropostaComercial from "./pages/NovaPropostaComercial";
 
 const queryClient = new QueryClient();
 
@@ -152,6 +153,11 @@ const App = () => (
             <Route path="/negociacoes" element={
               <ProtectedRoute moduleName="negociacoes">
                 <Negociacoes />
+              </ProtectedRoute>
+            } />
+            <Route path="/negociacoes/nova" element={
+              <ProtectedRoute moduleName="negociacoes">
+                <NovaPropostaComercial />
               </ProtectedRoute>
             } />
             {/* Redirect old /propostas to /negociacoes */}
