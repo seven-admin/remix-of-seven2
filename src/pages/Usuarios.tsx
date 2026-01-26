@@ -185,13 +185,12 @@ export default function Usuarios() {
 
         if (roleError) throw roleError;
       } else {
-        // Insert new role with role_id (keeping role column for backward compatibility until removed)
+        // Insert new role with role_id only (enum column now optional)
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({ 
             user_id: editingUser.id, 
-            role_id: roleData.id,
-            role: editRole as any  // Temporary: keep enum column populated for backward compatibility
+            role_id: roleData.id
           });
 
         if (roleError) throw roleError;
