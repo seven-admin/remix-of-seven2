@@ -1,154 +1,73 @@
-# Plano: CRUD Completo para Propostas, Contratos e Eventos
 
-## Analise do Estado Atual
+# Plano: Adicionar Permissões para Diretor de Marketing
 
-### 1. Propostas - Estado Atual
-**Hook (`usePropostas.ts`):**
-- [x] CREATE: `useCreateProposta` - funciona
-- [x] READ: `usePropostas`, `useProposta` - funciona
-- [x] UPDATE: `useUpdateProposta` - existe mas nao tem UI
-- [x] DELETE: `useDeleteProposta` - soft delete funciona
+## Diagnóstico
+A usuária Jéssica (`marketing@sevengroup360.com.br`) está recebendo "Acesso Negado" porque:
+- Possui o role `diretor_de_marketing` (ID: `683bdb97-a42e-4d77-a07d-9f81988d731f`)
+- Este role não possui nenhuma permissão configurada na tabela `role_permissions`
+- Sem permissões, o sistema bloqueia o acesso a todos os módulos
 
-**Pagina (`Propostas.tsx`):**
-- [x] Listagem com filtros e paginacao
-- [x] Criar nova proposta via `PropostaForm`
-- [x] Visualizar detalhes via `PropostaDetalheDialog`
-- [ ] **FALTA: Editar proposta existente** - nao ha botao de editar nem formulario de edicao
-- [x] Excluir proposta (apenas rascunho)
-- [ ] **FALTA: Excluir proposta em qualquer status para super admin**
+## Solução
 
----
+Inserir registros na tabela `role_permissions` vinculando o role `diretor_de_marketing` aos módulos apropriados.
 
-### 2. Contratos - Estado Atual
-**Hook (`useContratos.ts`):**
-- [x] CREATE: `useCreateContrato` - funciona
-- [x] READ: `useContratos`, `useContrato`, `useContratosPaginated` - funciona
-- [x] UPDATE: `useUpdateContrato`, `useUpdateContratoStatus` - funciona
-- [x] DELETE: `useDeleteContrato` - soft delete funciona
+## Permissões Propostas
 
-**Pagina/Tabela (`Contratos.tsx`, `ContratosTable.tsx`):**
-- [x] Listagem com filtros e paginacao
-- [x] Criar novo contrato
-- [x] Visualizar detalhes
-- [x] Editar contrato (via tela de detalhe)
-- [x] **Excluir em qualquer status para super admin** - JA IMPLEMENTADO na ultima alteracao
+O Diretor de Marketing deverá ter acesso a:
 
-**Verificacao:** A funcionalidade de exclusao para super admin ja foi implementada corretamente em `ContratosTable.tsx` (linhas 85-170).
+| Módulo | Visualizar | Criar | Editar | Excluir |
+|--------|:----------:|:-----:|:------:|:-------:|
+| Dashboard Executivo | Sim | - | - | - |
+| Projetos de Marketing | Sim | Sim | Sim | Sim |
+| Config. Workflow Marketing | Sim | Sim | Sim | Sim |
+| Briefings | Sim | Sim | Sim | Sim |
+| Calendário de Eventos | Sim | Sim | Sim | Sim |
+| Templates de Evento | Sim | Sim | Sim | Sim |
+| Empreendimentos | Sim | - | - | - |
+| Relatórios | Sim | - | - | - |
 
----
+## Implementação Técnica
 
-### 3. Eventos - Estado Atual
-**Hook (`useEventos.ts`):**
-- [x] CREATE: `createEvento` - funciona
-- [x] READ: `eventos`, `useEvento` - funciona
-- [x] UPDATE: `updateEvento` - funciona
-- [x] DELETE: `deleteEvento` - soft delete funciona
+Executar o seguinte SQL via migration:
 
-**Pagina (`Eventos.tsx`, `EventoDetalhe.tsx`):**
-- [x] Listagem com busca
-- [x] Criar novo evento (com/sem template)
-- [x] Visualizar detalhes
-- [x] Editar evento via `EventoEditDialog`
-- [ ] **FALTA: Botao de excluir evento** - nao ha opcao de exclusao no menu
-
----
-
-## Alteracoes Necessarias
-
-### 1. Propostas - Completar CRUD
-
-#### 1.1 Adicionar Edicao de Proposta
-
-**Arquivo: `src/components/propostas/PropostaForm.tsx`**
-- Modificar para aceitar `proposta?: Proposta` como prop opcional
-- Pre-preencher formulario quando em modo edicao
-- Chamar `useUpdateProposta` em vez de `useCreateProposta` quando editando
-
-**Arquivo: `src/pages/Propostas.tsx`**
-- Adicionar estado `propostaParaEditar`
-- Adicionar botao de "Editar" na coluna de acoes (para rascunho/enviada)
-- Passar proposta para o form quando editando
-
-**Arquivo: `src/components/propostas/PropostaDetalheDialog.tsx`**
-- Adicionar botao "Editar" no dialog de detalhes
-
-#### 1.2 Permitir Exclusao para Super Admin
-
-**Arquivo: `src/pages/Propostas.tsx`**
-- Importar `usePermissions`
-- Mostrar botao de excluir para super admin em todos os status
-
----
-
-### 2. Contratos - Verificar e Confirmar
-
-A funcionalidade de exclusao para super admin **ja esta implementada** em `ContratosTable.tsx`:
-
-```typescript
-// Linha 86-91
-const isStatusAtivo = ['em_geracao', 'enviado_assinatura', 'assinado', 'enviado_incorporador'].includes(contrato.status);
-
-// Se nao tem acoes de status E nao pode excluir, nao mostra menu
-if (!isStatusAtivo && !canDelete) {
-  return null;
-}
+```sql
+INSERT INTO role_permissions (role, module_id, can_view, can_create, can_edit, can_delete, scope)
+VALUES
+  -- Dashboard Executivo (visualização)
+  ('diretor_de_marketing', '319c48ad-6bf8-4f57-b68f-4bcf84040dd9', true, false, false, false, 'global'),
+  
+  -- Projetos de Marketing (acesso total)
+  ('diretor_de_marketing', 'e8d4fe27-a4fe-4033-8b9e-c3795fdb9159', true, true, true, true, 'global'),
+  
+  -- Config. Workflow Marketing (acesso total)
+  ('diretor_de_marketing', '0802a585-fbc7-40a7-94d5-4dbc8eedd386', true, true, true, true, 'global'),
+  
+  -- Briefings (acesso total)
+  ('diretor_de_marketing', '43be8d14-9db0-46a5-9756-f5926757ffd1', true, true, true, true, 'global'),
+  
+  -- Calendário de Eventos (acesso total)
+  ('diretor_de_marketing', 'b042dfe2-b925-442c-b72b-c26276b89fcc', true, true, true, true, 'global'),
+  
+  -- Templates de Evento (acesso total)
+  ('diretor_de_marketing', 'f0d1ec3b-ea5a-45bf-8e5c-08e4462a54a9', true, true, true, true, 'global'),
+  
+  -- Empreendimentos (somente visualização)
+  ('diretor_de_marketing', '0d1019b5-ef9c-4744-ab0b-22877512ae5d', true, false, false, false, 'global'),
+  
+  -- Relatórios (somente visualização)
+  ('diretor_de_marketing', '713a265f-7007-48bc-b324-2d9eae3faeef', true, false, false, false, 'global');
 ```
 
-E na linha 156-167, o botao de exclusao aparece para super admin independente do status.
+## Resultado Esperado
 
-**Nenhuma alteracao necessaria** - apenas confirmar que funciona.
+Após a execução:
+1. Jéssica poderá fazer login normalmente
+2. Será redirecionada para o Dashboard Executivo (primeiro módulo com acesso)
+3. Terá acesso completo à área de Marketing (projetos, briefings, eventos)
+4. Poderá visualizar empreendimentos e relatórios para contexto
 
----
+## Arquivo a Modificar
 
-### 3. Eventos - Adicionar Exclusao
-
-#### 3.1 Adicionar Opcao de Excluir na Listagem
-
-**Arquivo: `src/pages/Eventos.tsx`**
-- Adicionar `deleteEvento` do hook
-- Adicionar opcao "Excluir" no `DropdownMenu` (mobile e desktop)
-- Adicionar confirmacao antes de excluir
-- Considerar permissao de super admin para excluir eventos em qualquer status
-
-#### 3.2 Adicionar Opcao de Excluir no Detalhe
-
-**Arquivo: `src/pages/EventoDetalhe.tsx`**
-- Adicionar botao "Excluir Evento" (destrutivo)
-- Redirecionar para `/eventos` apos exclusao
-- Adicionar dialog de confirmacao
-
----
-
-## Resumo das Alteracoes
-
-| Modulo | Arquivo | Alteracao |
-|--------|---------|-----------|
-| Propostas | `PropostaForm.tsx` | Suporte a modo edicao |
-| Propostas | `Propostas.tsx` | Botao editar + excluir para super admin |
-| Propostas | `PropostaDetalheDialog.tsx` | Botao editar no dialog |
-| Contratos | - | Nenhuma (ja implementado) |
-| Eventos | `Eventos.tsx` | Opcao de excluir no menu |
-| Eventos | `EventoDetalhe.tsx` | Botao de excluir na pagina de detalhe |
-
----
-
-## Fluxo de Implementacao
-
-1. **Propostas - Edicao:**
-   - Modificar `PropostaForm` para aceitar proposta existente
-   - Adicionar logica de update no submit
-   - Adicionar botoes de editar na lista e no dialog
-
-2. **Propostas - Exclusao Super Admin:**
-   - Verificar permissao com `usePermissions`
-   - Mostrar botao de excluir sempre para super admin
-
-3. **Eventos - Exclusao:**
-   - Adicionar opcao no dropdown da listagem
-   - Adicionar botao no detalhe do evento
-   - Implementar confirmacao e redirect
-
-4. **Testes:**
-   - Testar criar/editar/excluir propostas
-   - Testar exclusao de contratos aprovados como super admin
-   - Testar exclusao de eventos
+| Arquivo | Ação |
+|---------|------|
+| Nova migration SQL | Inserir permissões do role |
