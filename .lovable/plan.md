@@ -1,81 +1,92 @@
 
-# Plano: Ocultar Menu "Dashboard Executivo" para Não-Admins
+
+# Plano: Corrigir Acesso do Diretor de Marketing aos Tickets
 
 ## Problema Identificado
 
-O menu "Dashboard Executivo" aparece para Jéssica, mas ao clicar, ela recebe "Acesso Negado" porque:
+Os tickets sumiram para Jéssica porque as políticas de RLS (Row Level Security) não reconhecem o role `diretor_de_marketing` como alguém com permissão de visualização.
 
-1. **Rota `/dashboard-executivo`** tem `adminOnly={true}` no App.tsx (linha 82)
-2. **Item de menu no Sidebar.tsx** (linha 68) **NÃO tem** `adminOnly: true`
-3. Jéssica tem `can_view: true` para o módulo `dashboard` (configurado no banco)
-4. Resultado: O menu aparece (baseado em `canAccessModule`), mas a rota bloqueia acesso
+### Políticas Atuais da Tabela `projetos_marketing`
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│                    INCONSISTÊNCIA                          │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│  Sidebar.tsx (linha 68):                                   │
-│  { label: 'Executivo', path: '/dashboard-executivo',       │
-│    moduleName: 'dashboard' }     ← SEM adminOnly!          │
-│                                                            │
-│  App.tsx (linha 82):                                       │
-│  <ProtectedRoute moduleName="dashboard" adminOnly>         │
-│    <DashboardExecutivo />        ← COM adminOnly!          │
-│  </ProtectedRoute>                                         │
-│                                                            │
-│  Resultado: Menu visível, mas rota bloqueada               │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+| Política | Condição | Jéssica passa? |
+|----------|----------|----------------|
+| Admins can manage | `is_admin(auth.uid())` | **Não** (ela não é admin) |
+| Clientes can view own | `cliente_id = auth.uid()` | **Não** (ela não é cliente) |
+| Supervisores can manage | `is_marketing_supervisor(auth.uid())` | **Não** (role não incluído) |
+
+### Função `is_marketing_supervisor()` (atual)
+
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM user_roles ur
+  JOIN roles r ON r.id = ur.role_id
+  WHERE ur.user_id = _user_id
+  AND r.name IN (
+    'supervisor_relacionamento',
+    'supervisor_render', 
+    'supervisor_criacao',
+    'supervisor_video',
+    'equipe_marketing'
+  )  -- ← 'diretor_de_marketing' NÃO ESTÁ AQUI!
+  AND r.is_active = true
+)
 ```
 
 ## Solução
 
-Adicionar `adminOnly: true` ao item de menu do Dashboard Executivo no Sidebar.tsx, garantindo que só apareça para administradores.
+Atualizar a função `is_marketing_supervisor()` para incluir o role `diretor_de_marketing`.
 
-## Alteração Necessária
+### Migração SQL
 
-**Arquivo:** `src/components/layout/Sidebar.tsx`
-
-**Linha 68 - Antes:**
-```typescript
-{ icon: BarChart2, label: 'Executivo', path: '/dashboard-executivo', moduleName: 'dashboard' },
+```sql
+CREATE OR REPLACE FUNCTION public.is_marketing_supervisor(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+    WHERE ur.user_id = _user_id
+    AND r.name IN (
+      'supervisor_relacionamento', 
+      'supervisor_render', 
+      'supervisor_criacao', 
+      'supervisor_video', 
+      'equipe_marketing',
+      'diretor_de_marketing'  -- ← ADICIONAR ESTE ROLE
+    )
+    AND r.is_active = true
+  )
+$$;
 ```
 
-**Linha 68 - Depois:**
-```typescript
-{ icon: BarChart2, label: 'Executivo', path: '/dashboard-executivo', moduleName: 'dashboard', adminOnly: true },
+## Fluxo Após Correção
+
+```text
+Jéssica (diretor_de_marketing) → SELECT projetos_marketing
+                                        ↓
+                            RLS verifica políticas
+                                        ↓
+                     is_marketing_supervisor(jéssica_id)
+                                        ↓
+              role 'diretor_de_marketing' IN lista? → SIM ✓
+                                        ↓
+                              Retorna TRUE → ACESSO LIBERADO
 ```
-
-## Por que isso funciona
-
-O método `filterItems` no Sidebar.tsx (linha 242-248) já implementa a lógica correta:
-
-```typescript
-const filterItems = (items: MenuItem[]) =>
-  items.filter((item) => {
-    if (item.path === '/marketing/etapas') return isSuperAdmin();
-    if (item.adminOnly) return isAdmin();  // ← Esta linha já existe!
-    return canAccessModule(item.moduleName);
-  });
-```
-
-Com `adminOnly: true`, o item só será exibido se `isAdmin()` retornar `true` (admin ou super_admin).
 
 ## Resultado Esperado
 
-| Usuário | Role | Vê menu "Executivo"? | Pode acessar rota? |
-|---------|------|---------------------|-------------------|
-| Jéssica | diretor_de_marketing | Não | Não |
-| Admin | admin | Sim | Sim |
-| Super Admin | super_admin | Sim | Sim |
-| Corretor | corretor | Não | Não |
+Após a migração:
+- Jéssica verá todos os tickets no Kanban de Marketing
+- Poderá criar, editar e mover tickets normalmente
+- Outros usuários com roles de marketing continuarão funcionando
 
-## Decisão de Design
+## Resumo das Alterações
 
-Se no futuro o "Dashboard Executivo" precisar ser acessível a outros roles além de admin/super_admin:
-1. Remover `adminOnly` da rota no App.tsx
-2. Remover `adminOnly` do menu no Sidebar.tsx
-3. Configurar permissões específicas via banco de dados
+| Tipo | Descrição |
+|------|-----------|
+| Migração SQL | Atualizar função `is_marketing_supervisor()` para incluir `diretor_de_marketing` |
 
-Por enquanto, mantemos consistência: menu e rota ambos exigem admin.
