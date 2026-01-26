@@ -263,6 +263,7 @@ export function useCreateLancamento() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       if (result && result.count > 1) {
         toast.success(`${result.count} lançamentos recorrentes criados`);
       } else {
@@ -314,6 +315,7 @@ export function useUpdateRecurringSeries() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Série recorrente atualizada');
     },
     onError: (error) => {
@@ -349,6 +351,7 @@ export function useDeleteRecurringSeries() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Série recorrente excluída');
     },
     onError: (error) => {
@@ -374,6 +377,7 @@ export function useUpdateLancamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Lançamento atualizado');
     },
     onError: (error) => {
@@ -411,6 +415,7 @@ export function useRegistrarPagamentoLancamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Pagamento registrado');
     },
     onError: (error) => {
@@ -441,6 +446,7 @@ export function useAprovarLancamentos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Lançamentos aprovados com sucesso');
     },
     onError: (error) => {
@@ -500,6 +506,7 @@ export function useDeleteLancamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] });
       toast.success('Lançamento excluído');
     },
     onError: (error) => {
