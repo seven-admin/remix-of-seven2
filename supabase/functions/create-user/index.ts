@@ -154,13 +154,12 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Insert user role with role_id (keeping role column for backward compatibility)
+    // Insert user role with role_id only (enum column now optional)
     const { error: insertRoleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: newUserId,
-        role_id: roleData.id,
-        role: role  // Keep enum column populated for backward compatibility until removed
+        role_id: roleData.id
       })
 
     if (insertRoleError) {
