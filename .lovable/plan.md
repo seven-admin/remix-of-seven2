@@ -1,65 +1,148 @@
 
 
-# Plano: Corrigir Atualização de Usuários com Roles Dinâmicos
+# Plano: Corrigir Redirecionamento Pós-Login para Diretor de Marketing
 
 ## Problema Identificado
 
-Na página `src/pages/Usuarios.tsx`, a função `handleSaveUser` apresenta dois cenários:
+A usuária Jéssica (role `diretor_de_marketing`) está recebendo "Acesso Negado" ao logar porque:
 
-1. **Usuário já possui role** (linhas 179-186): Atualiza corretamente usando apenas `role_id`
-2. **Usuário não possui role** (linhas 187-198): Tenta inserir **ambas** as colunas `role_id` e `role` (enum legado)
+1. O sistema de login (`Auth.tsx`) usa `getDefaultRoute()` para redirecionar
+2. `getDefaultRoute()` retorna `/` porque Jéssica tem permissão no módulo `dashboard`
+3. O componente `Index.tsx` (rota `/`) ignora permissões e redireciona todos (exceto incorporadores) para `/dashboard-executivo`
+4. A rota `/dashboard-executivo` exige `adminOnly={true}`
+5. Jéssica não é admin → Acesso Negado
 
-O segundo cenário falha porque roles dinâmicos como `supervisão_de_criação` não existem no enum fixo `app_role`.
-
-### Código Problemático (linha 191-195):
-```typescript
-.insert({ 
-  user_id: editingUser.id, 
-  role_id: roleData.id,
-  role: editRole as any  // ← PROBLEMA: tenta inserir valor fora do enum
-});
+```text
+Login → Auth.tsx → getDefaultRoute() → "/"
+                                         ↓
+                                    Index.tsx
+                                         ↓
+                        (não é incorporador)
+                                         ↓
+                        Navigate → /dashboard-executivo
+                                         ↓
+                        ProtectedRoute adminOnly
+                                         ↓
+                        isAdmin() = false → "Acesso Negado"
 ```
 
 ## Solução
 
-Remover a inserção da coluna `role` (enum) e usar apenas `role_id`, seguindo o mesmo padrão já aplicado no Edge Function `create-user`.
+Modificar dois arquivos para que o sistema respeite as permissões corretamente:
 
-## Alteração Necessária
+### 1. Atualizar lista de prioridade de rotas
 
-**Arquivo:** `src/pages/Usuarios.tsx`
+**Arquivo:** `src/hooks/useDefaultRoute.ts`
 
-**Antes (linhas 188-195):**
+Adicionar a rota de Marketing antes do dashboard, para que usuários com acesso ao marketing sejam direcionados para lá:
+
+**Antes:**
 ```typescript
-// Insert new role with role_id (keeping role column for backward compatibility until removed)
-const { error: roleError } = await supabase
-  .from('user_roles')
-  .insert({ 
-    user_id: editingUser.id, 
-    role_id: roleData.id,
-    role: editRole as any  // Temporary: keep enum column populated
-  });
+const routePriority = [
+  { path: '/portal-corretor', module: 'portal_corretor' },
+  { path: '/', module: 'dashboard' },
+  { path: '/empreendimentos', module: 'empreendimentos' },
+  // ...
+];
 ```
 
 **Depois:**
 ```typescript
-// Insert new role with role_id only (enum column now optional)
-const { error: roleError } = await supabase
-  .from('user_roles')
-  .insert({ 
-    user_id: editingUser.id, 
-    role_id: roleData.id
-  });
+const routePriority = [
+  { path: '/portal-corretor', module: 'portal_corretor' },
+  { path: '/marketing', module: 'projetos_marketing' },  // Marketing antes do dashboard
+  { path: '/', module: 'dashboard' },
+  { path: '/empreendimentos', module: 'empreendimentos' },
+  // ...
+];
 ```
 
-## Resumo da Alteração
+### 2. Corrigir redirecionamento no Index.tsx
 
-| Arquivo | Linha | Ação |
-|---------|-------|------|
-| `src/pages/Usuarios.tsx` | 191-195 | Remover inserção da coluna `role` |
+**Arquivo:** `src/pages/Index.tsx`
+
+O componente atual ignora permissões. Deve usar o `getDefaultRoute()` para decidir o destino correto:
+
+**Antes:**
+```typescript
+const Index = () => {
+  const { role } = useAuth();
+
+  if (role === 'incorporador') {
+    return <DashboardIncorporador />;
+  }
+
+  // Redireciona SEMPRE para dashboard-executivo (ignora permissões)
+  return <Navigate to="/dashboard-executivo" replace />;
+};
+```
+
+**Depois:**
+```typescript
+const Index = () => {
+  const { role } = useAuth();
+  const { canAccessModule } = usePermissions();
+
+  // Dashboard específico para incorporadores
+  if (role === 'incorporador') {
+    return <DashboardIncorporador />;
+  }
+
+  // Se tem acesso ao dashboard executivo, mostra ele
+  if (canAccessModule('dashboard', 'view')) {
+    return <DashboardExecutivo />;
+  }
+
+  // Caso contrário, redireciona para marketing (ou outra área que tenha acesso)
+  return <Navigate to="/marketing" replace />;
+};
+```
+
+Alternativamente, usar o hook `useDefaultRoute` para decidir:
+
+```typescript
+const Index = () => {
+  const { role } = useAuth();
+  const { getDefaultRoute } = useDefaultRoute();
+
+  if (role === 'incorporador') {
+    return <DashboardIncorporador />;
+  }
+
+  const defaultRoute = getDefaultRoute();
+  
+  // Se a rota padrão é "/" (este componente), evita loop infinito
+  if (defaultRoute === '/') {
+    return <Navigate to="/marketing" replace />;
+  }
+
+  return <Navigate to={defaultRoute} replace />;
+};
+```
+
+## Fluxo Corrigido
+
+```text
+Login → Auth.tsx → getDefaultRoute()
+                         ↓
+              (Jéssica tem permissão em projetos_marketing)
+                         ↓
+                    retorna "/marketing"
+                         ↓
+               Navigate → /marketing ✓
+```
+
+## Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useDefaultRoute.ts` | Adicionar `/marketing` com `projetos_marketing` na lista de prioridade |
+| `src/pages/Index.tsx` | Usar sistema de permissões em vez de redirecionamento fixo |
 
 ## Resultado Esperado
 
-- Atualização de usuários funcionará com qualquer role da tabela `roles`
-- Roles com caracteres especiais (acentos) serão aceitos
-- Compatibilidade com o sistema dinâmico de permissões
+- Jéssica será redirecionada para `/marketing` ao fazer login
+- Usuários admin/super_admin continuarão acessando o dashboard executivo normalmente
+- Incorporadores continuarão vendo seu dashboard específico
+- O sistema respeitará as permissões configuradas para cada role
 
