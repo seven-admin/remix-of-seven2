@@ -468,3 +468,63 @@ export function useAtividadesVencidas(gestorId?: string) {
     },
   });
 }
+
+// Hook para Super Admin alterar status de atividade
+export function useAlterarStatusAtividade() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      statusAtual,
+      novoStatus,
+      justificativa,
+    }: {
+      id: string;
+      statusAtual: string;
+      novoStatus: string;
+      justificativa: string;
+    }) => {
+      // 1. Atualizar status da atividade
+      const { error: updateError } = await supabase
+        .from('atividades')
+        .update({ status: novoStatus })
+        .eq('id', id);
+      if (updateError) throw updateError;
+
+      // 2. Buscar nome do usuário para auditoria
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const nomeUsuario = profile?.full_name || 'Administrador';
+
+      // 3. Registrar comentário de auditoria
+      const comentarioAuditoria = `[ALTERAÇÃO DE STATUS] Status alterado de ${statusAtual.toUpperCase()} para ${novoStatus.toUpperCase()} por ${nomeUsuario}.\nJustificativa: ${justificativa}`;
+
+      const { error: comentarioError } = await supabase
+        .from('atividade_comentarios')
+        .insert({
+          atividade_id: id,
+          user_id: user.id,
+          comentario: comentarioAuditoria,
+        });
+
+      if (comentarioError) throw comentarioError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      queryClient.invalidateQueries({ queryKey: ['atividade'] });
+      queryClient.invalidateQueries({ queryKey: ['atividade-comentarios'] });
+      queryClient.invalidateQueries({ queryKey: ['atividades-vencidas'] });
+      invalidateDashboards(queryClient);
+      toast.success('Status alterado com sucesso!');
+    },
+    onError: () => toast.error('Erro ao alterar status'),
+  });
+}

@@ -137,3 +137,17 @@ export interface ConfiguracoesAtividades {
   dias_retorno_corretor: number;
   alerta_followup_horas: number;
 }
+
+// Interface para comentários/interações em atividades
+export interface AtividadeComentario {
+  id: string;
+  atividade_id: string;
+  user_id: string | null;
+  comentario: string;
+  created_at: string;
+  user?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string | null;
+  } | null;
+}
