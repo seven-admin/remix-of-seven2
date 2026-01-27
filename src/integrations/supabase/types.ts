@@ -4293,7 +4293,7 @@ export type Database = {
           created_at: string
           id: string
           module_id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: Database["public"]["Enums"]["app_role"] | null
           role_id: string | null
           scope: string
         }
@@ -4305,7 +4305,7 @@ export type Database = {
           created_at?: string
           id?: string
           module_id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           role_id?: string | null
           scope?: string
         }
@@ -4317,7 +4317,7 @@ export type Database = {
           created_at?: string
           id?: string
           module_id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           role_id?: string | null
           scope?: string
         }

@@ -39,11 +39,18 @@ export function usePermissions() {
           .select('*')
           .eq('is_active', true);
 
-        // Fetch permissions for user's role
-        const { data: rolePerms } = await supabase
-          .from('role_permissions')
-          .select('*')
-          .eq('role', role as any);
+      // Fetch role_id based on role name
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', role)
+        .maybeSingle();
+
+      // Fetch permissions for user's role using role_id
+      const { data: rolePerms } = await supabase
+        .from('role_permissions')
+        .select('*')
+        .eq('role_id', roleData?.id || '');
 
         // Fetch custom user permissions (overrides)
         const { data: userPerms } = await supabase
