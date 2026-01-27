@@ -1,149 +1,178 @@
 
-# Plano: Corrigir Sistema de Permissões para Roles Dinâmicos
+# Solução Definitiva: Permissões para Usuários com Roles Dinâmicos
 
-## Problemas Identificados
+## Diagnóstico Final
 
-Após análise detalhada, identifiquei **3 problemas** que causam o "Acesso Negado" ao cadastrar novos usuários:
+Após análise profunda de todo o fluxo de autenticação e permissões, identifiquei **3 problemas raiz** que causam o "Acesso Negado":
 
-### 1. Hook `usePermissions` usa coluna legada
-O hook busca permissões usando `.eq('role', role as any)` (coluna enum), mas o sistema foi migrado para usar `role_id`. Roles dinâmicos como "Diretor de Marketing" não existem no enum e retornam **0 permissões**.
+| Problema | Localização | Impacto |
+|----------|-------------|---------|
+| Roles sem permissões | Banco de dados | "Diretor de Marketing" e "Supervisão de Criação" têm **0 permissões** cadastradas |
+| Hook legado | `useUserPermissions.ts` linha 92-95 | Ainda usa `.eq('role', userRole)` ao invés de `role_id` |
+| Falta de validação na criação | `create-user` Edge Function | Não verifica se o perfil tem permissões antes de criar o usuário |
 
-### 2. Roles dinâmicos sem permissões configuradas
-| Role | Permissões Cadastradas |
-|------|------------------------|
-| admin | 26 |
-| super_admin | 37 |
-| gestor_produto | 27 |
-| corretor | 20 |
-| **diretor_de_marketing** | **0** |
-| **supervisão_de_criação** | **0** |
+## Fluxo Atual (Quebrado)
 
-### 3. Tabela `role_permissions` com coluna `role` NOT NULL
-Ao salvar permissões para roles dinâmicos, a inserção falha silenciosamente porque a coluna `role` (enum legado) é obrigatória mas não tem valor válido para roles novos.
+```text
+1. Admin cria usuário com role "supervisão_de_criação"
+   └─ Edge Function cria user_roles com role_id ✅
+
+2. Usuário faz login
+   └─ AuthContext busca role name via join ✅
+
+3. usePermissions busca role_id e depois role_permissions
+   └─ Retorna 0 permissões (nenhuma cadastrada para esse role) ❌
+
+4. ProtectedRoute verifica canAccessModule("projetos_marketing")
+   └─ Retorna false (sem permissões) ❌
+
+5. Usuário vê "Acesso Negado" ❌
+```
 
 ## Solução Proposta
 
-### Parte 1: Alterar Hook usePermissions
+### 1. Corrigir Hook useUserPermissions (Bug Crítico)
 
-Modificar para buscar permissões usando `role_id` ao invés da coluna enum:
+O hook que busca permissões para a aba de "Permissões Individuais" do usuário ainda usa a coluna enum legada. Precisa ser atualizado para usar `role_id`:
+
+**Arquivo**: `src/hooks/useUserPermissions.ts`
+
+**Antes** (linha 91-95):
+```typescript
+if (userRole) {
+  const { data: rolePerms, error: roleError } = await supabase
+    .from('role_permissions')
+    .select('*')
+    .eq('role', userRole as any);
+```
+
+**Depois**:
+```typescript
+if (userRole) {
+  // Buscar role_id pelo nome
+  const { data: roleData } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', userRole)
+    .maybeSingle();
+
+  const { data: rolePerms, error: roleError } = await supabase
+    .from('role_permissions')
+    .select('*')
+    .eq('role_id', roleData?.id || '');
+```
+
+### 2. Adicionar Validação na Edge Function (create-user)
+
+Quando o admin criar um usuário, verificar se o perfil escolhido tem permissões. Se não tiver:
+- Para **super_admin/admin** criando: Copiar permissões de um perfil base escolhido (ex: `equipe_marketing`)
+- Para cadastro externo (corretor): Manter pendente
+
+**Arquivo**: `supabase/functions/create-user/index.ts`
+
+Adicionar após encontrar o role_id:
+```typescript
+// Verificar se o role tem permissões cadastradas
+const { count } = await supabaseAdmin
+  .from('role_permissions')
+  .select('*', { count: 'exact', head: true })
+  .eq('role_id', roleData.id);
+
+if (count === 0 && callerRoleName !== 'cliente_externo') {
+  // Se criado por admin e sem permissões, copiar do perfil base
+  // (baseRoleId vem do body da requisição ou usa default)
+  const baseRoleId = body.base_role_id || 'equipe_marketing_role_id';
+  await copyPermissionsFromBase(supabaseAdmin, baseRoleId, roleData.id);
+}
+```
+
+### 3. Atualizar Página de Cadastro de Usuários
+
+Adicionar seletor de "Perfil Base" que aparece quando o perfil escolhido não tem permissões.
+
+**Arquivo**: `src/pages/Usuarios.tsx`
+
+- Adicionar estado `createBaseRole`
+- Mostrar seletor de perfil base quando perfil selecionado não tem permissões
+- Enviar `base_role_id` para a Edge Function
+
+### 4. Criar Página "Sem Acesso Configurado"
+
+Quando o usuário não tem nenhuma permissão disponível, mostrar uma página explicativa ao invés do genérico "Acesso Negado".
+
+**Novo arquivo**: `src/pages/SemAcesso.tsx`
 
 ```typescript
-// Antes (problemático)
-const { data: rolePerms } = await supabase
-  .from('role_permissions')
-  .select('*')
-  .eq('role', role as any);
-
-// Depois (correto)
-// 1. Primeiro buscar o role_id baseado no nome do role
-const { data: roleData } = await supabase
-  .from('roles')
-  .select('id')
-  .eq('name', role)
-  .single();
-
-// 2. Depois buscar permissões pelo role_id
-const { data: rolePerms } = await supabase
-  .from('role_permissions')
-  .select('*')
-  .eq('role_id', roleData?.id);
+export default function SemAcesso() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Card className="max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldOff className="h-6 w-6 text-amber-500" />
+            Acesso Pendente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Seu perfil ainda não possui permissões configuradas.</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Entre em contato com o administrador do sistema para liberar seu acesso.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 ```
 
-### Parte 2: Alterar Coluna `role` para Nullable
+### 5. Atualizar Lógica de Redirecionamento
 
-Executar migração SQL para permitir que roles dinâmicos sejam salvos:
+**Arquivo**: `src/components/auth/ProtectedRoute.tsx`
 
-```sql
-ALTER TABLE role_permissions 
-ALTER COLUMN role DROP NOT NULL;
-```
-
-### Parte 3: Corrigir useBulkUpdateRolePermissions
-
-Garantir que ao inserir permissões, o `role` legado seja obtido da tabela `roles` (para roles que existem no enum) ou seja NULL (para roles dinâmicos):
+Verificar se o usuário tem **alguma** permissão. Se não tiver nenhuma, redirecionar para `/sem-acesso`:
 
 ```typescript
-// Buscar info do role para obter name (usado no enum legado se existir)
-const { data: roleInfo } = await supabase
-  .from('roles')
-  .select('name')
-  .eq('id', roleId)
-  .single();
-
-// Verificar se o role name existe no enum (legado)
-const legacyEnumRoles = ['admin', 'super_admin', 'gestor_produto', 'corretor', 'incorporador', ...];
-const legacyRole = legacyEnumRoles.includes(roleInfo?.name) ? roleInfo?.name : null;
-
-// Inserir com role legado quando aplicável
-await supabase.from('role_permissions').insert({
-  role_id: roleId,
-  role: legacyRole, // NULL para roles dinâmicos
-  module_id: perm.moduleId,
-  // ...
-});
+// Se usuário não tem NENHUMA permissão, ir para página dedicada
+const hasAnyPermission = permissions.some(p => p.can_view);
+if (!hasAnyPermission && !isAdmin()) {
+  return <Navigate to="/sem-acesso" replace />;
+}
 ```
 
-## Arquivos a Modificar
+## Resumo de Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/usePermissions.ts` | Buscar role_id antes de buscar permissões |
-| `src/hooks/useRoles.ts` | Ajustar insert para lidar com roles dinâmicos |
-
-## Migração SQL Necessária
-
-```sql
--- Permitir role NULL para roles dinâmicos
-ALTER TABLE public.role_permissions 
-ALTER COLUMN role DROP NOT NULL;
-
--- Criar valor default (opcional, para retrocompatibilidade)
--- Se preferir, podemos atribuir um valor placeholder
-```
+| `src/hooks/useUserPermissions.ts` | Corrigir busca de permissões para usar `role_id` |
+| `supabase/functions/create-user/index.ts` | Adicionar verificação e cópia de permissões |
+| `src/pages/Usuarios.tsx` | Adicionar seletor de perfil base |
+| `src/pages/SemAcesso.tsx` | Criar nova página |
+| `src/components/auth/ProtectedRoute.tsx` | Adicionar verificação de zero permissões |
+| `src/App.tsx` | Adicionar rota `/sem-acesso` |
+| `src/hooks/usePermissions.ts` | Expor `permissions` para verificação externa |
 
 ## Fluxo Corrigido
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Admin cria novo usuário com role "Supervisão de Criação"    │
-├─────────────────────────────────────────────────────────────────┤
-│ 2. Edge Function:                                               │
-│    - Cria auth user                                             │
-│    - Insere profile                                             │
-│    - Busca role_id da tabela roles                              │
-│    - Insere em user_roles (user_id + role_id)                   │
-├─────────────────────────────────────────────────────────────────┤
-│ 3. Usuário faz login                                            │
-├─────────────────────────────────────────────────────────────────┤
-│ 4. AuthContext:                                                 │
-│    - Busca role name via user_roles + roles join                │
-│    - Retorna "supervisão_de_criação"                            │
-├─────────────────────────────────────────────────────────────────┤
-│ 5. usePermissions (CORRIGIDO):                                  │
-│    - Busca role_id baseado no nome do role                      │
-│    - Busca permissões via role_id (não mais pelo enum)          │
-│    - Retorna as permissões configuradas para esse role          │
-├─────────────────────────────────────────────────────────────────┤
-│ 6. ProtectedRoute:                                              │
-│    - Verifica canAccessModule() com as permissões carregadas    │
-│    - ✅ Permite acesso aos módulos configurados                 │
-└─────────────────────────────────────────────────────────────────┘
+1. Admin cria usuário com role "supervisão_de_criação"
+   └─ Seleciona perfil base "equipe_marketing" (se não tiver permissões)
+   └─ Edge Function copia permissões do base para o novo role ✅
+
+2. Usuário faz login
+   └─ AuthContext busca role name ✅
+
+3. usePermissions busca role_id e role_permissions
+   └─ Encontra as permissões copiadas ✅
+
+4. ProtectedRoute verifica canAccessModule("projetos_marketing")
+   └─ Retorna true ✅
+
+5. Usuário acessa o módulo normalmente ✅
 ```
-
-## Ação Necessária: Configurar Permissões
-
-Após a implementação, será necessário acessar **Usuários > Perfis de Acesso** e configurar as permissões para cada role dinâmico que ainda não tem configuração:
-
-1. Selecionar o perfil "Diretor de Marketing"
-2. Marcar as permissões desejadas (View/Create/Edit/Delete)
-3. Definir o escopo (Global/Empreendimento/Próprio)
-4. Clicar em "Salvar"
-
-Repetir para "Supervisão de Criação" e outros roles criados dinamicamente.
 
 ## Benefícios
 
-1. **Compatibilidade total**: Roles legados (via enum) e dinâmicos funcionam
-2. **Sem perda de dados**: Permissões existentes continuam funcionando
-3. **Administração centralizada**: Gestão via interface de Perfis de Acesso
-4. **Escalabilidade**: Novos roles podem ser criados sem alteração de código
+1. **Novos usuários funcionam imediatamente** quando criados por admin
+2. **Usuários externos ficam pendentes** até admin configurar
+3. **Página "Sem Acesso" clara** orienta usuários e admins
+4. **Sistema retrocompatível** com roles legados
