@@ -1,84 +1,148 @@
 
-# Plano: Corrigir Scroll Interno do Card "Próximas Atividades"
 
-## Problema Identificado
+# Plano: Registrar Motivo de Cancelamento de Visitas pelo Cliente
 
-O card "Próximas Atividades" no dashboard de Forecast apresenta layout quebrado quando há múltiplas atividades. O `ScrollArea` do Radix UI não está funcionando corretamente porque:
+## Contexto
 
-1. O `Viewport` do ScrollArea não está recebendo as classes necessárias para funcionar em contextos de layout flex/grid
-2. A estrutura CSS atual não garante que o scroll seja ativado corretamente
+O diálogo "Marcar Perdido" implementado anteriormente é para o módulo de **Clientes** (quando um cliente sai do funil de vendas). O que você precisa agora é diferente:
 
-## Análise Técnica
+**Novo Requisito**: Quando um **cliente cancela uma visita agendada**, o sistema deve capturar o motivo para gerar métricas sobre cancelamentos de atividades.
 
-O componente atual usa:
-```tsx
-<ScrollArea className="h-[280px]">
-  <div className="px-6 pb-6 space-y-1">
-    {/* atividades */}
-  </div>
-</ScrollArea>
+## Diferença entre os Conceitos
+
+| Conceito | Módulo | Exemplo |
+|----------|--------|---------|
+| Cliente Perdido | Clientes | "Cliente desistiu de comprar imóvel" |
+| Visita Cancelada | Atividades | "Cliente desmarcou a visita agendada" |
+
+## Solução Proposta
+
+### 1. Alteração no Banco de Dados
+
+Adicionar coluna `motivo_cancelamento` na tabela `atividades`:
+
+```sql
+ALTER TABLE atividades 
+ADD COLUMN motivo_cancelamento TEXT;
 ```
 
-O problema é que o `ScrollAreaPrimitive.Viewport` no componente `scroll-area.tsx` não possui controle sobre overflow, dependendo apenas do comportamento padrão do Radix.
+### 2. Motivos Pré-definidos para Cancelamento de Visita
 
-## Solução
+Sugestões de motivos comuns:
+- **Cliente desmarcou** - Cliente avisou que não pode comparecer
+- **Sem retorno / Não atende** - Não confirmou presença
+- **Reagendou** - Mudou para outra data
+- **Não compareceu** - Cliente faltou sem avisar
+- **Problema de agenda do corretor** - Corretor/imobiliária indisponível
+- **Outro** - Motivo personalizado
 
-Modificar o componente `scroll-area.tsx` para garantir que o Viewport tenha comportamento de scroll explícito, e ajustar o `ProximasAtividades.tsx` para ter uma estrutura mais robusta.
+### 3. Novo Diálogo: CancelarAtividadeDialog
 
-### Alterações Necessárias
+Similar ao `MarcarPerdidoDialog`, mas focado em atividades:
 
-#### 1. Atualizar `src/components/ui/scroll-area.tsx`
-
-Adicionar `overflow-y-auto` e `overflow-x-hidden` ao Viewport para garantir scroll vertical:
-
-```tsx
-<ScrollAreaPrimitive.Viewport 
-  className="h-full w-full rounded-[inherit] [&>div]:!block"
->
-  {children}
-</ScrollAreaPrimitive.Viewport>
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠ Cancelar Atividade                                       │
+│                                                              │
+│  Registre o motivo do cancelamento:                         │
+│  ○ Cliente desmarcou                                        │
+│  ○ Sem retorno / Não atende                                 │
+│  ○ Reagendou                                                │
+│  ○ Não compareceu                                           │
+│  ○ Problema de agenda do corretor                           │
+│  ○ Outro                                                    │
+│                                                              │
+│  Observações (opcional):                                     │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Detalhes adicionais...                              │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│                      [Voltar]  [Confirmar Cancelamento]     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-A classe `[&>div]:!block` força o container interno a ser `display: block`, resolvendo um bug conhecido do Radix ScrollArea.
+### 4. Fluxo de Uso
 
-#### 2. Simplificar `src/components/forecast/ProximasAtividades.tsx`
+1. Gestor agenda uma visita para o cliente
+2. Cliente cancela a visita
+3. Gestor clica em "Cancelar Atividade" 
+4. Abre o diálogo para selecionar o motivo
+5. Sistema salva o status como 'cancelada' + motivo_cancelamento
+6. Métricas ficam disponíveis para análise
 
-Garantir que o CardContent tenha altura máxima e o ScrollArea funcione corretamente:
+## Arquivos a Criar/Modificar
 
-```tsx
-<CardContent className="p-0">
-  {!atividades || atividades.length === 0 ? (
-    // estado vazio...
-  ) : (
-    <ScrollArea className="h-[300px]">
-      <div className="px-6 pb-4 space-y-2">
-        {/* lista de atividades */}
-      </div>
-    </ScrollArea>
-  )}
-</CardContent>
-```
+### Criar
 
-## Resultado Esperado
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/components/atividades/CancelarAtividadeDialog.tsx` | Diálogo com motivos de cancelamento |
 
-- Quando houver mais atividades do que cabem na altura definida (300px), uma scrollbar vertical aparecerá automaticamente
-- A lista terá scroll suave interno
-- O card manterá altura consistente independentemente do número de atividades
-- Layout não quebrará com muitas atividades
-
-## Arquivos a Modificar
+### Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/ui/scroll-area.tsx` | Adicionar classe `[&>div]:!block` no Viewport |
-| `src/components/forecast/ProximasAtividades.tsx` | Ajustar altura do ScrollArea e estrutura |
+| `src/types/atividades.types.ts` | Adicionar constante `MOTIVOS_CANCELAMENTO` e campo na interface |
+| `src/hooks/useAtividades.ts` | Modificar `useCancelarAtividade` para aceitar motivo |
+| `src/pages/Atividades.tsx` | Integrar o novo diálogo nas ações de cancelar |
+| `src/components/atividades/AtividadeDetalheDialog.tsx` | Exibir motivo quando atividade cancelada |
+
+### Migração SQL
+
+Adicionar coluna na tabela:
+```sql
+ALTER TABLE atividades 
+ADD COLUMN motivo_cancelamento TEXT;
+```
+
+## Métricas Possíveis
+
+Com o campo `motivo_cancelamento` preenchido, você poderá:
+- Quantificar visitas canceladas por motivo
+- Identificar padrões (ex: muitos "não compareceu" = clientes frios)
+- Comparar taxa de cancelamento por corretor/empreendimento
+- Criar dashboard de efetividade de agendamentos
 
 ## Seção Técnica
 
-### Bug do Radix ScrollArea
+### Interface CancelarAtividadeData
 
-O Radix ScrollArea cria um div wrapper interno com `display: table` em alguns contextos, o que quebra a altura e impede o scroll. A solução `[&>div]:!block` força esse div interno a usar `display: block`.
+```typescript
+export interface CancelarAtividadeData {
+  motivo_cancelamento: string;
+}
+```
 
-### Altura Escolhida
+### Hook Atualizado
 
-A altura de `300px` foi escolhida para exibir aproximadamente 4-5 atividades antes de precisar de scroll, mantendo o card compacto e alinhado com outros cards do dashboard.
+```typescript
+export function useCancelarAtividade() {
+  return useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
+      const { error } = await supabase
+        .from('atividades')
+        .update({ 
+          status: 'cancelada',
+          motivo_cancelamento: motivo.toUpperCase()
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    // ...
+  });
+}
+```
+
+### Constante de Motivos
+
+```typescript
+export const MOTIVOS_CANCELAMENTO_ATIVIDADE = [
+  'Cliente desmarcou',
+  'Sem retorno / Não atende',
+  'Reagendou',
+  'Não compareceu',
+  'Problema de agenda do corretor',
+  'Outro'
+] as const;
+```
+
