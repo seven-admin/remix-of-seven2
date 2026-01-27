@@ -5,6 +5,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to copy permissions from a base role to a target role
+async function copyPermissionsFromBaseRole(
+  supabaseAdmin: any,
+  baseRoleId: string,
+  targetRoleId: string
+): Promise<void> {
+  // Get all permissions from base role
+  const { data: basePerms, error: baseError } = await supabaseAdmin
+    .from('role_permissions')
+    .select('*')
+    .eq('role_id', baseRoleId);
+
+  if (baseError || !basePerms || basePerms.length === 0) {
+    console.log('No base permissions found to copy');
+    return;
+  }
+
+  // Create new permissions for target role
+  const newPerms = basePerms.map((perm: any) => ({
+    role_id: targetRoleId,
+    module_id: perm.module_id,
+    can_view: perm.can_view,
+    can_create: perm.can_create,
+    can_edit: perm.can_edit,
+    can_delete: perm.can_delete,
+    scope: perm.scope
+  }));
+
+  const { error: insertError } = await supabaseAdmin
+    .from('role_permissions')
+    .insert(newPerms);
+
+  if (insertError) {
+    console.error('Error copying permissions:', insertError);
+    throw insertError;
+  }
+
+  console.log(`Copied ${newPerms.length} permissions from base role to target role`);
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -88,7 +128,16 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, full_name, phone, role, is_active = true, tipo_vinculo = 'terceiro', cargo = null } = await req.json()
+    const { 
+      email, 
+      full_name, 
+      phone, 
+      role, 
+      is_active = true, 
+      tipo_vinculo = 'terceiro', 
+      cargo = null,
+      base_role_id = null 
+    } = await req.json()
 
     if (!email || !full_name || !role) {
       return new Response(
@@ -152,6 +201,25 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Role not found: ' + role }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Check if the role has any permissions configured
+    const { count: permCount } = await supabaseAdmin
+      .from('role_permissions')
+      .select('*', { count: 'exact', head: true })
+      .eq('role_id', roleData.id)
+
+    console.log(`Role ${role} has ${permCount} permissions configured`)
+
+    // If role has no permissions and a base_role_id was provided, copy permissions
+    if ((permCount === 0 || permCount === null) && base_role_id) {
+      console.log(`Copying permissions from base role ${base_role_id} to ${roleData.id}`)
+      try {
+        await copyPermissionsFromBaseRole(supabaseAdmin, base_role_id, roleData.id)
+      } catch (copyError) {
+        console.error('Failed to copy permissions:', copyError)
+        // Continue anyway - user will just have no permissions
+      }
     }
 
     // Insert user role with role_id only (enum column now optional)

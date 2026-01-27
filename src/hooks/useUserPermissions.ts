@@ -89,17 +89,26 @@ export function useModulesWithPermissions(userId: string | undefined, userRole: 
       // Fetch role permissions if user has a role
       let rolePermissions: Record<string, any> = {};
       if (userRole) {
-        const { data: rolePerms, error: roleError } = await supabase
-          .from('role_permissions')
-          .select('*')
-          .eq('role', userRole as any);
+        // First get the role_id from the role name
+        const { data: roleData } = await supabase
+          .from('roles')
+          .select('id')
+          .eq('name', userRole)
+          .maybeSingle();
 
-        if (roleError) throw roleError;
-        
-        rolePermissions = (rolePerms || []).reduce((acc, perm) => {
-          acc[perm.module_id] = perm;
-          return acc;
-        }, {} as Record<string, any>);
+        if (roleData?.id) {
+          const { data: rolePerms, error: roleError } = await supabase
+            .from('role_permissions')
+            .select('*')
+            .eq('role_id', roleData.id);
+
+          if (roleError) throw roleError;
+          
+          rolePermissions = (rolePerms || []).reduce((acc, perm) => {
+            acc[perm.module_id] = perm;
+            return acc;
+          }, {} as Record<string, any>);
+        }
       }
 
       // Fetch user custom permissions

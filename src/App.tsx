@@ -55,6 +55,7 @@ import TermosUso from "./pages/TermosUso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import PortalClientes from "./pages/PortalClientes";
 import NovaPropostaComercial from "./pages/NovaPropostaComercial";
+import SemAcesso from "./pages/SemAcesso";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/assinar/:token" element={<AssinarContrato />} />
             <Route path="/termos" element={<TermosUso />} />
             <Route path="/privacidade" element={<PoliticaPrivacidade />} />
+            <Route path="/sem-acesso" element={<SemAcesso />} />
             
             {/* Protected routes */}
             <Route path="/" element={
