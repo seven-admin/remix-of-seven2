@@ -6,6 +6,11 @@ import { useDefaultRoute } from '@/hooks/useDefaultRoute';
 import { ActionType } from '@/types/auth.types';
 import { Loader2 } from 'lucide-react';
 
+// Check if user has any view permission at all
+const hasAnyViewPermission = (permissions: { can_view: boolean }[]): boolean => {
+  return permissions.some(p => p.can_view);
+};
+
 interface ProtectedRouteProps {
   children: ReactNode;
   moduleName?: string;
@@ -22,7 +27,7 @@ export function ProtectedRoute({
   adminOnly = false 
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading: authLoading, role } = useAuth();
-  const { canAccessModule, isAdmin, isLoading: permLoading } = usePermissions();
+  const { canAccessModule, isAdmin, isLoading: permLoading, permissions } = usePermissions();
   const { getDefaultRoute } = useDefaultRoute();
   const location = useLocation();
   const [timedOut, setTimedOut] = useState(false);
@@ -81,6 +86,14 @@ export function ProtectedRoute({
     );
   }
 
+  // Check if user has ANY permissions at all (not admin and no view permissions)
+  if (!isAdmin() && permissions.length > 0 && !hasAnyViewPermission(permissions)) {
+    // User has no permissions configured - redirect to dedicated page
+    if (location.pathname !== '/sem-acesso') {
+      return <Navigate to="/sem-acesso" replace />;
+    }
+  }
+
   // Check module permissions
   if (moduleName) {
     const hasMainAccess = canAccessModule(moduleName, requiredAction);
@@ -92,6 +105,10 @@ export function ProtectedRoute({
         const defaultRoute = getDefaultRoute();
         if (defaultRoute !== '/') {
           return <Navigate to={defaultRoute} replace />;
+        }
+        // If no default route found and no permissions, go to sem-acesso
+        if (!isAdmin() && !hasAnyViewPermission(permissions)) {
+          return <Navigate to="/sem-acesso" replace />;
         }
       }
       

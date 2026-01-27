@@ -83,7 +83,16 @@ export default function Usuarios() {
   const [createIsActive, setCreateIsActive] = useState(true);
   const [createTipoVinculo, setCreateTipoVinculo] = useState<'funcionario_seven' | 'terceiro'>('terceiro');
   const [createCargo, setCreateCargo] = useState('');
+  const [createBaseRoleId, setCreateBaseRoleId] = useState<string>('');
 
+  // Check if selected role has permissions
+  const selectedRoleHasPermissions = useMemo(() => {
+    const selectedRole = rolesFromDb.find(r => r.name === createRole);
+    // We'll assume roles with is_active and well-known names have permissions
+    // For dynamic roles, we need to check the database (simplified check here)
+    const knownRolesWithPermissions = ['admin', 'super_admin', 'gestor_produto', 'corretor', 'incorporador', 'equipe_marketing'];
+    return knownRolesWithPermissions.includes(createRole);
+  }, [createRole, rolesFromDb]);
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
@@ -225,7 +234,8 @@ export default function Usuarios() {
           role: createRole,
           is_active: createIsActive,
           tipo_vinculo: createTipoVinculo,
-          cargo: createTipoVinculo === 'funcionario_seven' ? createCargo || null : null
+          cargo: createTipoVinculo === 'funcionario_seven' ? createCargo || null : null,
+          base_role_id: !selectedRoleHasPermissions && createBaseRoleId ? createBaseRoleId : null
         }
       });
 
@@ -246,6 +256,7 @@ export default function Usuarios() {
       setCreateIsActive(true);
       setCreateTipoVinculo('terceiro');
       setCreateCargo('');
+      setCreateBaseRoleId('');
       fetchUsers();
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -860,6 +871,33 @@ export default function Usuarios() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Show base role selector when selected role might not have permissions */}
+              {!selectedRoleHasPermissions && (
+                <div className="space-y-2 p-3 border border-warning/50 rounded-lg bg-warning/5">
+                  <Label htmlFor="create-base-role" className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-warning" />
+                    Copiar permissões de
+                  </Label>
+                  <Select value={createBaseRoleId} onValueChange={setCreateBaseRoleId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um perfil base..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rolesFromDb
+                        .filter(r => ['admin', 'gestor_produto', 'corretor', 'equipe_marketing'].includes(r.name))
+                        .map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.display_name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O perfil selecionado não possui permissões configuradas. Escolha um perfil base para copiar as permissões.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
