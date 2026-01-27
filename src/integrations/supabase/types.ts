@@ -29,6 +29,7 @@ export type Database = {
           gestor_id: string | null
           id: string
           imobiliaria_id: string | null
+          motivo_cancelamento: string | null
           observacoes: string | null
           requer_followup: boolean | null
           resultado: string | null
@@ -52,6 +53,7 @@ export type Database = {
           gestor_id?: string | null
           id?: string
           imobiliaria_id?: string | null
+          motivo_cancelamento?: string | null
           observacoes?: string | null
           requer_followup?: boolean | null
           resultado?: string | null
@@ -75,6 +77,7 @@ export type Database = {
           gestor_id?: string | null
           id?: string
           imobiliaria_id?: string | null
+          motivo_cancelamento?: string | null
           observacoes?: string | null
           requer_followup?: boolean | null
           resultado?: string | null

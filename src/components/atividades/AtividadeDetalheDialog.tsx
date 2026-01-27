@@ -222,6 +222,19 @@ export function AtividadeDetalheDialog({ atividade, loading = false, open, onOpe
             </div>
           )}
 
+          {/* Motivo do Cancelamento (se cancelada) */}
+          {atividade.status === 'cancelada' && atividade.motivo_cancelamento && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-destructive">
+                <MessageSquare className="h-4 w-4" />
+                <span className="text-sm font-medium">Motivo do Cancelamento</span>
+              </div>
+              <p className="text-sm bg-destructive/5 p-3 rounded-lg border border-destructive/20 whitespace-pre-wrap">
+                {atividade.motivo_cancelamento}
+              </p>
+            </div>
+          )}
+
           {/* Temperatura do Cliente */}
           {temperatura && (
             <div className="flex items-center gap-2">

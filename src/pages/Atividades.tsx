@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AtividadeForm } from '@/components/atividades/AtividadeForm';
 import { ConcluirAtividadeDialog } from '@/components/atividades/ConcluirAtividadeDialog';
+import { CancelarAtividadeDialog } from '@/components/atividades/CancelarAtividadeDialog';
 import { AtividadeDetalheDialog } from '@/components/atividades/AtividadeDetalheDialog';
 import { PendenciasTab } from '@/components/atividades/PendenciasTab';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
@@ -59,6 +60,8 @@ export default function Atividades() {
   const [editingAtividade, setEditingAtividade] = useState<Atividade | null>(null);
   const [concluirDialogOpen, setConcluirDialogOpen] = useState(false);
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
+  const [cancelarDialogOpen, setCancelarDialogOpen] = useState(false);
+  const [atividadeParaCancelar, setAtividadeParaCancelar] = useState<Atividade | null>(null);
   const [detalheDialogOpen, setDetalheDialogOpen] = useState(false);
   const [detalheAtividadeId, setDetalheAtividadeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -139,7 +142,24 @@ export default function Atividades() {
   };
 
   const handleDelete = (id: string) => deleteAtividade.mutate(id);
-  const handleCancelar = (id: string) => cancelarAtividade.mutate(id);
+  
+  const handleCancelar = (atividade: Atividade) => {
+    setAtividadeParaCancelar(atividade);
+    setCancelarDialogOpen(true);
+  };
+
+  const handleConfirmCancelamento = (motivo: string) => {
+    if (!atividadeParaCancelar) return;
+    cancelarAtividade.mutate(
+      { id: atividadeParaCancelar.id, motivo },
+      {
+        onSuccess: () => {
+          setCancelarDialogOpen(false);
+          setAtividadeParaCancelar(null);
+        }
+      }
+    );
+  };
 
   const handleAtividadeSubmit: (data: AtividadeFormSubmitData) => void = (data) => {
     if (editingAtividade) {
@@ -507,6 +527,17 @@ export default function Atividades() {
                                 size="icon"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleCancelar(atividade);
+                                }}
+                                title="Cancelar"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleEdit(atividade);
                                 }}
                                 title="Editar"
@@ -669,7 +700,7 @@ export default function Atividades() {
                                         size="icon"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleCancelar(atividade.id);
+                                          handleCancelar(atividade);
                                         }}
                                         title="Cancelar"
                                       >
@@ -815,6 +846,18 @@ export default function Atividades() {
         open={concluirDialogOpen}
         onOpenChange={setConcluirDialogOpen}
         onSuccess={handleConcluirSuccess}
+      />
+
+      {/* Dialog Cancelar Atividade */}
+      <CancelarAtividadeDialog
+        open={cancelarDialogOpen}
+        onOpenChange={(open) => {
+          setCancelarDialogOpen(open);
+          if (!open) setAtividadeParaCancelar(null);
+        }}
+        atividadeTitulo={atividadeParaCancelar?.titulo}
+        onConfirm={handleConfirmCancelamento}
+        isLoading={cancelarAtividade.isPending}
       />
 
       {/* Dialog Detalhe Atividade */}

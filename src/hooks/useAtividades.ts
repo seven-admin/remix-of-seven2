@@ -263,12 +263,21 @@ export function useConcluirAtividadesEmLote() {
 export function useCancelarAtividade() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('atividades').update({ status: 'cancelada' }).eq('id', id);
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
+      const motivoUpper = normalizeUpper(motivo) as string;
+      const { error } = await supabase
+        .from('atividades')
+        .update({ 
+          status: 'cancelada',
+          motivo_cancelamento: motivoUpper
+        })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      queryClient.invalidateQueries({ queryKey: ['atividade'] });
+      queryClient.invalidateQueries({ queryKey: ['atividades-vencidas'] });
       invalidateDashboards(queryClient);
       toast.success('Atividade cancelada!');
     },
