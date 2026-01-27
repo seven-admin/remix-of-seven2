@@ -1,137 +1,84 @@
 
-# Plano: Diálogo para Registrar Motivo de Cancelamento/Perda do Cliente
+# Plano: Corrigir Scroll Interno do Card "Próximas Atividades"
 
-## Objetivo
+## Problema Identificado
 
-Criar um diálogo para capturar o motivo quando um cliente é marcado como "perdido" (cancelou o atendimento), permitindo análise posterior dos motivos de perda.
+O card "Próximas Atividades" no dashboard de Forecast apresenta layout quebrado quando há múltiplas atividades. O `ScrollArea` do Radix UI não está funcionando corretamente porque:
 
-## Solução Proposta
+1. O `Viewport` do ScrollArea não está recebendo as classes necessárias para funcionar em contextos de layout flex/grid
+2. A estrutura CSS atual não garante que o scroll seja ativado corretamente
 
-### 1. Criar Componente MarcarPerdidoDialog
+## Análise Técnica
 
-Novo componente similar ao `RejeitarDialog` existente, com:
-- Lista de motivos pré-definidos (seleção rápida)
-- Campo de texto livre para detalhamento
-- Obrigatoriedade de informar pelo menos um motivo
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  ⚠ Marcar Cliente como Perdido                             │
-│                                                              │
-│  Selecione o motivo principal:                              │
-│  ○ Desistiu da compra                                       │
-│  ○ Comprou com concorrente                                  │
-│  ○ Não conseguiu financiamento                              │
-│  ○ Sem retorno / Não atende                                 │
-│  ○ Fora do perfil                                           │
-│  ○ Outro                                                    │
-│                                                              │
-│  Observações (opcional):                                     │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Detalhes adicionais sobre a perda...                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                                                              │
-│                      [Cancelar]  [Confirmar Perda]          │
-└─────────────────────────────────────────────────────────────┘
+O componente atual usa:
+```tsx
+<ScrollArea className="h-[280px]">
+  <div className="px-6 pb-6 space-y-1">
+    {/* atividades */}
+  </div>
+</ScrollArea>
 ```
 
-### 2. Motivos Pré-definidos
+O problema é que o `ScrollAreaPrimitive.Viewport` no componente `scroll-area.tsx` não possui controle sobre overflow, dependendo apenas do comportamento padrão do Radix.
 
-Sugestão de motivos comuns no mercado imobiliário:
-- **Desistiu da compra** - Cliente mudou de ideia
-- **Comprou com concorrente** - Fechou negócio em outro lugar
-- **Não conseguiu financiamento** - Problemas de crédito
-- **Sem retorno / Não atende** - Cliente sumiu
-- **Fora do perfil** - Não se enquadra no produto
-- **Preço / Condições** - Não aceitou as condições comerciais
-- **Outro** - Motivo personalizado
+## Solução
 
-### 3. Integração na Página de Clientes
+Modificar o componente `scroll-area.tsx` para garantir que o Viewport tenha comportamento de scroll explícito, e ajustar o `ProximasAtividades.tsx` para ter uma estrutura mais robusta.
 
-Alterar os callbacks `onMarcarPerdido` para abrir o diálogo ao invés de executar diretamente:
+### Alterações Necessárias
 
-**Antes:**
-```typescript
-onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
+#### 1. Atualizar `src/components/ui/scroll-area.tsx`
+
+Adicionar `overflow-y-auto` e `overflow-x-hidden` ao Viewport para garantir scroll vertical:
+
+```tsx
+<ScrollAreaPrimitive.Viewport 
+  className="h-full w-full rounded-[inherit] [&>div]:!block"
+>
+  {children}
+</ScrollAreaPrimitive.Viewport>
 ```
 
-**Depois:**
-```typescript
-onMarcarPerdido={(id) => {
-  setClienteParaPerder(id);
-  setPerdidoDialogOpen(true);
-}}
-```
+A classe `[&>div]:!block` força o container interno a ser `display: block`, resolvendo um bug conhecido do Radix ScrollArea.
 
-## Arquivos a Criar/Modificar
+#### 2. Simplificar `src/components/forecast/ProximasAtividades.tsx`
 
-### Criar: `src/components/clientes/MarcarPerdidoDialog.tsx`
+Garantir que o CardContent tenha altura máxima e o ScrollArea funcione corretamente:
 
-Novo componente com:
-- Props: `open`, `onOpenChange`, `onConfirm`, `isLoading`, `clienteNome`
-- Estado local para motivo selecionado e observações
-- RadioGroup para motivos pré-definidos
-- Textarea para observações adicionais
-- Lógica para combinar motivo + observação no campo `motivo_perda`
-
-### Modificar: `src/pages/Clientes.tsx`
-
-- Adicionar novos estados: `clienteParaPerder`, `perdidoDialogOpen`
-- Alterar handlers `onMarcarPerdido` no mobile e desktop
-- Adicionar o novo `MarcarPerdidoDialog` no JSX
-- Implementar callback que executa a mutation com o motivo
-
-### Criar: `src/types/clientes.types.ts` (atualização)
-
-Adicionar constante com motivos pré-definidos:
-
-```typescript
-export const MOTIVOS_PERDA = [
-  'Desistiu da compra',
-  'Comprou com concorrente',
-  'Não conseguiu financiamento',
-  'Sem retorno / Não atende',
-  'Fora do perfil',
-  'Preço / Condições',
-  'Outro'
-] as const;
+```tsx
+<CardContent className="p-0">
+  {!atividades || atividades.length === 0 ? (
+    // estado vazio...
+  ) : (
+    <ScrollArea className="h-[300px]">
+      <div className="px-6 pb-4 space-y-2">
+        {/* lista de atividades */}
+      </div>
+    </ScrollArea>
+  )}
+</CardContent>
 ```
 
 ## Resultado Esperado
 
-1. Ao clicar em "Marcar Perdido", abre um diálogo
-2. Usuário seleciona um motivo da lista
-3. Opcionalmente adiciona observações
-4. Ao confirmar, o cliente é marcado como perdido com o motivo registrado
-5. O motivo fica visível no histórico/detalhes do cliente
+- Quando houver mais atividades do que cabem na altura definida (300px), uma scrollbar vertical aparecerá automaticamente
+- A lista terá scroll suave interno
+- O card manterá altura consistente independentemente do número de atividades
+- Layout não quebrará com muitas atividades
+
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/ui/scroll-area.tsx` | Adicionar classe `[&>div]:!block` no Viewport |
+| `src/components/forecast/ProximasAtividades.tsx` | Ajustar altura do ScrollArea e estrutura |
 
 ## Seção Técnica
 
-### Estrutura do Componente
+### Bug do Radix ScrollArea
 
-```typescript
-interface MarcarPerdidoDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: (motivo: string) => void;
-  isLoading?: boolean;
-  clienteNome?: string;
-}
-```
+O Radix ScrollArea cria um div wrapper interno com `display: table` em alguns contextos, o que quebra a altura e impede o scroll. A solução `[&>div]:!block` força esse div interno a usar `display: block`.
 
-### Combinação de Motivo + Observação
+### Altura Escolhida
 
-O campo `motivo_perda` receberá o texto combinado:
-```typescript
-const motivoFinal = observacao 
-  ? `${motivoSelecionado}: ${observacao}`
-  : motivoSelecionado;
-```
-
-### Invalidação de Cache
-
-Não requer alteração - o hook `useMarcarPerdido` já invalida todas as queries necessárias.
-
-### Compatibilidade
-
-O diálogo será integrado tanto na visão desktop (tabela) quanto mobile (cards).
+A altura de `300px` foi escolhida para exibir aproximadamente 4-5 atividades antes de precisar de scroll, mantendo o card compacto e alinhado com outros cards do dashboard.
