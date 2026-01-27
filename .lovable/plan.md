@@ -1,148 +1,263 @@
 
-
-# Plano: Registrar Motivo de Cancelamento de Visitas pelo Cliente
+# Plano: Sistema de Interações em Atividades + Gestão de Status por Super Admin
 
 ## Contexto
 
-O diálogo "Marcar Perdido" implementado anteriormente é para o módulo de **Clientes** (quando um cliente sai do funil de vendas). O que você precisa agora é diferente:
+Você deseja duas funcionalidades:
+1. **Interações/Chat**: Permitir que Admins e Super Admins interajam com gestores sobre atividades (similar ao chat dos tickets de marketing)
+2. **Gestão de Status**: Permitir que Super Admins reabram atividades canceladas ou alterem seu status
 
-**Novo Requisito**: Quando um **cliente cancela uma visita agendada**, o sistema deve capturar o motivo para gerar métricas sobre cancelamentos de atividades.
+## Parte 1: Sistema de Comentários/Interações nas Atividades
 
-## Diferença entre os Conceitos
+### Modelo de Dados
 
-| Conceito | Módulo | Exemplo |
-|----------|--------|---------|
-| Cliente Perdido | Clientes | "Cliente desistiu de comprar imóvel" |
-| Visita Cancelada | Atividades | "Cliente desmarcou a visita agendada" |
+Criar uma nova tabela `atividade_comentarios` seguindo o padrão já existente em `projeto_comentarios`:
 
-## Solução Proposta
-
-### 1. Alteração no Banco de Dados
-
-Adicionar coluna `motivo_cancelamento` na tabela `atividades`:
-
-```sql
-ALTER TABLE atividades 
-ADD COLUMN motivo_cancelamento TEXT;
+```text
+┌─────────────────────────────────────────┐
+│        atividade_comentarios            │
+├─────────────────────────────────────────┤
+│ id             UUID (PK)                │
+│ atividade_id   UUID (FK → atividades)   │
+│ user_id        UUID (FK → profiles)     │
+│ comentario     TEXT                     │
+│ created_at     TIMESTAMP                │
+└─────────────────────────────────────────┘
 ```
 
-### 2. Motivos Pré-definidos para Cancelamento de Visita
+### Componente de Comentários
 
-Sugestões de motivos comuns:
-- **Cliente desmarcou** - Cliente avisou que não pode comparecer
-- **Sem retorno / Não atende** - Não confirmou presença
-- **Reagendou** - Mudou para outra data
-- **Não compareceu** - Cliente faltou sem avisar
-- **Problema de agenda do corretor** - Corretor/imobiliária indisponível
-- **Outro** - Motivo personalizado
-
-### 3. Novo Diálogo: CancelarAtividadeDialog
-
-Similar ao `MarcarPerdidoDialog`, mas focado em atividades:
+Criar `AtividadeComentarios.tsx` similar ao `ProjetoComentarios.tsx`:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  ⚠ Cancelar Atividade                                       │
-│                                                              │
-│  Registre o motivo do cancelamento:                         │
-│  ○ Cliente desmarcou                                        │
-│  ○ Sem retorno / Não atende                                 │
-│  ○ Reagendou                                                │
-│  ○ Não compareceu                                           │
-│  ○ Problema de agenda do corretor                           │
-│  ○ Outro                                                    │
-│                                                              │
-│  Observações (opcional):                                     │
+│  💬 Interações                                              │
+├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │ Detalhes adicionais...                              │    │
+│  │ Escreva uma mensagem...                             │    │
 │  └─────────────────────────────────────────────────────┘    │
+│                                          [Enviar]           │
+├─────────────────────────────────────────────────────────────┤
+│  👤 João Silva                           27/01 às 14:30    │
+│  Verificar com o cliente se prefere outro horário          │
 │                                                              │
-│                      [Voltar]  [Confirmar Cancelamento]     │
+│  👤 Maria Admin                          27/01 às 13:15    │
+│  Por favor, confirmar disponibilidade do empreendimento    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 4. Fluxo de Uso
+### Integração no Diálogo de Detalhes
 
-1. Gestor agenda uma visita para o cliente
-2. Cliente cancela a visita
-3. Gestor clica em "Cancelar Atividade" 
-4. Abre o diálogo para selecionar o motivo
-5. Sistema salva o status como 'cancelada' + motivo_cancelamento
-6. Métricas ficam disponíveis para análise
+O componente será adicionado ao `AtividadeDetalheDialog`, exibindo:
+- Histórico de interações
+- Caixa de texto para nova mensagem
+- Visível para todos, mas com destaque visual para mensagens de admins
 
-## Arquivos a Criar/Modificar
+## Parte 2: Super Admin - Alterar Status de Atividades
 
-### Criar
+### Nova Funcionalidade
+
+Adicionar no `AtividadeDetalheDialog` uma seção exclusiva para Super Admin:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  ⚙ Ações de Administrador                                   │
+├─────────────────────────────────────────────────────────────┤
+│  Status atual: Cancelada                                     │
+│                                                              │
+│  Alterar para:                                               │
+│  [Pendente ▼]                                               │
+│                                                              │
+│  Justificativa (obrigatória):                               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Motivo da reabertura...                             │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│                              [Aplicar Alteração]            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Regras de Negócio
+
+| Ação | Quem pode | Condição |
+|------|-----------|----------|
+| Reabrir atividade cancelada | Super Admin | Sempre |
+| Alterar de concluída para pendente | Super Admin | Sempre |
+| Alterar de pendente para concluída | Qualquer usuário | Via diálogo de conclusão |
+| Alterar para cancelada | Qualquer usuário | Via diálogo de cancelamento |
+
+### Rastreabilidade
+
+Cada alteração de status feita por um Super Admin será automaticamente registrada como um comentário na atividade:
+
+```
+"[SISTEMA] Status alterado de CANCELADA para PENDENTE por Maria Admin. 
+Justificativa: Cliente retornou contato e deseja reagendar visita."
+```
+
+## Arquivos a Criar
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `src/components/atividades/CancelarAtividadeDialog.tsx` | Diálogo com motivos de cancelamento |
+| `src/components/atividades/AtividadeComentarios.tsx` | Componente de chat/interações |
+| `src/components/atividades/AlterarStatusAtividadeDialog.tsx` | Diálogo para Super Admin alterar status |
+| `src/hooks/useAtividadeComentarios.ts` | Hook para buscar/criar comentários |
 
-### Modificar
+## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/types/atividades.types.ts` | Adicionar constante `MOTIVOS_CANCELAMENTO` e campo na interface |
-| `src/hooks/useAtividades.ts` | Modificar `useCancelarAtividade` para aceitar motivo |
-| `src/pages/Atividades.tsx` | Integrar o novo diálogo nas ações de cancelar |
-| `src/components/atividades/AtividadeDetalheDialog.tsx` | Exibir motivo quando atividade cancelada |
+| `src/components/atividades/AtividadeDetalheDialog.tsx` | Adicionar seção de comentários e botão de ações admin |
+| `src/hooks/useAtividades.ts` | Adicionar mutation para alterar status (Super Admin) |
+| `src/types/atividades.types.ts` | Adicionar interface para comentário |
 
-### Migração SQL
+## Migração SQL
 
-Adicionar coluna na tabela:
 ```sql
-ALTER TABLE atividades 
-ADD COLUMN motivo_cancelamento TEXT;
+-- Tabela de comentários/interações em atividades
+CREATE TABLE public.atividade_comentarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  atividade_id UUID NOT NULL REFERENCES public.atividades(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  comentario TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Índice para performance
+CREATE INDEX idx_atividade_comentarios_atividade ON public.atividade_comentarios(atividade_id);
+
+-- RLS
+ALTER TABLE public.atividade_comentarios ENABLE ROW LEVEL SECURITY;
+
+-- Política: usuários autenticados podem ver comentários
+CREATE POLICY "Authenticated users can view comments"
+  ON public.atividade_comentarios FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Política: usuários autenticados podem criar comentários
+CREATE POLICY "Authenticated users can create comments"
+  ON public.atividade_comentarios FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
 ```
 
-## Métricas Possíveis
+## Fluxo de Uso
 
-Com o campo `motivo_cancelamento` preenchido, você poderá:
-- Quantificar visitas canceladas por motivo
-- Identificar padrões (ex: muitos "não compareceu" = clientes frios)
-- Comparar taxa de cancelamento por corretor/empreendimento
-- Criar dashboard de efetividade de agendamentos
+### Cenário 1: Interação Admin → Gestor
+1. Admin abre detalhes de uma atividade
+2. Escreve mensagem: "Por favor, confirmar disponibilidade do cliente"
+3. Gestor visualiza a atividade e vê o comentário
+4. Gestor responde: "Confirmado, cliente disponível amanhã às 10h"
+
+### Cenário 2: Reabrir Atividade Cancelada
+1. Super Admin abre detalhes de uma atividade cancelada
+2. Clica em "Ações de Administrador"
+3. Seleciona novo status "Pendente"
+4. Informa justificativa: "Cliente retornou contato"
+5. Sistema atualiza status e registra comentário automático
 
 ## Seção Técnica
 
-### Interface CancelarAtividadeData
+### Hook useAtividadeComentarios
 
 ```typescript
-export interface CancelarAtividadeData {
-  motivo_cancelamento: string;
+export function useAtividadeComentarios(atividadeId: string) {
+  const queryClient = useQueryClient();
+
+  const { data: comentarios, isLoading } = useQuery({
+    queryKey: ['atividade-comentarios', atividadeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('atividade_comentarios')
+        .select(`*, user:profiles(id, full_name, avatar_url)`)
+        .eq('atividade_id', atividadeId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!atividadeId
+  });
+
+  const createComentario = useMutation({
+    mutationFn: async (comentario: string) => {
+      const { error } = await supabase
+        .from('atividade_comentarios')
+        .insert({
+          atividade_id: atividadeId,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          comentario
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['atividade-comentarios', atividadeId] });
+    }
+  });
+
+  return { comentarios, isLoading, createComentario };
 }
 ```
 
-### Hook Atualizado
+### Mutation para Alterar Status (Super Admin)
 
 ```typescript
-export function useCancelarAtividade() {
+export function useAlterarStatusAtividade() {
+  const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
-      const { error } = await supabase
+    mutationFn: async ({ 
+      id, 
+      novoStatus, 
+      justificativa 
+    }: { 
+      id: string; 
+      novoStatus: AtividadeStatus; 
+      justificativa: string 
+    }) => {
+      // 1. Atualizar status
+      const { error: updateError } = await supabase
         .from('atividades')
-        .update({ 
-          status: 'cancelada',
-          motivo_cancelamento: motivo.toUpperCase()
-        })
+        .update({ status: novoStatus })
         .eq('id', id);
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // 2. Registrar comentário de auditoria
+      const user = (await supabase.auth.getUser()).data.user;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user?.id)
+        .single();
+
+      await supabase.from('atividade_comentarios').insert({
+        atividade_id: id,
+        user_id: user?.id,
+        comentario: `[ALTERAÇÃO DE STATUS] Status alterado para ${novoStatus.toUpperCase()} por ${profile?.full_name}.\nJustificativa: ${justificativa}`
+      });
     },
-    // ...
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      queryClient.invalidateQueries({ queryKey: ['atividade'] });
+      toast.success('Status alterado com sucesso!');
+    }
   });
 }
 ```
 
-### Constante de Motivos
+### Interface AtividadeComentario
 
 ```typescript
-export const MOTIVOS_CANCELAMENTO_ATIVIDADE = [
-  'Cliente desmarcou',
-  'Sem retorno / Não atende',
-  'Reagendou',
-  'Não compareceu',
-  'Problema de agenda do corretor',
-  'Outro'
-] as const;
+export interface AtividadeComentario {
+  id: string;
+  atividade_id: string;
+  user_id: string | null;
+  comentario: string;
+  created_at: string;
+  user?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+  } | null;
+}
 ```
-
