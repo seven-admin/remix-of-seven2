@@ -30,6 +30,18 @@ export const ATIVIDADE_STATUS_COLORS: Record<AtividadeStatus, string> = {
   cancelada: 'bg-gray-100 text-gray-800 border-gray-200'
 };
 
+// Motivos pré-definidos para cancelamento de atividades
+export const MOTIVOS_CANCELAMENTO_ATIVIDADE = [
+  'Cliente desmarcou',
+  'Sem retorno / Não atende',
+  'Reagendou',
+  'Não compareceu',
+  'Problema de agenda do corretor',
+  'Outro'
+] as const;
+
+export type MotivoCancelamentoAtividade = typeof MOTIVOS_CANCELAMENTO_ATIVIDADE[number];
+
 export interface Atividade {
   id: string;
   tipo: AtividadeTipo;
@@ -73,6 +85,7 @@ export interface Atividade {
   observacoes?: string | null;
   temperatura_cliente?: ClienteTemperatura | null;
   resultado?: string | null;
+  motivo_cancelamento?: string | null;
   requer_followup: boolean;
   data_followup?: string | null;
   created_at: string;
