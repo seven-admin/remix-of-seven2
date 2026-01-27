@@ -73,3 +73,19 @@ export const TOOLTIP_STYLE = {
 export const TOOLTIP_CURSOR_STYLE = {
   fill: 'hsl(var(--muted) / 0.3)',
 } as const;
+
+// Cores do Sidebar por categoria
+export const CORES_SIDEBAR = {
+  dashboard: '#3B82F6',       // Azul
+  empreendimentos: '#10B981', // Verde
+  clientes: '#8B5CF6',        // Roxo
+  forecast: '#06B6D4',        // Ciano
+  comercial: '#F97316',       // Laranja
+  contratos: '#3B82F6',       // Azul
+  financeiro: '#F59E0B',      // Amarelo
+  parceiros: '#EC4899',       // Rosa
+  marketing: '#EC4899',       // Rosa
+  eventos: '#06B6D4',         // Ciano
+  utilidades: '#6B7280',      // Cinza
+  sistema: '#EF4444',         // Vermelho
+} as const;

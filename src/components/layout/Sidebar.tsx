@@ -43,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ROLE_LABELS } from '@/types/auth.types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CORES_SIDEBAR } from '@/lib/chartColors';
 import logo from '@/assets/logo.png';
 
 interface MenuItem {
@@ -57,6 +58,7 @@ interface MenuGroup {
   label: string | null;
   icon?: LucideIcon;
   items: MenuItem[];
+  color?: string;
 }
 
 const menuGroups: MenuGroup[] = [
@@ -64,6 +66,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Dashboard',
     icon: LayoutDashboard,
+    color: CORES_SIDEBAR.dashboard,
     items: [
       { icon: BarChart2, label: 'Executivo', path: '/dashboard-executivo', moduleName: 'dashboard', adminOnly: true },
     ],
@@ -72,6 +75,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Empreendimentos',
     icon: Building2,
+    color: CORES_SIDEBAR.empreendimentos,
     items: [
       { icon: Building2, label: 'Listagem', path: '/empreendimentos', moduleName: 'empreendimentos' },
       { icon: Map, label: 'Mapa de Unidades', path: '/mapa-unidades', moduleName: 'unidades' },
@@ -81,6 +85,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Clientes',
     icon: Users,
+    color: CORES_SIDEBAR.clientes,
     items: [
       { icon: Users, label: 'Cadastro de Clientes', path: '/clientes', moduleName: 'clientes' },
     ],
@@ -89,6 +94,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Forecast',
     icon: TrendingUp,
+    color: CORES_SIDEBAR.forecast,
     items: [
       { icon: BarChart2, label: 'Dashboard', path: '/forecast', moduleName: 'forecast' },
       { icon: ClipboardList, label: 'Atividades', path: '/atividades', moduleName: 'atividades' },
@@ -99,6 +105,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Comercial',
     icon: Target,
+    color: CORES_SIDEBAR.comercial,
     items: [
       { icon: Kanban, label: 'Fichas de Proposta', path: '/negociacoes', moduleName: 'negociacoes' },
       { icon: ClipboardCheck, label: 'Solicitações', path: '/solicitacoes', moduleName: 'solicitacoes', adminOnly: true },
@@ -108,6 +115,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Contratos',
     icon: FileSignature,
+    color: CORES_SIDEBAR.contratos,
     items: [
       { icon: FileCheck, label: 'Gestão de Contratos', path: '/contratos', moduleName: 'contratos' },
       { icon: FilePlus, label: 'Templates', path: '/contratos?tab=templates', moduleName: 'contratos_templates' },
@@ -119,6 +127,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Financeiro',
     icon: DollarSign,
+    color: CORES_SIDEBAR.financeiro,
     items: [
       { icon: Wallet, label: 'Fluxo de Caixa', path: '/financeiro', moduleName: 'financeiro_fluxo' },
       { icon: BarChart2, label: 'DRE', path: '/dre', moduleName: 'financeiro_dre' },
@@ -130,6 +139,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Parceiros',
     icon: Handshake,
+    color: CORES_SIDEBAR.parceiros,
     items: [
       { icon: Building2, label: 'Incorporadoras', path: '/incorporadoras', moduleName: 'incorporadoras' },
       { icon: Building, label: 'Imobiliárias', path: '/imobiliarias', moduleName: 'imobiliarias' },
@@ -140,6 +150,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Marketing',
     icon: Palette,
+    color: CORES_SIDEBAR.marketing,
     items: [
       { icon: BarChart2, label: 'Dashboard', path: '/marketing/dashboard', moduleName: 'projetos_marketing' },
       { icon: Palette, label: 'Tickets', path: '/marketing', moduleName: 'projetos_marketing' },
@@ -152,6 +163,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Eventos',
     icon: CalendarDays,
+    color: CORES_SIDEBAR.eventos,
     items: [
       { icon: CalendarDays, label: 'Listagem', path: '/eventos', moduleName: 'eventos' },
       { icon: Calendar, label: 'Calendário', path: '/eventos/calendario', moduleName: 'eventos' },
@@ -162,6 +174,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Utilidades',
     icon: Calculator,
+    color: CORES_SIDEBAR.utilidades,
     items: [
       { icon: Calculator, label: 'Simulador', path: '/simulador', moduleName: 'simulador' },
     ],
@@ -170,6 +183,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'Sistema',
     icon: Settings,
+    color: CORES_SIDEBAR.sistema,
     items: [
       { icon: Shield, label: 'Auditoria', path: '/auditoria', moduleName: 'auditoria', adminOnly: true },
       { icon: UserCog, label: 'Usuários', path: '/usuarios', moduleName: 'usuarios', adminOnly: true },
@@ -290,18 +304,30 @@ export function Sidebar() {
     const isOpen = openGroups.includes(group.label);
     const hasActiveItem = group.items.some((item) => item.path === location.pathname);
     const GroupIcon = group.icon;
+    const groupColor = group.color;
 
     return (
-      <Collapsible key={group.label} open={isOpen} onOpenChange={() => toggleGroup(group.label)}>
+      <Collapsible 
+        key={group.label} 
+        open={isOpen} 
+        onOpenChange={() => toggleGroup(group.label)}
+        className="sidebar-group-colored"
+        style={{ '--group-color': groupColor } as React.CSSProperties}
+      >
         <CollapsibleTrigger asChild>
           <button
             className={cn(
-              'sidebar-nav-item w-full justify-between group/trigger',
+              'sidebar-nav-item sidebar-group-trigger w-full justify-between group/trigger',
               hasActiveItem ? 'text-sidebar-foreground font-semibold' : 'sidebar-nav-item-inactive'
             )}
           >
             <div className="flex items-center gap-3">
-              {GroupIcon && <GroupIcon className="h-4 w-4 flex-shrink-0" />}
+              {GroupIcon && (
+                <GroupIcon 
+                  className="h-4 w-4 flex-shrink-0 sidebar-group-icon" 
+                  style={{ color: groupColor }}
+                />
+              )}
               <span>{group.label}</span>
             </div>
             <ChevronDown
