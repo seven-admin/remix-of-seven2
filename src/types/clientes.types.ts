@@ -44,6 +44,19 @@ export const CLIENTE_TEMPERATURA_COLORS: Record<ClienteTemperatura, string> = {
   quente: 'bg-red-100 text-red-800 border-red-200'
 };
 
+// Motivos de perda pré-definidos
+export const MOTIVOS_PERDA = [
+  'Desistiu da compra',
+  'Comprou com concorrente',
+  'Não conseguiu financiamento',
+  'Sem retorno / Não atende',
+  'Fora do perfil',
+  'Preço / Condições',
+  'Outro'
+] as const;
+
+export type MotivoPerda = typeof MOTIVOS_PERDA[number];
+
 // Origens
 export const CLIENTE_ORIGENS = [
   'Site',

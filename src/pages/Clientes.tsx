@@ -29,6 +29,7 @@ import { ClienteInteracoesDialog } from '@/components/clientes/ClienteInteracoes
 import { ClienteHistoricoAtividadesDialog } from '@/components/clientes/ClienteHistoricoAtividadesDialog';
 import { ClienteQuickViewDialog } from '@/components/clientes/ClienteQuickViewDialog';
 import { AcaoEmLoteDialog, AcaoEmLoteData } from '@/components/clientes/AcaoEmLoteDialog';
+import { MarcarPerdidoDialog } from '@/components/clientes/MarcarPerdidoDialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,6 +54,10 @@ const Clientes = () => {
   // State for batch selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [acaoEmLoteDialogOpen, setAcaoEmLoteDialogOpen] = useState(false);
+  
+  // State for loss dialog
+  const [perdidoDialogOpen, setPerdidoDialogOpen] = useState(false);
+  const [clienteParaPerder, setClienteParaPerder] = useState<Cliente | null>(null);
   
   const { data: gestores = [] } = useGestoresProduto();
   
@@ -233,7 +238,11 @@ const Clientes = () => {
             setDeleteDialogOpen(true);
           }}
           onQualificar={(id) => qualificarMutation.mutate(id)}
-          onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
+          onMarcarPerdido={(id) => {
+            const cliente = clientes.find(c => c.id === id);
+            setClienteParaPerder(cliente || null);
+            setPerdidoDialogOpen(true);
+          }}
           onReativar={(id) => reativarMutation.mutate(id)}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
@@ -250,7 +259,11 @@ const Clientes = () => {
             setDeleteDialogOpen(true);
           }}
           onQualificar={(id) => qualificarMutation.mutate(id)}
-          onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
+          onMarcarPerdido={(id) => {
+            const cliente = clientes.find(c => c.id === id);
+            setClienteParaPerder(cliente || null);
+            setPerdidoDialogOpen(true);
+          }}
           onReativar={(id) => reativarMutation.mutate(id)}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
@@ -374,6 +387,29 @@ const Clientes = () => {
         cliente={historicoCliente}
         open={!!historicoCliente}
         onOpenChange={(open) => !open && setHistoricoCliente(null)}
+      />
+
+      <MarcarPerdidoDialog
+        open={perdidoDialogOpen}
+        onOpenChange={(open) => {
+          setPerdidoDialogOpen(open);
+          if (!open) setClienteParaPerder(null);
+        }}
+        onConfirm={(motivo) => {
+          if (clienteParaPerder) {
+            marcarPerdidoMutation.mutate(
+              { id: clienteParaPerder.id, motivo },
+              {
+                onSuccess: () => {
+                  setPerdidoDialogOpen(false);
+                  setClienteParaPerder(null);
+                }
+              }
+            );
+          }
+        }}
+        isLoading={marcarPerdidoMutation.isPending}
+        clienteNome={clienteParaPerder?.nome}
       />
     </MainLayout>
   );
