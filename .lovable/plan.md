@@ -1,114 +1,137 @@
 
-# Plano: Corrigir Atualização dos Cards na Aba Visão Geral
+# Plano: Diálogo para Registrar Motivo de Cancelamento/Perda do Cliente
 
-## Problema Identificado
+## Objetivo
 
-Os contadores dos cards na aba **Visão Geral** da página Financeiro não estão sendo atualizados após operações como criar, editar, excluir lançamentos ou registrar pagamentos.
+Criar um diálogo para capturar o motivo quando um cliente é marcado como "perdido" (cancelou o atendimento), permitindo análise posterior dos motivos de perda.
 
-### Causa Raiz
+## Solução Proposta
 
-A query `financeiro-stats` que alimenta os dados dos cards **não está sendo invalidada** após a maioria das mutações no hook `useFinanceiro.ts`.
+### 1. Criar Componente MarcarPerdidoDialog
 
-**Situação Atual:**
-| Mutation | Invalida `lancamentos` | Invalida `financeiro-stats` |
-|----------|------------------------|-----------------------------|
-| useCreateLancamento | Sim | **NÃO** |
-| useUpdateLancamento | Sim | **NÃO** |
-| useRegistrarPagamentoLancamento | Sim | **NÃO** |
-| useRegistrarPagamentoEmLote | Sim | Sim |
-| useDeleteLancamento | Sim | **NÃO** |
-| useAprovarLancamentos | Sim | **NÃO** |
+Novo componente similar ao `RejeitarDialog` existente, com:
+- Lista de motivos pré-definidos (seleção rápida)
+- Campo de texto livre para detalhamento
+- Obrigatoriedade de informar pelo menos um motivo
 
-Apenas `useRegistrarPagamentoEmLote` invalida a query `financeiro-stats`, por isso os cards só atualizam quando um pagamento em lote é registrado.
-
-## Solução
-
-Adicionar `queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] })` no callback `onSuccess` de todas as mutations que afetam dados financeiros.
-
-## Alterações Necessárias
-
-### Arquivo: `src/hooks/useFinanceiro.ts`
-
-Adicionar invalidação da query `financeiro-stats` nas seguintes mutations:
-
-**1. useCreateLancamento (linha 265)**
-```typescript
-onSuccess: (result) => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  // ...
-}
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠ Marcar Cliente como Perdido                             │
+│                                                              │
+│  Selecione o motivo principal:                              │
+│  ○ Desistiu da compra                                       │
+│  ○ Comprou com concorrente                                  │
+│  ○ Não conseguiu financiamento                              │
+│  ○ Sem retorno / Não atende                                 │
+│  ○ Fora do perfil                                           │
+│  ○ Outro                                                    │
+│                                                              │
+│  Observações (opcional):                                     │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Detalhes adicionais sobre a perda...                │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│                      [Cancelar]  [Confirmar Perda]          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**2. useUpdateLancamento (linha 376)**
+### 2. Motivos Pré-definidos
+
+Sugestão de motivos comuns no mercado imobiliário:
+- **Desistiu da compra** - Cliente mudou de ideia
+- **Comprou com concorrente** - Fechou negócio em outro lugar
+- **Não conseguiu financiamento** - Problemas de crédito
+- **Sem retorno / Não atende** - Cliente sumiu
+- **Fora do perfil** - Não se enquadra no produto
+- **Preço / Condições** - Não aceitou as condições comerciais
+- **Outro** - Motivo personalizado
+
+### 3. Integração na Página de Clientes
+
+Alterar os callbacks `onMarcarPerdido` para abrir o diálogo ao invés de executar diretamente:
+
+**Antes:**
 ```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Lançamento atualizado');
-}
+onMarcarPerdido={(id) => marcarPerdidoMutation.mutate({ id })}
 ```
 
-**3. useRegistrarPagamentoLancamento (linha 413)**
+**Depois:**
 ```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Pagamento registrado');
-}
+onMarcarPerdido={(id) => {
+  setClienteParaPerder(id);
+  setPerdidoDialogOpen(true);
+}}
 ```
 
-**4. useDeleteLancamento (linha 502)**
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Lançamento excluído');
-}
-```
+## Arquivos a Criar/Modificar
 
-**5. useAprovarLancamentos (linha 444)**
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Lançamentos aprovados com sucesso');
-}
-```
+### Criar: `src/components/clientes/MarcarPerdidoDialog.tsx`
 
-**6. useUpdateRecurringSeries (linha 315)**
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Série recorrente atualizada');
-}
-```
+Novo componente com:
+- Props: `open`, `onOpenChange`, `onConfirm`, `isLoading`, `clienteNome`
+- Estado local para motivo selecionado e observações
+- RadioGroup para motivos pré-definidos
+- Textarea para observações adicionais
+- Lógica para combinar motivo + observação no campo `motivo_perda`
 
-**7. useDeleteRecurringSeries (linha 351)**
+### Modificar: `src/pages/Clientes.tsx`
+
+- Adicionar novos estados: `clienteParaPerder`, `perdidoDialogOpen`
+- Alterar handlers `onMarcarPerdido` no mobile e desktop
+- Adicionar o novo `MarcarPerdidoDialog` no JSX
+- Implementar callback que executa a mutation com o motivo
+
+### Criar: `src/types/clientes.types.ts` (atualização)
+
+Adicionar constante com motivos pré-definidos:
+
 ```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
-  queryClient.invalidateQueries({ queryKey: ['financeiro-stats'] }); // ADICIONAR
-  toast.success('Série recorrente excluída');
-}
+export const MOTIVOS_PERDA = [
+  'Desistiu da compra',
+  'Comprou com concorrente',
+  'Não conseguiu financiamento',
+  'Sem retorno / Não atende',
+  'Fora do perfil',
+  'Preço / Condições',
+  'Outro'
+] as const;
 ```
 
 ## Resultado Esperado
 
-Após implementar as alterações:
-- Os cards de **Saldo Inicial**, **Entradas**, **Saídas** e **Saldo Atual** serão atualizados automaticamente após qualquer operação
-- Os gráficos da aba Visão Geral refletirão as mudanças em tempo real
-- A experiência do usuário será consistente em toda a página
+1. Ao clicar em "Marcar Perdido", abre um diálogo
+2. Usuário seleciona um motivo da lista
+3. Opcionalmente adiciona observações
+4. Ao confirmar, o cliente é marcado como perdido com o motivo registrado
+5. O motivo fica visível no histórico/detalhes do cliente
 
 ## Seção Técnica
 
-### Query Keys Afetadas
-- `lancamentos` - Lista de lançamentos filtrados por período
-- `financeiro-stats` - Estatísticas agregadas (totais, saldos)
+### Estrutura do Componente
 
-### Padrão de Invalidação
-O React Query mantém as queries em cache. Ao chamar `invalidateQueries`, a query é marcada como "stale" e será refetchada quando acessada novamente ou imediatamente se estiver sendo observada por um componente ativo.
+```typescript
+interface MarcarPerdidoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (motivo: string) => void;
+  isLoading?: boolean;
+  clienteNome?: string;
+}
+```
 
-### Impacto de Performance
-Mínimo - a query `financeiro-stats` é leve e retorna apenas agregações. A invalidação ocorre apenas após mutações bem-sucedidas.
+### Combinação de Motivo + Observação
+
+O campo `motivo_perda` receberá o texto combinado:
+```typescript
+const motivoFinal = observacao 
+  ? `${motivoSelecionado}: ${observacao}`
+  : motivoSelecionado;
+```
+
+### Invalidação de Cache
+
+Não requer alteração - o hook `useMarcarPerdido` já invalida todas as queries necessárias.
+
+### Compatibilidade
+
+O diálogo será integrado tanto na visão desktop (tabela) quanto mobile (cards).
