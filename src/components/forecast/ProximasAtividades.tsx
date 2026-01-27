@@ -55,8 +55,8 @@ export function ProximasAtividades({ gestorId }: ProximasAtividadesProps) {
             <p className="text-sm">Nenhuma atividade agendada</p>
           </div>
         ) : (
-          <ScrollArea className="h-[280px]">
-            <div className="px-6 pb-6 space-y-1">
+        <ScrollArea className="h-[300px]">
+            <div className="px-6 pb-4 space-y-2">
               {atividades.map((atividade: any, index: number) => {
                 const Icon = TIPO_ICON[atividade.tipo] || Calendar;
                 const isToday = format(new Date(atividade.data_hora), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
