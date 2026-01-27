@@ -397,6 +397,31 @@
     color: hsl(var(--sidebar-foreground));
   }
 
+  /* Sidebar Group com Cores por Categoria */
+  .sidebar-group-colored {
+    @apply relative;
+  }
+
+  .sidebar-group-colored::before {
+    content: '';
+    @apply absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm;
+    background-color: var(--group-color);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  .sidebar-group-colored[data-state="open"]::before {
+    opacity: 1;
+  }
+
+  .sidebar-group-trigger:hover {
+    background-color: color-mix(in srgb, var(--group-color) 15%, transparent);
+  }
+
+  .sidebar-group-icon {
+    transition: color 0.2s ease-in-out;
+  }
+
   /* Process Visualization Animations */
   .animate-fade-in-up {
     animation: fadeInUp 0.5s ease-out forwards;
