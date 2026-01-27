@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      atividade_comentarios: {
+        Row: {
+          atividade_id: string
+          comentario: string
+          created_at: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          atividade_id: string
+          comentario: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          atividade_id?: string
+          comentario?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atividade_comentarios_atividade_id_fkey"
+            columns: ["atividade_id"]
+            isOneToOne: false
+            referencedRelation: "atividades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividade_comentarios_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atividades: {
         Row: {
           categoria: string | null
