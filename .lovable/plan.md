@@ -1,108 +1,149 @@
 
+# Plano: Corrigir Sistema de Permissões para Roles Dinâmicos
 
-# Plano: Estender Cores de Categoria aos Subitens do Sidebar
+## Problemas Identificados
 
-## Contexto
+Após análise detalhada, identifiquei **3 problemas** que causam o "Acesso Negado" ao cadastrar novos usuários:
 
-Atualmente, os **ícones dos grupos** (ex: Financeiro, Comercial) recebem a cor da categoria, mas os **subitens internos** (ex: Fluxo de Caixa, DRE) permanecem brancos. Sua sugestão é replicar a cor para os subitens, criando uma hierarquia visual mais coesa.
+### 1. Hook `usePermissions` usa coluna legada
+O hook busca permissões usando `.eq('role', role as any)` (coluna enum), mas o sistema foi migrado para usar `role_id`. Roles dinâmicos como "Diretor de Marketing" não existem no enum e retornam **0 permissões**.
 
-## Comparação Visual
+### 2. Roles dinâmicos sem permissões configuradas
+| Role | Permissões Cadastradas |
+|------|------------------------|
+| admin | 26 |
+| super_admin | 37 |
+| gestor_produto | 27 |
+| corretor | 20 |
+| **diretor_de_marketing** | **0** |
+| **supervisão_de_criação** | **0** |
 
-### Antes (atual)
-```text
-┌─────────────────────────────────┐
-│ ▌ 💛 Financeiro           ▼    │  ← Ícone amarelo
-│  │   ⚪ Fluxo de Caixa         │  ← Ícone branco
-│  │   ⚪ DRE                    │  ← Ícone branco
-│  │   ⚪ Comissões              │  ← Ícone branco
-└─────────────────────────────────┘
+### 3. Tabela `role_permissions` com coluna `role` NOT NULL
+Ao salvar permissões para roles dinâmicos, a inserção falha silenciosamente porque a coluna `role` (enum legado) é obrigatória mas não tem valor válido para roles novos.
+
+## Solução Proposta
+
+### Parte 1: Alterar Hook usePermissions
+
+Modificar para buscar permissões usando `role_id` ao invés da coluna enum:
+
+```typescript
+// Antes (problemático)
+const { data: rolePerms } = await supabase
+  .from('role_permissions')
+  .select('*')
+  .eq('role', role as any);
+
+// Depois (correto)
+// 1. Primeiro buscar o role_id baseado no nome do role
+const { data: roleData } = await supabase
+  .from('roles')
+  .select('id')
+  .eq('name', role)
+  .single();
+
+// 2. Depois buscar permissões pelo role_id
+const { data: rolePerms } = await supabase
+  .from('role_permissions')
+  .select('*')
+  .eq('role_id', roleData?.id);
 ```
 
-### Depois (proposta)
-```text
-┌─────────────────────────────────┐
-│ ▌ 💛 Financeiro           ▼    │  ← Ícone amarelo
-│  │   💛 Fluxo de Caixa         │  ← Ícone amarelo
-│  │   💛 DRE                    │  ← Ícone amarelo
-│  │   💛 Comissões              │  ← Ícone amarelo
-└─────────────────────────────────┘
+### Parte 2: Alterar Coluna `role` para Nullable
+
+Executar migração SQL para permitir que roles dinâmicos sejam salvos:
+
+```sql
+ALTER TABLE role_permissions 
+ALTER COLUMN role DROP NOT NULL;
 ```
 
-## Implementação
+### Parte 3: Corrigir useBulkUpdateRolePermissions
 
-A alteração é simples e requer apenas modificar a função `renderMenuItem` para receber a cor do grupo pai e aplicá-la ao ícone do subitem.
+Garantir que ao inserir permissões, o `role` legado seja obtido da tabela `roles` (para roles que existem no enum) ou seja NULL (para roles dinâmicos):
 
-### Alterações no Arquivo
+```typescript
+// Buscar info do role para obter name (usado no enum legado se existir)
+const { data: roleInfo } = await supabase
+  .from('roles')
+  .select('name')
+  .eq('id', roleId)
+  .single();
+
+// Verificar se o role name existe no enum (legado)
+const legacyEnumRoles = ['admin', 'super_admin', 'gestor_produto', 'corretor', 'incorporador', ...];
+const legacyRole = legacyEnumRoles.includes(roleInfo?.name) ? roleInfo?.name : null;
+
+// Inserir com role legado quando aplicável
+await supabase.from('role_permissions').insert({
+  role_id: roleId,
+  role: legacyRole, // NULL para roles dinâmicos
+  module_id: perm.moduleId,
+  // ...
+});
+```
+
+## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/layout/Sidebar.tsx` | Passar a cor do grupo para `renderMenuItem` e aplicar ao ícone |
+| `src/hooks/usePermissions.ts` | Buscar role_id antes de buscar permissões |
+| `src/hooks/useRoles.ts` | Ajustar insert para lidar com roles dinâmicos |
 
-## Detalhes Técnicos
+## Migração SQL Necessária
 
-### Função renderMenuItem Atualizada
+```sql
+-- Permitir role NULL para roles dinâmicos
+ALTER TABLE public.role_permissions 
+ALTER COLUMN role DROP NOT NULL;
 
-```typescript
-// Adicionar parâmetro groupColor
-const renderMenuItem = (item: MenuItem, showLabel: boolean, groupColor?: string) => {
-  const [basePath, queryString] = item.path.split('?');
-  const isActive = queryString 
-    ? location.pathname === basePath && location.search === `?${queryString}`
-    : location.pathname === item.path && !location.search;
-  
-  return (
-    <Link
-      key={item.path}
-      to={item.path}
-      onClick={() => setMobileOpen(false)}
-      className={cn(
-        'sidebar-nav-item',
-        isActive ? 'sidebar-nav-item-active' : 'sidebar-nav-item-inactive'
-      )}
-      title={!showLabel ? item.label : undefined}
-    >
-      <item.icon 
-        className="h-4 w-4 flex-shrink-0" 
-        style={groupColor ? { color: groupColor } : undefined}  // Aplicar cor
-      />
-      {showLabel && <span>{item.label}</span>}
-    </Link>
-  );
-};
+-- Criar valor default (opcional, para retrocompatibilidade)
+-- Se preferir, podemos atribuir um valor placeholder
 ```
 
-### Chamada Atualizada no renderGroup
+## Fluxo Corrigido
 
-```typescript
-<CollapsibleContent className="pl-4 space-y-0.5 mt-1 ...">
-  {group.items.map((item) => renderMenuItem(item, true, groupColor))}
-</CollapsibleContent>
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. Admin cria novo usuário com role "Supervisão de Criação"    │
+├─────────────────────────────────────────────────────────────────┤
+│ 2. Edge Function:                                               │
+│    - Cria auth user                                             │
+│    - Insere profile                                             │
+│    - Busca role_id da tabela roles                              │
+│    - Insere em user_roles (user_id + role_id)                   │
+├─────────────────────────────────────────────────────────────────┤
+│ 3. Usuário faz login                                            │
+├─────────────────────────────────────────────────────────────────┤
+│ 4. AuthContext:                                                 │
+│    - Busca role name via user_roles + roles join                │
+│    - Retorna "supervisão_de_criação"                            │
+├─────────────────────────────────────────────────────────────────┤
+│ 5. usePermissions (CORRIGIDO):                                  │
+│    - Busca role_id baseado no nome do role                      │
+│    - Busca permissões via role_id (não mais pelo enum)          │
+│    - Retorna as permissões configuradas para esse role          │
+├─────────────────────────────────────────────────────────────────┤
+│ 6. ProtectedRoute:                                              │
+│    - Verifica canAccessModule() com as permissões carregadas    │
+│    - ✅ Permite acesso aos módulos configurados                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+## Ação Necessária: Configurar Permissões
+
+Após a implementação, será necessário acessar **Usuários > Perfis de Acesso** e configurar as permissões para cada role dinâmico que ainda não tem configuração:
+
+1. Selecionar o perfil "Diretor de Marketing"
+2. Marcar as permissões desejadas (View/Create/Edit/Delete)
+3. Definir o escopo (Global/Empreendimento/Próprio)
+4. Clicar em "Salvar"
+
+Repetir para "Supervisão de Criação" e outros roles criados dinamicamente.
 
 ## Benefícios
 
-1. **Consistência visual**: Todos os ícones de uma categoria compartilham a mesma cor
-2. **Identificação rápida**: Ao ver um subitem, o usuário sabe imediatamente a qual categoria pertence
-3. **Hierarquia reforçada**: A cor cria uma conexão visual entre grupo e subitens
-4. **Implementação mínima**: Apenas 3-4 linhas de código alteradas
-
-## Resultado Final Esperado
-
-```text
-┌─────────────────────────────────┐
-│ ▌ 🟢 Empreendimentos      ▼    │
-│  │   🟢 Listagem               │
-│  │   🟢 Mapa de Unidades       │
-├─────────────────────────────────┤
-│ ▌ 🟡 Financeiro           ▼    │
-│  │   🟡 Fluxo de Caixa         │
-│  │   🟡 DRE                    │
-│  │   🟡 Comissões              │
-│  │   🟡 Bonificações           │
-├─────────────────────────────────┤
-│ ▌ 🟠 Comercial            ▼    │
-│  │   🟠 Fichas de Proposta     │
-│  │   🟠 Solicitações           │
-└─────────────────────────────────┘
-```
-
+1. **Compatibilidade total**: Roles legados (via enum) e dinâmicos funcionam
+2. **Sem perda de dados**: Permissões existentes continuam funcionando
+3. **Administração centralizada**: Gestão via interface de Perfis de Acesso
+4. **Escalabilidade**: Novos roles podem ser criados sem alteração de código
