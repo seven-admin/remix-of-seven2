@@ -1,263 +1,238 @@
 
-# Plano: Sistema de Interações em Atividades + Gestão de Status por Super Admin
 
-## Contexto
+# Proposta: Modernização do Sidebar com Categorias Coloridas
 
-Você deseja duas funcionalidades:
-1. **Interações/Chat**: Permitir que Admins e Super Admins interajam com gestores sobre atividades (similar ao chat dos tickets de marketing)
-2. **Gestão de Status**: Permitir que Super Admins reabram atividades canceladas ou alterem seu status
+## Visão Geral
 
-## Parte 1: Sistema de Comentários/Interações nas Atividades
+Transformar o sidebar atual em uma experiência visual mais intuitiva, usando cores para identificar rapidamente cada categoria de módulos. A ideia é manter a elegância do design escuro atual, adicionando sutis indicadores de cor que não sobrecarreguem visualmente.
 
-### Modelo de Dados
+## Análise do Estado Atual
 
-Criar uma nova tabela `atividade_comentarios` seguindo o padrão já existente em `projeto_comentarios`:
+O sidebar possui **12 grupos de navegação**:
+- Dashboard, Empreendimentos, Clientes, Forecast, Comercial, Contratos
+- Financeiro, Parceiros, Marketing, Eventos, Utilidades, Sistema
 
-```text
-┌─────────────────────────────────────────┐
-│        atividade_comentarios            │
-├─────────────────────────────────────────┤
-│ id             UUID (PK)                │
-│ atividade_id   UUID (FK → atividades)   │
-│ user_id        UUID (FK → profiles)     │
-│ comentario     TEXT                     │
-│ created_at     TIMESTAMP                │
-└─────────────────────────────────────────┘
-```
+Atualmente todos usam o mesmo visual neutro (branco/cinza), dificultando a identificação rápida de onde cada módulo está.
 
-### Componente de Comentários
+## Proposta de Cores por Categoria
 
-Criar `AtividadeComentarios.tsx` similar ao `ProjetoComentarios.tsx`:
+Usando a paleta já definida em `chartColors.ts` para manter consistência:
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  💬 Interações                                              │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Escreva uma mensagem...                             │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                                          [Enviar]           │
-├─────────────────────────────────────────────────────────────┤
-│  👤 João Silva                           27/01 às 14:30    │
-│  Verificar com o cliente se prefere outro horário          │
-│                                                              │
-│  👤 Maria Admin                          27/01 às 13:15    │
-│  Por favor, confirmar disponibilidade do empreendimento    │
-└─────────────────────────────────────────────────────────────┘
-```
+| Categoria | Cor | Código | Justificativa |
+|-----------|-----|--------|---------------|
+| Dashboard | Azul | `#3B82F6` | Visão analítica, dados |
+| Empreendimentos | Verde | `#10B981` | Crescimento, imóveis |
+| Clientes | Roxo | `#8B5CF6` | Relacionamento, pessoas |
+| Forecast | Ciano | `#06B6D4` | Previsão, futuro |
+| Comercial | Laranja | `#F97316` | Vendas, energia |
+| Contratos | Azul Escuro | `#3B82F6` | Documentos, formalidade |
+| Financeiro | Amarelo | `#F59E0B` | Dinheiro, ouro |
+| Parceiros | Rosa | `#EC4899` | Relacionamentos |
+| Marketing | Rosa | `#EC4899` | Criatividade |
+| Eventos | Ciano | `#06B6D4` | Calendário, agenda |
+| Utilidades | Cinza | `#6B7280` | Ferramentas gerais |
+| Sistema | Vermelho | `#EF4444` | Configurações críticas |
 
-### Integração no Diálogo de Detalhes
+## 3 Opções de Implementação Visual
 
-O componente será adicionado ao `AtividadeDetalheDialog`, exibindo:
-- Histórico de interações
-- Caixa de texto para nova mensagem
-- Visível para todos, mas com destaque visual para mensagens de admins
-
-## Parte 2: Super Admin - Alterar Status de Atividades
-
-### Nova Funcionalidade
-
-Adicionar no `AtividadeDetalheDialog` uma seção exclusiva para Super Admin:
+### Opção A: Borda Lateral Colorida (Recomendada)
+Uma barra fina colorida na lateral esquerda do grupo quando expandido:
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  ⚙ Ações de Administrador                                   │
-├─────────────────────────────────────────────────────────────┤
-│  Status atual: Cancelada                                     │
-│                                                              │
-│  Alterar para:                                               │
-│  [Pendente ▼]                                               │
-│                                                              │
-│  Justificativa (obrigatória):                               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Motivo da reabertura...                             │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                                                              │
-│                              [Aplicar Alteração]            │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────┐
+│ ▌🟠 Comercial           ▼   │  ← Barra laranja na lateral
+│     Fichas de Proposta      │
+│     Solicitações            │
+├──────────────────────────────┤
+│ ▌🟡 Financeiro          ▼   │  ← Barra amarela
+│     Fluxo de Caixa          │
+│     DRE                     │
+└──────────────────────────────┘
 ```
 
-### Regras de Negócio
+**Vantagens**: Sutil, elegante, não interfere no conteúdo
 
-| Ação | Quem pode | Condição |
-|------|-----------|----------|
-| Reabrir atividade cancelada | Super Admin | Sempre |
-| Alterar de concluída para pendente | Super Admin | Sempre |
-| Alterar de pendente para concluída | Qualquer usuário | Via diálogo de conclusão |
-| Alterar para cancelada | Qualquer usuário | Via diálogo de cancelamento |
+### Opção B: Ícone Colorido
+Os ícones dos grupos recebem a cor da categoria:
 
-### Rastreabilidade
-
-Cada alteração de status feita por um Super Admin será automaticamente registrada como um comentário na atividade:
-
+```text
+┌──────────────────────────────┐
+│ 🎯 Comercial            ▼   │  ← Ícone Target em laranja
+│     Fichas de Proposta      │
+│     Solicitações            │
+├──────────────────────────────┤
+│ 💰 Financeiro           ▼   │  ← Ícone DollarSign em amarelo
+│     Fluxo de Caixa          │
+│     DRE                     │
+└──────────────────────────────┘
 ```
-"[SISTEMA] Status alterado de CANCELADA para PENDENTE por Maria Admin. 
-Justificativa: Cliente retornou contato e deseja reagendar visita."
+
+**Vantagens**: Fácil identificação visual, sem elementos extras
+
+### Opção C: Badge/Ponto Colorido
+Um pequeno círculo colorido antes do nome do grupo:
+
+```text
+┌──────────────────────────────┐
+│ 🟠 • Comercial          ▼   │  ← Círculo laranja
+│     Fichas de Proposta      │
+│     Solicitações            │
+├──────────────────────────────┤
+│ 🟡 • Financeiro         ▼   │  ← Círculo amarelo
+│     Fluxo de Caixa          │
+│     DRE                     │
+└──────────────────────────────┘
 ```
 
-## Arquivos a Criar
+**Vantagens**: Muito sutil, ocupa pouco espaço
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `src/components/atividades/AtividadeComentarios.tsx` | Componente de chat/interações |
-| `src/components/atividades/AlterarStatusAtividadeDialog.tsx` | Diálogo para Super Admin alterar status |
-| `src/hooks/useAtividadeComentarios.ts` | Hook para buscar/criar comentários |
+## Sugestão de Implementação Combinada
+
+Combinar **Opção A + Opção B** para máximo impacto visual:
+- Ícone do grupo com a cor da categoria
+- Borda lateral colorida quando o grupo está expandido
+- Ao passar o mouse, um leve fundo com a cor em opacidade baixa
+
+```text
+┌──────────────────────────────┐
+│ ▌ 💰 Financeiro         ▼   │  ← Ícone amarelo + borda
+│  │   Fluxo de Caixa         │
+│  │   DRE                    │
+│  │   Comissões              │
+│  │   Bonificações           │
+└──────────────────────────────┘
+```
 
 ## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/atividades/AtividadeDetalheDialog.tsx` | Adicionar seção de comentários e botão de ações admin |
-| `src/hooks/useAtividades.ts` | Adicionar mutation para alterar status (Super Admin) |
-| `src/types/atividades.types.ts` | Adicionar interface para comentário |
-
-## Migração SQL
-
-```sql
--- Tabela de comentários/interações em atividades
-CREATE TABLE public.atividade_comentarios (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  atividade_id UUID NOT NULL REFERENCES public.atividades(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  comentario TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- Índice para performance
-CREATE INDEX idx_atividade_comentarios_atividade ON public.atividade_comentarios(atividade_id);
-
--- RLS
-ALTER TABLE public.atividade_comentarios ENABLE ROW LEVEL SECURITY;
-
--- Política: usuários autenticados podem ver comentários
-CREATE POLICY "Authenticated users can view comments"
-  ON public.atividade_comentarios FOR SELECT
-  TO authenticated
-  USING (true);
-
--- Política: usuários autenticados podem criar comentários
-CREATE POLICY "Authenticated users can create comments"
-  ON public.atividade_comentarios FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-```
-
-## Fluxo de Uso
-
-### Cenário 1: Interação Admin → Gestor
-1. Admin abre detalhes de uma atividade
-2. Escreve mensagem: "Por favor, confirmar disponibilidade do cliente"
-3. Gestor visualiza a atividade e vê o comentário
-4. Gestor responde: "Confirmado, cliente disponível amanhã às 10h"
-
-### Cenário 2: Reabrir Atividade Cancelada
-1. Super Admin abre detalhes de uma atividade cancelada
-2. Clica em "Ações de Administrador"
-3. Seleciona novo status "Pendente"
-4. Informa justificativa: "Cliente retornou contato"
-5. Sistema atualiza status e registra comentário automático
+| `src/components/layout/Sidebar.tsx` | Adicionar propriedade `color` aos grupos e aplicar estilos |
+| `src/index.css` | Adicionar classes CSS para cada cor de categoria |
+| `src/lib/chartColors.ts` | Adicionar `CORES_SIDEBAR` com mapeamento de categorias |
 
 ## Seção Técnica
 
-### Hook useAtividadeComentarios
+### Nova Interface MenuGroup
 
 ```typescript
-export function useAtividadeComentarios(atividadeId: string) {
-  const queryClient = useQueryClient();
-
-  const { data: comentarios, isLoading } = useQuery({
-    queryKey: ['atividade-comentarios', atividadeId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('atividade_comentarios')
-        .select(`*, user:profiles(id, full_name, avatar_url)`)
-        .eq('atividade_id', atividadeId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!atividadeId
-  });
-
-  const createComentario = useMutation({
-    mutationFn: async (comentario: string) => {
-      const { error } = await supabase
-        .from('atividade_comentarios')
-        .insert({
-          atividade_id: atividadeId,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          comentario
-        });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['atividade-comentarios', atividadeId] });
-    }
-  });
-
-  return { comentarios, isLoading, createComentario };
+interface MenuGroup {
+  label: string | null;
+  icon?: LucideIcon;
+  items: MenuItem[];
+  color?: string; // Nova propriedade para a cor da categoria
 }
 ```
 
-### Mutation para Alterar Status (Super Admin)
+### Mapeamento de Cores
 
 ```typescript
-export function useAlterarStatusAtividade() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ 
-      id, 
-      novoStatus, 
-      justificativa 
-    }: { 
-      id: string; 
-      novoStatus: AtividadeStatus; 
-      justificativa: string 
-    }) => {
-      // 1. Atualizar status
-      const { error: updateError } = await supabase
-        .from('atividades')
-        .update({ status: novoStatus })
-        .eq('id', id);
-      if (updateError) throw updateError;
+// src/lib/chartColors.ts
+export const CORES_SIDEBAR = {
+  dashboard: '#3B82F6',      // Azul
+  empreendimentos: '#10B981', // Verde
+  clientes: '#8B5CF6',       // Roxo
+  forecast: '#06B6D4',       // Ciano
+  comercial: '#F97316',      // Laranja
+  contratos: '#3B82F6',      // Azul
+  financeiro: '#F59E0B',     // Amarelo
+  parceiros: '#EC4899',      // Rosa
+  marketing: '#EC4899',      // Rosa
+  eventos: '#06B6D4',        // Ciano
+  utilidades: '#6B7280',     // Cinza
+  sistema: '#EF4444',        // Vermelho
+} as const;
+```
 
-      // 2. Registrar comentário de auditoria
-      const user = (await supabase.auth.getUser()).data.user;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user?.id)
-        .single();
+### Exemplo de Grupo com Cor
 
-      await supabase.from('atividade_comentarios').insert({
-        atividade_id: id,
-        user_id: user?.id,
-        comentario: `[ALTERAÇÃO DE STATUS] Status alterado para ${novoStatus.toUpperCase()} por ${profile?.full_name}.\nJustificativa: ${justificativa}`
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['atividades'] });
-      queryClient.invalidateQueries({ queryKey: ['atividade'] });
-      toast.success('Status alterado com sucesso!');
-    }
-  });
+```typescript
+const menuGroups: MenuGroup[] = [
+  {
+    label: 'Financeiro',
+    icon: DollarSign,
+    color: CORES_SIDEBAR.financeiro, // '#F59E0B'
+    items: [
+      { icon: Wallet, label: 'Fluxo de Caixa', path: '/financeiro', moduleName: 'financeiro_fluxo' },
+      // ...
+    ],
+  },
+];
+```
+
+### Estilos CSS
+
+```css
+/* Borda lateral colorida para grupo expandido */
+.sidebar-group-colored {
+  position: relative;
+}
+
+.sidebar-group-colored::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--group-color);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.sidebar-group-colored[data-state="open"]::before {
+  opacity: 1;
+}
+
+/* Hover com cor de fundo sutil */
+.sidebar-group-trigger:hover {
+  background-color: color-mix(in srgb, var(--group-color) 10%, transparent);
 }
 ```
 
-### Interface AtividadeComentario
+### Componente Atualizado
 
-```typescript
-export interface AtividadeComentario {
-  id: string;
-  atividade_id: string;
-  user_id: string | null;
-  comentario: string;
-  created_at: string;
-  user?: {
-    id: string;
-    full_name: string;
-    avatar_url?: string;
-  } | null;
-}
+```tsx
+const renderGroup = (group: MenuGroup) => {
+  // ...
+  return (
+    <Collapsible 
+      key={group.label} 
+      open={isOpen} 
+      onOpenChange={() => toggleGroup(group.label)}
+      className="sidebar-group-colored"
+      style={{ '--group-color': group.color } as React.CSSProperties}
+    >
+      <CollapsibleTrigger asChild>
+        <button className="sidebar-nav-item sidebar-group-trigger ...">
+          <div className="flex items-center gap-3">
+            {GroupIcon && (
+              <GroupIcon 
+                className="h-4 w-4 flex-shrink-0" 
+                style={{ color: group.color }} // Ícone colorido
+              />
+            )}
+            <span>{group.label}</span>
+          </div>
+          <ChevronDown className="..." />
+        </button>
+      </CollapsibleTrigger>
+      {/* ... */}
+    </Collapsible>
+  );
+};
 ```
+
+## Benefícios
+
+1. **Navegação mais rápida**: Cores ajudam a encontrar módulos visualmente
+2. **Consistência visual**: Usa a mesma paleta dos dashboards
+3. **Hierarquia clara**: Diferencia grupos principais de itens internos
+4. **Modernização sutil**: Não altera drasticamente o design atual
+5. **Acessibilidade**: Cores são complementares ao texto, não substituem
+
+## Próximos Passos
+
+Após aprovação, posso implementar qualquer uma das 3 opções ou a combinação sugerida. Qual abordagem você prefere?
+
