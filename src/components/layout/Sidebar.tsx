@@ -271,7 +271,7 @@ export function Sidebar() {
   const userName = profile?.full_name || 'Usuário';
   const userRole = role ? ROLE_LABELS[role] : 'Carregando...';
 
-  const renderMenuItem = (item: MenuItem, showLabel: boolean) => {
+  const renderMenuItem = (item: MenuItem, showLabel: boolean, groupColor?: string) => {
     // Check if path contains query params
     const [basePath, queryString] = item.path.split('?');
     const isActive = queryString 
@@ -289,7 +289,10 @@ export function Sidebar() {
         )}
         title={!showLabel ? item.label : undefined}
       >
-        <item.icon className="h-4 w-4 flex-shrink-0" />
+        <item.icon 
+          className="h-4 w-4 flex-shrink-0" 
+          style={groupColor ? { color: groupColor } : undefined}
+        />
         {showLabel && <span>{item.label}</span>}
       </Link>
     );
@@ -339,7 +342,7 @@ export function Sidebar() {
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pl-4 space-y-0.5 mt-1 overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-          {group.items.map((item) => renderMenuItem(item, true))}
+          {group.items.map((item) => renderMenuItem(item, true, groupColor))}
         </CollapsibleContent>
       </Collapsible>
     );
