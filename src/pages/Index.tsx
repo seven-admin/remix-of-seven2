@@ -1,5 +1,4 @@
 import { Navigate } from 'react-router-dom';
-import { DashboardIncorporador } from '@/components/dashboard/DashboardIncorporador';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDefaultRoute } from '@/hooks/useDefaultRoute';
 import { Loader2 } from 'lucide-react';
@@ -9,7 +8,8 @@ const Index = () => {
   const { getDefaultRoute, isLoading: permLoading } = useDefaultRoute();
 
   // Aguardar TODAS as informações carregarem antes de decidir redirecionamento
-  if (authLoading || permLoading) {
+  // IMPORTANTE: Incluir verificação de role === null para evitar race conditions
+  if (authLoading || permLoading || role === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -20,17 +20,22 @@ const Index = () => {
     );
   }
 
-  // Incorporadores vão para o portal dedicado
+  // Incorporadores vão para o portal dedicado - verificação explícita antes de getDefaultRoute
   if (role === 'incorporador') {
     return <Navigate to="/portal-incorporador" replace />;
+  }
+
+  // Corretores vão para o portal do corretor
+  if (role === 'corretor') {
+    return <Navigate to="/portal-corretor" replace />;
   }
 
   // Agora as permissões estão carregadas, getDefaultRoute() retorna valor correto
   const defaultRoute = getDefaultRoute();
   
-  // Se a rota padrão é "/" (este componente), redireciona para marketing para evitar loop
+  // Se a rota padrão é "/" (este componente), redireciona para dashboard-executivo para evitar loop
   if (defaultRoute === '/') {
-    return <Navigate to="/marketing" replace />;
+    return <Navigate to="/dashboard-executivo" replace />;
   }
 
   return <Navigate to={defaultRoute} replace />;

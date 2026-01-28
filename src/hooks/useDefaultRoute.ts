@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 // Admin/Super Admin vão direto para dashboard, outros seguem prioridade
 const routePriority = [
   { path: '/', module: 'dashboard' },
-  { path: '/portal-incorporador', module: 'portal_incorporador' },
   { path: '/marketing', module: 'projetos_marketing' },
   { path: '/mapa-unidades', module: 'unidades' },
   { path: '/empreendimentos', module: 'empreendimentos' },
@@ -14,11 +13,10 @@ const routePriority = [
   { path: '/atividades', module: 'atividades' },
   { path: '/contratos', module: 'contratos' },
   { path: '/comissoes', module: 'comissoes' },
-  { path: '/portal-corretor', module: 'portal_corretor' },
 ];
 
 export function useDefaultRoute() {
-  const { canAccessModule, isLoading, isAdmin } = usePermissions();
+  const { canAccessModule, isLoading, isAdmin, permissions } = usePermissions();
   const { role } = useAuth();
 
   const getDefaultRoute = (): string => {
@@ -27,9 +25,20 @@ export function useDefaultRoute() {
       return '/';
     }
     
-    // Incorporadores vão para o portal dedicado
+    // Incorporadores vão para o portal dedicado - SEMPRE
     if (role === 'incorporador') {
       return '/portal-incorporador';
+    }
+
+    // Corretores vão para o portal do corretor - SEMPRE
+    if (role === 'corretor') {
+      return '/portal-corretor';
+    }
+    
+    // Se permissions ainda não carregaram, retornar fallback seguro
+    // O componente que chama deve verificar isLoading antes de usar
+    if (permissions.length === 0) {
+      return '/';
     }
     
     for (const route of routePriority) {
@@ -37,9 +46,9 @@ export function useDefaultRoute() {
         return route.path;
       }
     }
-    // Fallback - retorna a primeira rota mesmo sem permissão
-    // O ProtectedRoute vai lidar com o acesso negado
-    return '/';
+    
+    // Fallback final - página de sem acesso
+    return '/sem-acesso';
   };
 
   const canAccessDashboard = (): boolean => {
