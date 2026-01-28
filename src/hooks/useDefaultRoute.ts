@@ -7,6 +7,7 @@ const routePriority = [
   { path: '/', module: 'dashboard' },
   { path: '/portal-incorporador', module: 'portal_incorporador' },
   { path: '/marketing', module: 'projetos_marketing' },
+  { path: '/mapa-unidades', module: 'unidades' },
   { path: '/empreendimentos', module: 'empreendimentos' },
   { path: '/clientes', module: 'clientes' },
   { path: '/negociacoes', module: 'negociacoes' },
