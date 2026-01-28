@@ -744,7 +744,12 @@ export function ImportarUnidadesDialog({
           {/* Etapa 3: Mapeamento de Valores */}
           {etapa === 'mapear-valores' && (
           <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-0">
-            <ScrollArea className="max-h-[50vh] w-full">
+              {/*
+                Scroll do mapeamento: usamos overflow-y-auto (CSS puro) porque o Radix ScrollArea
+                depende de heights percentuais (Viewport h-full) e pode não calcular corretamente
+                quando o Root só tem max-height.
+              */}
+              <div className="max-h-[50vh] w-full overflow-y-auto">
                 <div className="space-y-6 pr-4 pb-4">
                   {/* Mapeamento de Blocos */}
                   {mapeamentoBlocos.length > 0 && (
@@ -874,7 +879,7 @@ export function ImportarUnidadesDialog({
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
 
               <DialogFooter className="flex-shrink-0">
                 <Button variant="outline" onClick={() => setEtapa('mapear-colunas')}>
