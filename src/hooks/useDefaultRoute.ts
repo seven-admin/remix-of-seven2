@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 // Admin/Super Admin vão direto para dashboard, outros seguem prioridade
 const routePriority = [
   { path: '/', module: 'dashboard' },
+  { path: '/portal-incorporador', module: 'portal_incorporador' },
   { path: '/marketing', module: 'projetos_marketing' },
   { path: '/empreendimentos', module: 'empreendimentos' },
   { path: '/clientes', module: 'clientes' },
@@ -23,6 +24,11 @@ export function useDefaultRoute() {
     // Admin e Super Admin sempre vão para o dashboard
     if (isAdmin() || role === 'super_admin' || role === 'admin') {
       return '/';
+    }
+    
+    // Incorporadores vão para o portal dedicado
+    if (role === 'incorporador') {
+      return '/portal-incorporador';
     }
     
     for (const route of routePriority) {
