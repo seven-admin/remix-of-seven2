@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, GripVertical, Trash2, Edit2, Check, X, Flag, Trophy, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,7 @@ export function EtapasEditor({ funilId }: EtapasEditorProps) {
   const createMutation = useCreateEtapa();
   const updateMutation = useUpdateEtapa();
   const deleteMutation = useDeleteEtapa();
-  const reordenarMutation = useReordenarEtapas();
+  const reordenarMutation = useReordenarEtapas(funilId);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNome, setEditingNome] = useState('');
@@ -48,6 +48,19 @@ export function EtapasEditor({ funilId }: EtapasEditorProps) {
   const [newEtapaCor, setNewEtapaCor] = useState(CORES_ETAPAS[0]);
   const [deleteConfirm, setDeleteConfirm] = useState<FunilEtapa | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  
+  // Estado local para ordem visual otimista durante drag
+  const [localEtapas, setLocalEtapas] = useState<FunilEtapa[] | null>(null);
+
+  // Sincronizar quando a query atualiza com dados frescos
+  useEffect(() => {
+    if (etapas.length > 0 && !reordenarMutation.isPending) {
+      setLocalEtapas(null);
+    }
+  }, [etapas, reordenarMutation.isPending]);
+
+  // Usar etapas locais se disponíveis (durante drag otimista)
+  const displayEtapas = localEtapas ?? etapas;
 
   const handleAddEtapa = async () => {
     if (!newEtapaNome.trim()) return;
@@ -125,19 +138,35 @@ export function EtapasEditor({ funilId }: EtapasEditorProps) {
       return;
     }
 
-    const draggedIndex = etapas.findIndex((e) => e.id === draggedId);
-    const targetIndex = etapas.findIndex((e) => e.id === targetId);
+    const currentEtapas = displayEtapas;
+    const draggedIndex = currentEtapas.findIndex((e) => e.id === draggedId);
+    const targetIndex = currentEtapas.findIndex((e) => e.id === targetId);
 
-    const newEtapas = [...etapas];
+    // Criar nova ordem
+    const newEtapas = [...currentEtapas];
     const [dragged] = newEtapas.splice(draggedIndex, 1);
     newEtapas.splice(targetIndex, 0, dragged);
 
+    // ATUALIZAÇÃO OTIMISTA: Atualizar estado local imediatamente
+    const updatedEtapas = newEtapas.map((etapa, index) => ({
+      ...etapa,
+      ordem: index,
+    }));
+    setLocalEtapas(updatedEtapas);
+
+    // Preparar updates para o banco
     const updates = newEtapas.map((etapa, index) => ({
       id: etapa.id,
       ordem: index,
     }));
 
-    await reordenarMutation.mutateAsync(updates);
+    try {
+      await reordenarMutation.mutateAsync(updates);
+    } catch (error) {
+      // Em caso de erro, reverter para os dados da query
+      setLocalEtapas(null);
+    }
+    
     setDraggedId(null);
   };
 
@@ -166,7 +195,7 @@ export function EtapasEditor({ funilId }: EtapasEditorProps) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-2">
-        {etapas.map((etapa) => (
+        {displayEtapas.map((etapa) => (
           <div
             key={etapa.id}
             draggable
