@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KanbanBoard, KanbanColumnType } from '@/components/ui/kanban';
 import { MoverNegociacaoDialog, ContratoSolicitadoData } from './MoverNegociacaoDialog';
@@ -55,6 +55,19 @@ export function FunilKanbanBoard({ filters, negociacoes: negociacoesProp, isLoad
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [propostaOpen, setPropostaOpen] = useState(false);
   const [propostaMode, setPropostaMode] = useState<'gerar' | 'enviar' | 'aceitar' | 'recusar' | 'view'>('view');
+  
+  // Estado otimista para manter a posição visual durante a mutation
+  const [optimisticNegociacoes, setOptimisticNegociacoes] = useState<Negociacao[] | null>(null);
+
+  // Limpar estado otimista quando dados reais chegam
+  useEffect(() => {
+    if (negociacoes.length > 0 && !moverMutation.isPending) {
+      setOptimisticNegociacoes(null);
+    }
+  }, [negociacoes, moverMutation.isPending]);
+
+  // Usar dados otimistas se disponíveis
+  const displayNegociacoes = optimisticNegociacoes ?? negociacoes;
 
   const isLoading = etapasLoading || negociacoesLoading;
 
@@ -183,15 +196,29 @@ export function FunilKanbanBoard({ filters, negociacoes: negociacoesProp, isLoad
       return;
     }
 
+    // ATUALIZAÇÃO OTIMISTA: Atualizar estado local imediatamente
+    const updatedNegociacoes = negociacoes.map(n =>
+      n.id === negociacao.id ? { ...n, funil_etapa_id: destinationColumn } : n
+    );
+    setOptimisticNegociacoes(updatedNegociacoes);
+
     // For other stages, move instantly
-    moverMutation.mutate({
-      id: negociacao.id,
-      etapa_anterior_id: negociacao.funil_etapa_id,
-      targetEtapa: { is_final_sucesso: false, is_final_perda: false },
-      data: {
-        funil_etapa_id: destinationColumn
+    moverMutation.mutate(
+      {
+        id: negociacao.id,
+        etapa_anterior_id: negociacao.funil_etapa_id,
+        targetEtapa: { is_final_sucesso: false, is_final_perda: false },
+        data: {
+          funil_etapa_id: destinationColumn
+        }
+      },
+      {
+        onSettled: () => {
+          // Limpar estado otimista após mutation (sucesso ou erro)
+          setOptimisticNegociacoes(null);
+        }
       }
-    });
+    );
   };
 
   // Column header with total value
@@ -241,7 +268,7 @@ export function FunilKanbanBoard({ filters, negociacoes: negociacoesProp, isLoad
     <>
       <KanbanBoard<Negociacao>
         columns={columns}
-        items={negociacoes}
+        items={displayNegociacoes}
         getItemId={(neg) => neg.id}
         getItemColumn={(neg) => neg.funil_etapa_id || ''}
         isLoading={false}

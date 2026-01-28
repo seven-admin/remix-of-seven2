@@ -334,7 +334,7 @@ export function useDeleteEtapa() {
   });
 }
 
-export function useReordenarEtapas() {
+export function useReordenarEtapas(funilId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -346,7 +346,12 @@ export function useReordenarEtapas() {
       await Promise.all(promises);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['funil_etapas'] });
+      // Invalidar query específica do funil
+      if (funilId) {
+        queryClient.invalidateQueries({ queryKey: ['funil_etapas', funilId] });
+      }
+      // E também a de etapas padrão (usada no Kanban)
+      queryClient.invalidateQueries({ queryKey: ['funil_etapas', 'padrao'] });
     },
     onError: (error: Error) => {
       toast.error('Erro ao reordenar etapas: ' + error.message);
