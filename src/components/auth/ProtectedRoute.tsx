@@ -72,6 +72,17 @@ export function ProtectedRoute({
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // IMPORTANTE: Verificar se usuário com role específico está tentando acessar área errada
+  // Incorporadores só podem acessar /portal-incorporador/*
+  if (role === 'incorporador' && !location.pathname.startsWith('/portal-incorporador')) {
+    return <Navigate to="/portal-incorporador" replace />;
+  }
+
+  // Corretores só podem acessar /portal-corretor/* e /portal/*
+  if (role === 'corretor' && !location.pathname.startsWith('/portal-corretor') && !location.pathname.startsWith('/portal')) {
+    return <Navigate to="/portal-corretor" replace />;
+  }
+
   // Check admin-only routes
   if (adminOnly && !isAdmin()) {
     return (
