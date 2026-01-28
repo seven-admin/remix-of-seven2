@@ -365,7 +365,8 @@ export function ImportarUnidadesDialog({
       else if (novasTipologias[m.valorExcel]) mapaTipologia[m.valorExcel] = novasTipologias[m.valorExcel];
     });
 
-    // Processar linhas
+    // Processar linhas - usar Set para rastrear duplicatas (evita referência circular)
+    const combinacoesVistas = new Set<string>();
     const linhasProcessadas: LinhaImportacao[] = dadosBrutos.map((row, index) => {
       const erros: string[] = [];
       const avisos: string[] = [];
@@ -446,17 +447,14 @@ export function ImportarUnidadesDialog({
         ? String(row[mapeamentoColunas.observacoes] || '').trim() || undefined
         : undefined;
 
-        // Verificar duplicata interna (mesmo Excel)
-        const jaExisteNoLote = linhasProcessadas
-          .slice(0, index)
-          .some(l => 
-            l.dados.numero === numero && 
-            ((l.dados.bloco_id === blocoId) || (!l.dados.bloco_id && !blocoId))
-          );
+      // Verificar duplicata interna (mesmo Excel) usando Set
+      const chaveUnidade = `${numero}__${blocoId || 'NULL'}`;
+      const jaExisteNoLote = combinacoesVistas.has(chaveUnidade);
+      combinacoesVistas.add(chaveUnidade);
 
-        if (jaExisteNoLote) {
-          erros.push('Linha duplicada no arquivo Excel');
-        }
+      if (jaExisteNoLote) {
+        erros.push('Linha duplicada no arquivo Excel');
+      }
 
         // Verificar duplicata no banco
         const unidadeExistente = unidadesExistentes.find(u => {
