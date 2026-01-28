@@ -5158,6 +5158,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_cliente_externo: { Args: { _user_id: string }; Returns: boolean }
+      is_incorporador: { Args: { _user_id: string }; Returns: boolean }
       is_marketing_supervisor: { Args: { _user_id: string }; Returns: boolean }
       is_seven_team: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }

@@ -1,5 +1,6 @@
 import { useIncorporadorEmpreendimentos } from '@/hooks/useIncorporadorEmpreendimentos';
 import { useDashboardExecutivo } from '@/hooks/useDashboardExecutivo';
+import { useGestoresMultiplosEmpreendimentos } from '@/hooks/useGestoresMultiplosEmpreendimentos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,13 +13,15 @@ import {
   BarChart3,
   Palette,
   ArrowRight,
+  User,
 } from 'lucide-react';
 
 export default function PortalIncorporadorDashboard() {
   const { empreendimentoIds, empreendimentos, isLoading: loadingEmps } = useIncorporadorEmpreendimentos();
   const { data: dashData, isLoading: loadingDash } = useDashboardExecutivo(undefined, empreendimentoIds);
+  const { data: gestorMap, isLoading: loadingGestores } = useGestoresMultiplosEmpreendimentos(empreendimentoIds);
 
-  const isLoading = loadingEmps || loadingDash;
+  const isLoading = loadingEmps || loadingDash || loadingGestores;
 
   if (isLoading) {
     return (
@@ -179,6 +182,12 @@ export default function PortalIncorporadorDashboard() {
                         {(emp.endereco_cidade || emp.endereco_uf) && (
                           <p className="text-sm text-muted-foreground">
                             {[emp.endereco_cidade, emp.endereco_uf].filter(Boolean).join(' - ')}
+                          </p>
+                        )}
+                        {gestorMap?.[emp.id] && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                            <User className="h-3 w-3" />
+                            Gestor: {gestorMap[emp.id].nome}
                           </p>
                         )}
                       </div>

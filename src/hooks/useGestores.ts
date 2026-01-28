@@ -26,21 +26,31 @@ export function useGestoresProduto(options: QueryOptions = {}) {
   return useQuery({
     queryKey: ['gestores-produto'],
     queryFn: async () => {
-      // First get user_ids with role gestor_produto
+      // Buscar role_id do gestor_produto via tabela roles (compatível com roles dinâmicos)
       const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'gestor_produto');
+        .from('roles')
+        .select('id')
+        .eq('name', 'gestor_produto')
+        .maybeSingle();
 
-      if (roleError) throw roleError;
-
-      if (!roleData || roleData.length === 0) {
+      if (roleError || !roleData) {
+        console.warn('Não foi possível encontrar o role gestor_produto');
         return [];
       }
 
-      const userIds = roleData.map(r => r.user_id);
+      // Buscar user_ids com esse role_id
+      const { data: userRoles, error: urError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role_id', roleData.id);
 
-      // Then get profiles for those users
+      if (urError || !userRoles?.length) {
+        return [];
+      }
+
+      const userIds = userRoles.map(r => r.user_id);
+
+      // Buscar perfis dos gestores
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, is_active, percentual_comissao')
@@ -63,18 +73,28 @@ export function useGestoresComPercentual() {
   return useQuery({
     queryKey: ['gestores-percentual'],
     queryFn: async () => {
+      // Buscar role_id do gestor_produto via tabela roles
       const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'gestor_produto');
+        .from('roles')
+        .select('id')
+        .eq('name', 'gestor_produto')
+        .maybeSingle();
 
-      if (roleError) throw roleError;
-
-      if (!roleData || roleData.length === 0) {
+      if (roleError || !roleData) {
         return [];
       }
 
-      const userIds = roleData.map(r => r.user_id);
+      // Buscar user_ids com esse role_id
+      const { data: userRoles, error: urError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role_id', roleData.id);
+
+      if (urError || !userRoles?.length) {
+        return [];
+      }
+
+      const userIds = userRoles.map(r => r.user_id);
 
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
