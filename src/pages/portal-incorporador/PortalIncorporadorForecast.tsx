@@ -6,9 +6,7 @@ import { VisitasPorEmpreendimento } from '@/components/forecast/VisitasPorEmpree
 import { AtividadesPorTipo } from '@/components/forecast/AtividadesPorTipo';
 import { ProximasAtividades } from '@/components/forecast/ProximasAtividades';
 import { AtendimentosResumo } from '@/components/forecast/AtendimentosResumo';
-import {
-  useResumoAtividades,
-} from '@/hooks/useForecast';
+import { useResumoAtividades } from '@/hooks/useForecast';
 import {
   CalendarDays,
   CheckCircle2,
@@ -19,9 +17,13 @@ import {
 export default function PortalIncorporadorForecast() {
   const { empreendimentoIds, isLoading: loadingEmps } = useIncorporadorEmpreendimentos();
   
-  // Os hooks de forecast atualmente filtram por gestor_id
-  // Por enquanto mostraremos dados consolidados
-  const { data: resumoAtividades, isLoading: loadingResumo } = useResumoAtividades();
+  // Passar empreendimentoIds para filtrar os dados do incorporador
+  const { data: resumoAtividades, isLoading: loadingResumo } = useResumoAtividades(
+    undefined, // gestorId
+    undefined, // dataInicio
+    undefined, // dataFim
+    empreendimentoIds.length > 0 ? empreendimentoIds : undefined
+  );
 
   const isLoading = loadingEmps || loadingResumo;
 
@@ -112,18 +114,18 @@ export default function PortalIncorporadorForecast() {
 
       {/* Funil e Visitas */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <FunilTemperatura />
-        <VisitasPorEmpreendimento />
+        <FunilTemperatura empreendimentoIds={empreendimentoIds} />
+        <VisitasPorEmpreendimento empreendimentoIds={empreendimentoIds} />
       </div>
 
       {/* Atividades e Próximas */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <AtividadesPorTipo />
-        <ProximasAtividades />
+        <AtividadesPorTipo empreendimentoIds={empreendimentoIds} />
+        <ProximasAtividades empreendimentoIds={empreendimentoIds} />
       </div>
 
       {/* Atendimentos */}
-      <AtendimentosResumo />
+      <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
     </div>
   );
 }

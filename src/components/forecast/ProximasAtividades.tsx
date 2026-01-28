@@ -17,10 +17,11 @@ const TIPO_ICON: Record<string, React.ElementType> = {
 
 interface ProximasAtividadesProps {
   gestorId?: string;
+  empreendimentoIds?: string[];
 }
 
-export function ProximasAtividades({ gestorId }: ProximasAtividadesProps) {
-  const { data: atividades, isLoading } = useProximasAtividades(10, gestorId);
+export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtividadesProps) {
+  const { data: atividades, isLoading } = useProximasAtividades(10, gestorId, empreendimentoIds);
 
   if (isLoading) {
     return (

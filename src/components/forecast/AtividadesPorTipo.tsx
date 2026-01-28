@@ -25,10 +25,11 @@ interface AtividadesPorTipoProps {
   gestorId?: string;
   dataInicio?: Date;
   dataFim?: Date;
+  empreendimentoIds?: string[];
 }
 
-export function AtividadesPorTipo({ gestorId, dataInicio, dataFim }: AtividadesPorTipoProps) {
-  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(gestorId, dataInicio, dataFim);
+export function AtividadesPorTipo({ gestorId, dataInicio, dataFim, empreendimentoIds }: AtividadesPorTipoProps) {
+  const { data: semanas, isLoading } = useAtividadesPorTipoPorSemana(gestorId, dataInicio, dataFim, empreendimentoIds);
 
   if (isLoading) {
     return (

@@ -8,9 +8,14 @@ interface FunilTemperaturaItem {
   percentual: number;
 }
 
-export function useFunilTemperatura(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useFunilTemperatura(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'funil-temperatura', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'funil-temperatura', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<FunilTemperaturaItem[]> => {
@@ -18,60 +23,27 @@ export function useFunilTemperatura(gestorId?: string, dataInicio?: Date, dataFi
       const inicioMes = dataInicio || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const fimMes = dataFim || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
       
-      // Se não há filtro, considerar clientes que possuem atividades no período
-      if (!gestorId) {
-        // Buscar clientes que têm atividades no período
-        const { data: atividades, error: atividadesError } = await supabase
-          .from('atividades' as any)
-          .select('cliente_id')
-          .gte('data_hora', inicioMes.toISOString())
-          .lte('data_hora', fimMes.toISOString())
-          .not('cliente_id', 'is', null)
-          .neq('status', 'cancelada');
-        
-        if (atividadesError) throw atividadesError;
-        
-        const clienteIds = Array.from(new Set((atividades || []).map((a: any) => a.cliente_id).filter(Boolean)));
-        if (clienteIds.length === 0) {
-          return (['frio', 'morno', 'quente'] as ClienteTemperatura[]).map((temp) => ({
-            temperatura: temp,
-            quantidade: 0,
-            percentual: 0,
-          }));
-        }
-        
-        const { data, error } = await supabase
-          .from('clientes')
-          .select('temperatura')
-          .eq('is_active', true)
-          .in('id', clienteIds);
-        if (error) throw error;
-
-        const contagem: Record<ClienteTemperatura, number> = { frio: 0, morno: 0, quente: 0 };
-        (data || []).forEach((cliente: any) => {
-          if (cliente.temperatura in contagem) contagem[cliente.temperatura as ClienteTemperatura]++;
-        });
-
-        const total = Object.values(contagem).reduce((a, b) => a + b, 0);
-        return (['frio', 'morno', 'quente'] as ClienteTemperatura[]).map((temp) => ({
-          temperatura: temp,
-          quantidade: contagem[temp],
-          percentual: total > 0 ? Math.round((contagem[temp] / total) * 100) : 0,
-        }));
-      }
-
-      // Com filtro (por gestor): considerar apenas clientes que possuem atividades do gestor no período.
-      const { data: atividades, error: atividadesError } = await supabase
+      // Buscar clientes que têm atividades no período
+      let atividadesQuery = supabase
         .from('atividades' as any)
         .select('cliente_id')
-        .eq('gestor_id', gestorId)
         .gte('data_hora', inicioMes.toISOString())
         .lte('data_hora', fimMes.toISOString())
         .not('cliente_id', 'is', null)
         .neq('status', 'cancelada');
-
+      
+      if (gestorId) {
+        atividadesQuery = atividadesQuery.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        atividadesQuery = atividadesQuery.in('empreendimento_id', empreendimentoIds);
+      }
+      
+      const { data: atividades, error: atividadesError } = await atividadesQuery;
+      
       if (atividadesError) throw atividadesError;
-
+      
       const clienteIds = Array.from(new Set((atividades || []).map((a: any) => a.cliente_id).filter(Boolean)));
       if (clienteIds.length === 0) {
         return (['frio', 'morno', 'quente'] as ClienteTemperatura[]).map((temp) => ({
@@ -80,7 +52,7 @@ export function useFunilTemperatura(gestorId?: string, dataInicio?: Date, dataFi
           percentual: 0,
         }));
       }
-
+      
       const { data, error } = await supabase
         .from('clientes')
         .select('temperatura')
@@ -103,9 +75,14 @@ export function useFunilTemperatura(gestorId?: string, dataInicio?: Date, dataFi
   });
 }
 
-export function useVisitasPorEmpreendimento(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useVisitasPorEmpreendimento(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'visitas-por-empreendimento', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'visitas-por-empreendimento', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -124,6 +101,10 @@ export function useVisitasPorEmpreendimento(gestorId?: string, dataInicio?: Date
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
       }
 
       const { data, error } = await query;
@@ -152,9 +133,14 @@ export function useVisitasPorEmpreendimento(gestorId?: string, dataInicio?: Date
   });
 }
 
-export function useResumoAtividades(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useResumoAtividades(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atividades', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'resumo-atividades', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -170,7 +156,12 @@ export function useResumoAtividades(gestorId?: string, dataInicio?: Date, dataFi
         .select('status, data_hora, requer_followup, data_followup')
         .gte('data_hora', inicioMes.toISOString())
         .lte('data_hora', fimMes.toISOString());
+      
       if (gestorId) query = query.eq('gestor_id', gestorId);
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -233,9 +224,14 @@ export interface AtividadeSemanaItem {
   atendimento: number;
 }
 
-export function useAtividadesPorTipoPorSemana(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useAtividadesPorTipoPorSemana(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-tipo-semana', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'atividades-por-tipo-semana', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<AtividadeSemanaItem[]> => {
@@ -254,6 +250,10 @@ export function useAtividadesPorTipoPorSemana(gestorId?: string, dataInicio?: Da
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
       }
 
       const { data, error } = await query;
@@ -296,9 +296,14 @@ export function useAtividadesPorTipoPorSemana(gestorId?: string, dataInicio?: Da
 }
 
 // Novo hook: Atividades por corretor
-export function useAtividadesPorCorretor(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useAtividadesPorCorretor(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'atividades-por-corretor', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'atividades-por-corretor', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -316,6 +321,10 @@ export function useAtividadesPorCorretor(gestorId?: string, dataInicio?: Date, d
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
       }
 
       const { data, error } = await query;
@@ -377,9 +386,13 @@ export function useCalendarioAtividades(ano: number, mes: number) {
 }
 
 // Novo hook: Próximas atividades
-export function useProximasAtividades(limite: number = 10, gestorId?: string) {
+export function useProximasAtividades(
+  limite: number = 10, 
+  gestorId?: string,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'proximas-atividades', limite, gestorId || 'all'],
+    queryKey: ['forecast', 'proximas-atividades', limite, gestorId || 'all', empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
@@ -400,6 +413,10 @@ export function useProximasAtividades(limite: number = 10, gestorId?: string) {
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
       }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
+      }
 
       const { data, error } = await query.limit(limite);
 
@@ -415,9 +432,14 @@ type ResumoAtendimentos = {
   retornos: { total: number; pendentes: number; concluidos: number };
 };
 
-export function useResumoAtendimentos(gestorId?: string, dataInicio?: Date, dataFim?: Date) {
+export function useResumoAtendimentos(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'resumo-atendimentos', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString()],
+    queryKey: ['forecast', 'resumo-atendimentos', gestorId || 'all', dataInicio?.toISOString(), dataFim?.toISOString(), empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<ResumoAtendimentos> => {
@@ -435,6 +457,10 @@ export function useResumoAtendimentos(gestorId?: string, dataInicio?: Date, data
 
       if (gestorId) {
         query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
       }
 
       const { data, error } = await query;

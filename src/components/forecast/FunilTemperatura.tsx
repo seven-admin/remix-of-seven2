@@ -15,11 +15,12 @@ interface FunilTemperaturaProps {
   gestorId?: string;
   dataInicio?: Date;
   dataFim?: Date;
+  empreendimentoIds?: string[];
   onTemperaturaClick?: (temperatura: ClienteTemperatura) => void;
 }
 
-export function FunilTemperatura({ gestorId, dataInicio, dataFim, onTemperaturaClick }: FunilTemperaturaProps) {
-  const { data: funil, isLoading } = useFunilTemperatura(gestorId, dataInicio, dataFim);
+export function FunilTemperatura({ gestorId, dataInicio, dataFim, empreendimentoIds, onTemperaturaClick }: FunilTemperaturaProps) {
+  const { data: funil, isLoading } = useFunilTemperatura(gestorId, dataInicio, dataFim, empreendimentoIds);
 
   if (isLoading) {
     return (

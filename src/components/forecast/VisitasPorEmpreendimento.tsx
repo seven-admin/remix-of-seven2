@@ -16,11 +16,12 @@ interface VisitasPorEmpreendimentoProps {
   gestorId?: string;
   dataInicio?: Date;
   dataFim?: Date;
+  empreendimentoIds?: string[];
   onEmpreendimentoClick?: (empreendimentoId: string) => void;
 }
 
-export function VisitasPorEmpreendimento({ gestorId, dataInicio, dataFim, onEmpreendimentoClick }: VisitasPorEmpreendimentoProps) {
-  const { data: visitas, isLoading } = useVisitasPorEmpreendimento(gestorId, dataInicio, dataFim);
+export function VisitasPorEmpreendimento({ gestorId, dataInicio, dataFim, empreendimentoIds, onEmpreendimentoClick }: VisitasPorEmpreendimentoProps) {
+  const { data: visitas, isLoading } = useVisitasPorEmpreendimento(gestorId, dataInicio, dataFim, empreendimentoIds);
 
   if (isLoading) {
     return (
