@@ -744,8 +744,8 @@ export function ImportarUnidadesDialog({
           {/* Etapa 3: Mapeamento de Valores */}
           {etapa === 'mapear-valores' && (
             <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-              <ScrollArea className="flex-1">
-                <div className="space-y-6 pr-4">
+              <ScrollArea className="flex-1 max-h-[50vh]">
+                <div className="space-y-6 pr-4 pb-4">
                   {/* Mapeamento de Blocos */}
                   {mapeamentoBlocos.length > 0 && (
                     <div>
