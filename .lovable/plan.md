@@ -1,145 +1,63 @@
 
-# Correção: Falha na Importação de Terrenos via Excel (Criação de Quadras)
+# Correção: Scroll não funciona na Seção de Mapeamento de Quadras
 
 ## Problema Identificado
 
-Ao analisar o código do componente `ImportarUnidadesDialog.tsx` e o erro de runtime capturado no console:
+Analisando a estrutura do componente e o contexto do problema de scroll que não aparece quando há mais de 9 quadras:
 
-```
-ReferenceError: Cannot access 'ue' before initialization
-```
+| Local | Código Atual | Problema |
+|-------|--------------|----------|
+| Linha 747 | `<ScrollArea className="flex-1 max-h-[50vh]">` | O `flex-1` faz o container expandir para caber todo conteúdo, ignorando `max-h-[50vh]` |
+| Linha 746 | `<div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">` | Parent com `overflow-hidden` mas flex layout conflitante |
 
-Identifiquei um **bug crítico de referência circular** na função `processarDadosFinais` (linhas 449-455):
-
-```typescript
-// Linhas 369-491
-const linhasProcessadas: LinhaImportacao[] = dadosBrutos.map((row, index) => {
-  // ... código ...
-  
-  // ❌ BUG: Referenciando linhasProcessadas DENTRO do próprio .map() que a cria!
-  const jaExisteNoLote = linhasProcessadas  // <-- Variável ainda não existe!
-    .slice(0, index)
-    .some(l => 
-      l.dados.numero === numero && 
-      ((l.dados.bloco_id === blocoId) || (!l.dados.bloco_id && !blocoId))
-    );
-  
-  // ... resto do código ...
-});
-```
-
-### Por que isso causa o travamento na etapa 3?
-
-1. O usuário avança para a etapa "Mapear Valores" (etapa 3)
-2. Clica em "Avançar" para ir ao preview (etapa 4)
-3. A função `handleAvancarValores` chama `processarDadosFinais()`
-4. Durante a criação das quadras (blocos), o código tenta acessar `linhasProcessadas` antes dela ser inicializada
-5. JavaScript lança `ReferenceError: Cannot access 'linhasProcessadas' before initialization`
-6. O try/catch em `handleAvancarValores` captura o erro silenciosamente e o estado `criandoEntidades` fica em `false`
-7. O sistema fica travado sem avançar para a etapa 4
+O problema é que quando você usa `flex-1` em um `ScrollArea`, o container cresce para acomodar todo o conteúdo, mesmo com `max-h-[50vh]`. O scroll só funciona quando o container tem uma **altura fixa ou limitada** que é menor que o conteúdo.
 
 ## Solução
 
-Modificar a lógica de detecção de duplicatas internas para usar um Set acumulador ao invés de referenciar o array que está sendo construído:
+Remover `flex-1` do `ScrollArea` e manter apenas `max-h-[50vh]` para garantir que a altura seja limitada e o scroll apareça:
 
-### Antes (Código Problemático)
-```typescript
-const linhasProcessadas: LinhaImportacao[] = dadosBrutos.map((row, index) => {
-  // ...
-  const jaExisteNoLote = linhasProcessadas
-    .slice(0, index)
-    .some(l => l.dados.numero === numero && ...);
-  // ...
-});
+### Modificação no Arquivo
+
+| Arquivo | Linha | Alteração |
+|---------|-------|-----------|
+| `src/components/empreendimentos/ImportarUnidadesDialog.tsx` | 747 | Trocar `flex-1 max-h-[50vh]` por `max-h-[50vh] w-full` |
+| Mesma linha | - | Adicionar `overflow-y-auto` como fallback se necessário |
+
+### Código
+
+**Antes (linha 747):**
+```tsx
+<ScrollArea className="flex-1 max-h-[50vh]">
 ```
 
-### Depois (Código Corrigido)
-```typescript
-// Usar Set para rastrear combinações já vistas
-const combinacoesVistas = new Set<string>();
-const linhasProcessadas: LinhaImportacao[] = dadosBrutos.map((row, index) => {
-  // ...
-  
-  // Criar chave única para verificar duplicata
-  const chaveUnidade = `${numero}__${blocoId || 'NULL'}`;
-  const jaExisteNoLote = combinacoesVistas.has(chaveUnidade);
-  
-  // Adicionar ao Set para próximas iterações
-  combinacoesVistas.add(chaveUnidade);
-  
-  // ...
-});
+**Depois:**
+```tsx
+<ScrollArea className="max-h-[50vh] w-full">
 ```
 
-## Arquivo a Modificar
+Também vou ajustar o container pai (linha 746) para garantir que o layout funcione corretamente sem o `flex-1` no `ScrollArea`:
+
+**Antes (linha 746):**
+```tsx
+<div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+```
+
+**Depois:**
+```tsx
+<div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-0">
+```
+
+O `min-h-0` é crucial em layouts flexbox porque por padrão o `min-height` é `auto`, o que impede o shrink do container.
+
+## Resumo de Alterações
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/empreendimentos/ImportarUnidadesDialog.tsx` | Corrigir referência circular na função `processarDadosFinais` |
+| `src/components/empreendimentos/ImportarUnidadesDialog.tsx` | Corrigir classes CSS do ScrollArea e container pai na etapa "mapear-valores" |
 
-## Código Específico da Correção
+## Teste Esperado
 
-A função `processarDadosFinais` será modificada para:
-
-1. Criar um `Set<string>` antes do `.map()` para rastrear combinações número+bloco já processadas
-2. Substituir a verificação `linhasProcessadas.slice(0, index).some(...)` por uma verificação no Set
-3. Adicionar cada combinação ao Set após processá-la
-
-```typescript
-// Dentro de processarDadosFinais, antes do map:
-const combinacoesVistas = new Set<string>();
-
-// Dentro do map, substituir:
-// DE:
-const jaExisteNoLote = linhasProcessadas
-  .slice(0, index)
-  .some(l => 
-    l.dados.numero === numero && 
-    ((l.dados.bloco_id === blocoId) || (!l.dados.bloco_id && !blocoId))
-  );
-
-// PARA:
-const chaveUnidade = `${numero}__${blocoId || 'NULL'}`;
-const jaExisteNoLote = combinacoesVistas.has(chaveUnidade);
-combinacoesVistas.add(chaveUnidade);
-```
-
-## Fluxo Corrigido
-
-```text
-Etapa 1: Upload do Excel
-    │
-    ▼
-Etapa 2: Mapear Colunas
-    │
-    ▼
-Etapa 3: Mapear Valores (Quadras/Tipologias)
-    │
-    ├─ Usuário clica "Avançar"
-    │
-    ├─ handleAvancarValores() chamada
-    │
-    ├─ setCriandoEntidades(true)
-    │
-    ├─ processarDadosFinais() executada
-    │   ├─ Cria blocos novos (se marcados)        ✅
-    │   ├─ Cria tipologias novas (se marcadas)    ✅
-    │   ├─ Processa linhas do Excel               ✅ (CORRIGIDO)
-    │   └─ setEtapa('preview')                    ✅
-    │
-    ├─ setCriandoEntidades(false)
-    │
-    ▼
-Etapa 4: Preview dos Dados ✅
-    │
-    ▼
-Etapa 5: Resultado da Importação
-```
-
-## Benefícios da Correção
-
-1. **Elimina o erro de referência circular** que travava a importação
-2. **Melhora a performance** - usar Set tem complexidade O(1) vs O(n) do slice+some
-3. **Código mais limpo** e fácil de manter
-4. **Mantém a mesma lógica de negócio** - detectar duplicatas internas no Excel
-
+Após a correção:
+1. Importar um arquivo Excel com mais de 9 quadras
+2. Na etapa 3 (Mapear Valores), o usuário deve ver uma barra de scroll vertical
+3. Todas as quadras devem ser acessíveis via scroll
