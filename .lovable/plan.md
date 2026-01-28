@@ -1,202 +1,108 @@
 
-# Plano de Correção: Portal do Incorporador - Dados Não Exibidos
+# Plano de Correção: Dados de Forecast no Portal do Incorporador
 
-## Análise Completa
+## Problema Identificado
 
-### Dados no Banco de Dados (Corretos)
+O usuário logado como **incorporador** (`mail@mail.com`) não consegue visualizar os dados de Forecast, apesar do Gestor de Produto **Michel** ter várias atividades vinculadas aos empreendimentos do incorporador (VITHORIA DO SOL e DON INÁCIO).
 
-- **Usuário logado:** `mail@mail.com` (Incorp) com role `incorporador`
-- **Empreendimentos vinculados:** 
-  - VITHORIA DO SOL (`f2208f56-edd6-4c98-b82a-9657606376cf`)
-  - DON INÁCIO (`2271f374-62b7-4772-90f6-fe67de5c1113`)
-- **Gestor de Produto:** Michel (user_id: `0bb345de-208f-47c5-a9f7-4935c033fd9b`) vinculado a ambos empreendimentos
-- **Tickets de Marketing:** 3 tickets existentes para VITHORIA DO SOL:
-  - MKT-00020: "Cobertura de Garagem" (em_producao)
-  - MKT-00017: "Identidade visual e logo Vithoria" (aprovacao_cliente)
-  - MKT-00009: "CALENDÁRIO - KRAFT" (aprovacao_cliente)
+### Causa Raiz: Políticas RLS Bloqueando Acesso
 
-### Problemas Identificados
+As tabelas utilizadas pelo Forecast têm políticas RLS que **não permitem** ao role `incorporador` visualizar dados:
 
-#### 1. RLS Bloqueando Acesso aos Tickets de Marketing
+| Tabela | Políticas Existentes | Inclui Incorporador? |
+|--------|---------------------|---------------------|
+| `atividades` | Admins, Gestores (próprias), Corretores | **Não** |
+| `clientes` | Admins, Gestores (próprios), Corretores, Imobiliárias | **Não** |
 
-A tabela `projetos_marketing` tem as seguintes políticas RLS:
+### Dados que Deveriam Aparecer
 
-| Policy | Condição |
-|--------|----------|
-| Admins can manage | `is_admin(auth.uid())` |
-| Supervisores can manage | `is_marketing_supervisor(auth.uid())` |
-| Clientes can view own | `cliente_id = auth.uid()` |
+O Michel (gestor) tem **17+ atividades** vinculadas ao empreendimento VITHORIA DO SOL, incluindo:
+- 2 pendentes (29/01)
+- 15+ concluídas (janeiro/2026)
 
-**Problema:** Não existe política para o role `incorporador` visualizar tickets dos seus empreendimentos. A request de rede retorna `[]` (array vazio) mesmo com tickets existentes.
-
-#### 2. Dashboard Não Exibe Gestor de Produto
-
-O `PortalIncorporadorDashboard.tsx` lista os empreendimentos, mas NÃO exibe quem é o gestor de produto de cada um. Isso é uma informação valiosa para o incorporador saber com quem entrar em contato.
-
-O hook `useGestorEmpreendimento` já existe e funciona corretamente (usa a RPC `get_gestor_empreendimento`), mas não está sendo utilizado no portal.
+Todas essas atividades estão vinculadas a empreendimentos onde o incorporador tem acesso, mas a RLS bloqueia a visualização.
 
 ---
 
-## Solução
+## Solução Proposta
 
-### Correção 1: Criar Política RLS para Incorporadores
+### Etapa 1: Adicionar Políticas RLS para Incorporadores
 
-**Localização:** Banco de Dados (via SQL Migration)
+Criar políticas que permitam ao `incorporador` visualizar dados dos seus empreendimentos.
 
-Criar uma função helper `is_incorporador()` e adicionar política na tabela `projetos_marketing`:
-
+**Tabela `atividades`:**
 ```sql
--- Função para verificar se usuário é incorporador
-CREATE OR REPLACE FUNCTION public.is_incorporador(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 
-    FROM public.user_roles ur
-    JOIN public.roles r ON r.id = ur.role_id
-    WHERE ur.user_id = _user_id
-    AND r.name = 'incorporador'
-    AND r.is_active = true
-  )
-$$;
-
--- Política para incorporadores visualizarem tickets de seus empreendimentos
-CREATE POLICY "Incorporadores can view tickets of their empreendimentos"
-ON public.projetos_marketing
+CREATE POLICY "Incorporadores can view atividades of their empreendimentos"
+ON public.atividades
 FOR SELECT
 TO authenticated
 USING (
-  is_incorporador(auth.uid())
+  public.is_incorporador(auth.uid())
   AND empreendimento_id IN (
     SELECT empreendimento_id 
-    FROM user_empreendimentos 
+    FROM public.user_empreendimentos 
     WHERE user_id = auth.uid()
   )
 );
 ```
 
-### Correção 2: Exibir Gestor de Produto no Dashboard
+**Tabela `clientes`:**
+```sql
+CREATE POLICY "Incorporadores can view clientes of their gestores"
+ON public.clientes
+FOR SELECT
+TO authenticated
+USING (
+  public.is_incorporador(auth.uid())
+  AND gestor_id IN (
+    SELECT ue.user_id 
+    FROM public.user_empreendimentos ue
+    WHERE ue.empreendimento_id IN (
+      SELECT empreendimento_id 
+      FROM public.user_empreendimentos 
+      WHERE user_id = auth.uid()
+    )
+  )
+);
+```
 
-**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
+A função `is_incorporador()` já foi criada na correção anterior dos tickets de marketing.
 
-Adicionar o nome do gestor de produto em cada card de empreendimento. Para isso:
+### Etapa 2: Ajustar Componentes de Forecast para Filtrar por Empreendimento
 
-1. Criar um novo hook `useGestoresEmpreendimentos` que busca os gestores de todos os empreendimentos de uma vez (evitando N+1 queries)
-2. Exibir o nome do gestor no card de cada empreendimento
+Atualmente, os componentes de Forecast no Portal do Incorporador **não passam** os empreendimentoIds como filtro. Mesmo com RLS permitindo acesso, os dados precisam ser filtrados corretamente.
+
+**Modificações nos componentes:**
+
+1. **`PortalIncorporadorForecast.tsx`**: Passar `empreendimentoIds` para os hooks de Forecast
+2. **Hooks em `useForecast.ts`**: Adicionar suporte a filtro por `empreendimentoIds[]` além do `gestorId`
+
+### Etapa 3: Atualizar Hooks de Forecast
+
+Modificar os hooks para aceitar uma lista opcional de `empreendimentoIds` e filtrar os dados adequadamente:
 
 ```typescript
-// Novo hook para buscar gestores de múltiplos empreendimentos
-export function useGestoresMultiplosEmpreendimentos(empreendimentoIds: string[]) {
-  return useQuery({
-    queryKey: ['gestores-empreendimentos', empreendimentoIds],
-    queryFn: async () => {
-      if (empreendimentoIds.length === 0) return {};
-      
-      // Buscar role_id do gestor_produto
-      const { data: roleData } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'gestor_produto')
-        .single();
-      
-      if (!roleData) return {};
-      
-      // Buscar todos os vínculos de gestores
-      const { data: links } = await supabase
-        .from('user_empreendimentos')
-        .select(`
-          empreendimento_id,
-          user:profiles(id, full_name)
-        `)
-        .in('empreendimento_id', empreendimentoIds)
-        .in('user_id', 
-          supabase.from('user_roles')
-            .select('user_id')
-            .eq('role_id', roleData.id)
-        );
-      
-      // Mapear empreendimento -> nome do gestor
-      const gestorMap: Record<string, string> = {};
-      links?.forEach(link => {
-        if (link.user) {
-          gestorMap[link.empreendimento_id] = link.user.full_name;
-        }
-      });
-      
-      return gestorMap;
-    },
-    enabled: empreendimentoIds.length > 0,
-  });
+// useForecast.ts
+export function useResumoAtividades(
+  gestorId?: string, 
+  dataInicio?: Date, 
+  dataFim?: Date,
+  empreendimentoIds?: string[]  // NOVO parâmetro
+) {
+  // ... 
+  if (empreendimentoIds?.length) {
+    query = query.in('empreendimento_id', empreendimentoIds);
+  }
+  // ...
 }
 ```
 
-E no componente do Dashboard, adicionar:
-
-```tsx
-{/* Card de Empreendimento */}
-<div className="p-4 border rounded-lg bg-card">
-  <div className="flex items-start justify-between gap-2">
-    <div className="flex-1">
-      <h4 className="font-medium">{emp.nome}</h4>
-      {gestorMap[emp.id] && (
-        <p className="text-sm text-muted-foreground flex items-center gap-1">
-          <User className="h-3 w-3" />
-          Gestor: {gestorMap[emp.id]}
-        </p>
-      )}
-    </div>
-    <Badge>{emp.status}</Badge>
-  </div>
-</div>
-```
-
-### Correção 3: Melhorar Hook useGestores para Compatibilidade
-
-**Arquivo:** `src/hooks/useGestores.ts`
-
-O hook atual usa `.eq('role', 'gestor_produto')` que depende da coluna enum legada. Atualizar para usar join com a tabela `roles`:
-
-```typescript
-export function useGestoresProduto(options: QueryOptions = {}) {
-  return useQuery({
-    queryKey: ['gestores-produto'],
-    queryFn: async () => {
-      // Buscar role_id do gestor_produto
-      const { data: roleData, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'gestor_produto')
-        .single();
-
-      if (roleError || !roleData) return [];
-
-      // Buscar usuários com esse role_id
-      const { data: userRoles, error: urError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role_id', roleData.id);
-
-      if (urError || !userRoles?.length) return [];
-
-      const userIds = userRoles.map(r => r.user_id);
-
-      // Buscar perfis
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, is_active, percentual_comissao')
-        .in('id', userIds)
-        .eq('is_active', true);
-
-      return profiles || [];
-    },
-    // ... options
-  });
-}
-```
+Aplicar a mesma lógica para:
+- `useFunilTemperatura`
+- `useVisitasPorEmpreendimento`  
+- `useAtividadesPorTipoPorSemana`
+- `useProximasAtividades`
+- `useResumoAtendimentos`
 
 ---
 
@@ -204,53 +110,90 @@ export function useGestoresProduto(options: QueryOptions = {}) {
 
 | Arquivo/Local | Modificação |
 |---------------|-------------|
-| **Banco de Dados** | Criar função `is_incorporador()` e política RLS em `projetos_marketing` para permitir SELECT aos incorporadores |
-| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Adicionar exibição do gestor de produto em cada card de empreendimento |
-| `src/hooks/useGestores.ts` | Atualizar para usar `role_id` via join com tabela `roles` em vez do enum legado |
-| `src/hooks/useGestorEmpreendimento.ts` | (Opcional) Criar variante que busca gestores de múltiplos empreendimentos |
+| **Banco de Dados** | Criar política RLS em `atividades` para incorporadores visualizarem atividades dos seus empreendimentos |
+| **Banco de Dados** | Criar política RLS em `clientes` para incorporadores visualizarem clientes dos gestores vinculados aos seus empreendimentos |
+| `src/hooks/useForecast.ts` | Adicionar parâmetro `empreendimentoIds?: string[]` a todos os hooks e aplicar filtro `.in('empreendimento_id', ...)` |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Passar `empreendimentoIds` do hook `useIncorporadorEmpreendimentos` para cada componente de Forecast |
+| `src/components/forecast/FunilTemperatura.tsx` | Adicionar prop `empreendimentoIds` e passar para o hook |
+| `src/components/forecast/VisitasPorEmpreendimento.tsx` | Adicionar prop `empreendimentoIds` e passar para o hook |
+| `src/components/forecast/AtividadesPorTipo.tsx` | Adicionar prop `empreendimentoIds` e passar para o hook |
+| `src/components/forecast/ProximasAtividades.tsx` | Adicionar prop `empreendimentoIds` e passar para o hook |
+| `src/components/forecast/AtendimentosResumo.tsx` | Adicionar prop `empreendimentoIds` e passar para o hook |
 
 ---
 
 ## Detalhes Técnicos
 
-### Por que os Tickets Retornam Vazio?
+### Por que os Dados Não Aparecem?
 
-O Supabase aplica Row Level Security antes de retornar os dados. A query em `PortalIncorporadorMarketing.tsx`:
-
-```typescript
-const { data: tickets } = await supabase
-  .from('projetos_marketing')
-  .select('...')
-  .in('empreendimento_id', empreendimentoIds);
-```
-
-Funciona corretamente no nível de filtro, mas a RLS bloqueia o acesso porque nenhuma das políticas existentes cobre o caso do incorporador:
+O fluxo atual falha em dois pontos:
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ is_admin(auth.uid())                 → false           │
-│ is_marketing_supervisor(auth.uid())  → false           │
-│ cliente_id = auth.uid()              → false           │
-│                                                         │
-│ RESULTADO: 0 rows retornadas (RLS bloqueou)            │
-└─────────────────────────────────────────────────────────┘
+1. PortalIncorporadorForecast chama useResumoAtividades() sem filtros
+                    ↓
+2. Hook busca atividades da tabela `atividades`
+                    ↓
+3. RLS verifica:
+   - is_admin(auth.uid()) → false
+   - gestor_id = auth.uid() → false (incorporador não é gestor)
+   - corretor vinculado → false
+                    ↓
+4. RESULTADO: 0 registros retornados
 ```
 
-Com a nova política:
+Com a correção:
+
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ is_incorporador(auth.uid())          → true ✓          │
-│ empreendimento_id IN user_empreendimentos → true ✓     │
-│                                                         │
-│ RESULTADO: 3 tickets retornados                         │
-└─────────────────────────────────────────────────────────┘
+1. PortalIncorporadorForecast passa empreendimentoIds para useResumoAtividades()
+                    ↓
+2. Hook busca atividades com filtro .in('empreendimento_id', [...ids])
+                    ↓
+3. RLS verifica:
+   - is_incorporador(auth.uid()) → true ✓
+   - empreendimento_id IN user_empreendimentos → true ✓
+                    ↓
+4. RESULTADO: 17+ atividades do Michel retornadas
+```
+
+### Relacionamento dos Dados
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    user_empreendimentos                          │
+├─────────────────────────────────────────────────────────────────┤
+│ user_id (Incorp)  ←→  empreendimento_id (VITHORIA DO SOL)       │
+│ user_id (Michel)  ←→  empreendimento_id (VITHORIA DO SOL)       │
+│ user_id (Incorp)  ←→  empreendimento_id (DON INÁCIO)            │
+│ user_id (Michel)  ←→  empreendimento_id (DON INÁCIO)            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        atividades                                │
+├─────────────────────────────────────────────────────────────────┤
+│ gestor_id = Michel                                               │
+│ empreendimento_id = VITHORIA DO SOL                             │
+│ → 17+ atividades (2 pendentes, 15+ concluídas)                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Critérios de Aceite
 
-1. Ao acessar `/portal-incorporador/marketing`, os 3 tickets de marketing são exibidos corretamente
-2. Os KPIs (Tickets Ativos, Em Produção, etc.) mostram valores corretos
-3. No Dashboard, cada empreendimento exibe o nome do gestor de produto associado (ex: "Gestor: Michel")
-4. O hook `useGestoresProduto` continua funcionando para outros componentes do sistema
+1. Ao acessar `/portal-incorporador/forecast`, os KPIs mostram as contagens corretas de atividades
+2. O "Funil de Temperatura" exibe os clientes dos gestores vinculados aos empreendimentos do incorporador
+3. "Visitas por Empreendimento" mostra as visitas de VITHORIA DO SOL e DON INÁCIO
+4. "Atividades por Tipo" exibe o gráfico de barras empilhadas com dados reais
+5. "Próximas Atividades" lista as 2 atividades pendentes do Michel (29/01)
+6. "Atendimentos" mostra o resumo correto de novos vs retornos
+
+---
+
+## Considerações de Segurança
+
+As novas políticas RLS garantem que:
+- Incorporadores só veem atividades de **seus** empreendimentos
+- Incorporadores só veem clientes de gestores vinculados aos **mesmos** empreendimentos
+- A verificação `is_incorporador()` usa SECURITY DEFINER para evitar recursão
+- Não há vazamento de dados entre incorporadores diferentes
