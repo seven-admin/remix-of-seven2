@@ -1,88 +1,133 @@
 
 
-# Plano de Correção: Redirecionamento Incorreto para Incorporadores
+# Plano de Correção: React Error #310 no ContratoDetalhe
 
 ## Problema Identificado
 
-O usuário com role `incorporador` está sendo redirecionado para `/mapa-unidades` em vez de `/portal-incorporador` após o login.
+O erro React #310 significa: **"Hooks can only be called inside of the body of a function component."**
 
 ### Causa Raiz
 
-Existem **dois problemas** no código atual:
+No arquivo `ContratoDetalhe.tsx`, o hook `useCallback` (linha 137-140) está sendo chamado **DEPOIS** de early returns condicionais:
 
-1. **`Index.tsx` (linha 24-26)**: Renderiza `DashboardIncorporador` (dashboard antigo com layout do sistema) quando `role === 'incorporador'`, ao invés de redirecionar para o novo portal.
+```typescript
+// Linhas 113-119: Early return para loading
+if (isLoading) {
+  return <div>...</div>;
+}
 
-2. **Conflito de lógica**: O `useDefaultRoute.ts` retorna `/portal-incorporador` para incorporadores, mas o `Index.tsx` nunca chega a usar esse valor porque retorna antes com `<DashboardIncorporador />`.
+// Linhas 121-128: Early return para contrato não encontrado
+if (!contrato) {
+  return <div>...</div>;
+}
 
-### Por que foi para `/mapa-unidades`?
+// Linha 137-140: useCallback APÓS os returns - VIOLA A REGRA DOS HOOKS!
+const handlePagamentoValidation = useCallback((isValid: boolean, diferenca: number) => {
+  setPagamentoValido(isValid);
+  setDiferencaPagamento(diferenca);
+}, []);
+```
 
-Com base nos dados da sessão, o incorporador tem as seguintes permissões com `can_view: true`:
-- `dashboard` (rota `/`)
-- `portal_incorporador` (rota `/portal-incorporador`)
-- `unidades` (rota `/mapa-unidades`)
-- `relatorios`, `reservas`, `briefings`
-
-Se houver uma race condition onde o `role` não está carregado no momento da verificação inicial, o código cai no loop de `routePriority` e encontra `unidades` com permissão, redirecionando para `/mapa-unidades`.
+Quando o componente está em loading ou quando `contrato` é null, o React retorna antes de chegar ao `useCallback`. Na próxima renderização (quando os dados chegam), o número de hooks chamados muda, causando o erro #310.
 
 ---
 
 ## Solução
 
-### Alteração 1: Corrigir `Index.tsx`
+Mover o `useCallback` para **ANTES** de qualquer return condicional, junto com os outros hooks no topo do componente.
 
-Modificar o `Index.tsx` para redirecionar incorporadores para `/portal-incorporador` ao invés de renderizar `DashboardIncorporador`:
+### Alteração no Arquivo
+
+**Arquivo:** `src/components/contratos/ContratoDetalhe.tsx`
+
+#### Antes (Linhas 104-140):
 
 ```typescript
-// Antes (linhas 24-26):
-if (role === 'incorporador') {
-  return <DashboardIncorporador />;
+// Validação completa do contrato
+const validacaoContrato = useMemo(() => {
+  if (!contrato) return { valido: true, pendencias: [] };
+  return validarContratoCompleto(contrato);
+}, [contrato]);
+
+const errosValidacao = validacaoContrato.pendencias.filter(p => p.tipo === 'erro');
+const avisosValidacao = validacaoContrato.pendencias.filter(p => p.tipo === 'aviso');
+
+if (isLoading) {
+  return (...);
 }
 
-// Depois:
-if (role === 'incorporador') {
-  return <Navigate to="/portal-incorporador" replace />;
+if (!contrato) {
+  return (...);
 }
+
+const pendenciasAbertas = ...;
+const documentosPendentes = ...;
+const podeEnviarAssinatura = ...;
+
+// useCallback APÓS early returns - PROBLEMA!
+const handlePagamentoValidation = useCallback((isValid: boolean, diferenca: number) => {
+  setPagamentoValido(isValid);
+  setDiferencaPagamento(diferenca);
+}, []);
 ```
 
-### Alteração 2: Adicionar módulo `unidades` ao `routePriority` (opcional mas recomendado)
-
-Para evitar confusão futura, garantir que o `routePriority` inclua `/mapa-unidades`:
+#### Depois:
 
 ```typescript
-const routePriority = [
-  { path: '/', module: 'dashboard' },
-  { path: '/portal-incorporador', module: 'portal_incorporador' },
-  { path: '/marketing', module: 'projetos_marketing' },
-  { path: '/mapa-unidades', module: 'unidades' }, // Adicionar
-  { path: '/empreendimentos', module: 'empreendimentos' },
-  // ...
-];
+// Callback estável para evitar loops de render infinito
+// MOVIDO PARA ANTES DOS EARLY RETURNS
+const handlePagamentoValidation = useCallback((isValid: boolean, diferenca: number) => {
+  setPagamentoValido(isValid);
+  setDiferencaPagamento(diferenca);
+}, []);
+
+// Validação completa do contrato
+const validacaoContrato = useMemo(() => {
+  if (!contrato) return { valido: true, pendencias: [] };
+  return validarContratoCompleto(contrato);
+}, [contrato]);
+
+const errosValidacao = validacaoContrato.pendencias.filter(p => p.tipo === 'erro');
+const avisosValidacao = validacaoContrato.pendencias.filter(p => p.tipo === 'aviso');
+
+if (isLoading) {
+  return (...);
+}
+
+if (!contrato) {
+  return (...);
+}
+
+const pendenciasAbertas = ...;
+const documentosPendentes = ...;
+const podeEnviarAssinatura = ...;
+
+// useCallback removido daqui (já está acima)
 ```
 
 ---
 
-## Arquivos a Modificar
+## Resumo das Alterações
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `src/pages/Index.tsx` | Trocar `<DashboardIncorporador />` por `<Navigate to="/portal-incorporador" replace />` para role `incorporador` |
-| `src/hooks/useDefaultRoute.ts` | (Opcional) Adicionar `/mapa-unidades` ao `routePriority` para consistência |
+| `src/components/contratos/ContratoDetalhe.tsx` | Mover `useCallback` (linhas 137-140) para a linha 104, antes do `useMemo` e dos early returns |
+
+---
+
+## Regra dos Hooks (Referência)
+
+Os Hooks do React devem:
+1. Ser chamados no nível superior do componente
+2. Ser chamados na mesma ordem em cada render
+3. **NUNCA** ser chamados após condicionais que podem retornar antecipadamente
 
 ---
 
 ## Critérios de Aceite
 
-1. Usuário com role `incorporador` é redirecionado para `/portal-incorporador` após login
-2. O Portal do Incorporador é exibido com o layout próprio (`PortalIncorporadorLayout`)
-3. Não há mais acesso ao `DashboardIncorporador` antigo pelo fluxo normal
-4. O menu do portal mostra apenas: Dashboard, Executivo, Forecast, Marketing
-
----
-
-## Próximo Passo Após Correção
-
-Testar o fluxo de login com o usuário `mail@mail.com` para confirmar:
-1. Login redireciona para `/portal-incorporador`
-2. Portal exibe corretamente os dados dos empreendimentos vinculados
-3. Navegação entre páginas do portal funciona
+1. Abrir um contrato gerado não exibe mais o erro #310
+2. A página do contrato carrega corretamente
+3. A funcionalidade de validação de pagamento continua funcionando
+4. Todos os estados do contrato são exibidos corretamente
 
