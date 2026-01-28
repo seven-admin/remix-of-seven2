@@ -1,238 +1,256 @@
 
-# Plano de Correção: Redirecionamento do Portal do Incorporador
+# Plano de Correção: Portal do Incorporador - Dados Não Exibidos
 
 ## Análise Completa
 
-### Configuração do Banco de Dados (CORRETA ✅)
-- Módulo `portal_incorporador` existe e está ativo
-- Role `incorporador` existe com `is_active: true`
-- Permissão `role_permissions` para incorporador + portal_incorporador tem `can_view: true`
-- Usuário `mail@mail.com` tem o role `incorporador` corretamente atribuído
-- Usuário tem 2 empreendimentos vinculados (VITHORIA DO SOL e DON INÁCIO)
+### Dados no Banco de Dados (Corretos)
 
-### Fluxo Atual (DEVERIA FUNCIONAR)
-1. Login → AuthContext busca role via join `user_roles ↔ roles`
-2. Navega para `/` → ProtectedRoute aguarda loading
-3. Index.tsx verifica `role === 'incorporador'` → Redireciona para `/portal-incorporador`
-4. ProtectedRoute para `/portal-incorporador` verifica `canAccessModule('portal_incorporador', 'view')` → Deveria retornar `true`
-5. Portal renderiza
+- **Usuário logado:** `mail@mail.com` (Incorp) com role `incorporador`
+- **Empreendimentos vinculados:** 
+  - VITHORIA DO SOL (`f2208f56-edd6-4c98-b82a-9657606376cf`)
+  - DON INÁCIO (`2271f374-62b7-4772-90f6-fe67de5c1113`)
+- **Gestor de Produto:** Michel (user_id: `0bb345de-208f-47c5-a9f7-4935c033fd9b`) vinculado a ambos empreendimentos
+- **Tickets de Marketing:** 3 tickets existentes para VITHORIA DO SOL:
+  - MKT-00020: "Cobertura de Garagem" (em_producao)
+  - MKT-00017: "Identidade visual e logo Vithoria" (aprovacao_cliente)
+  - MKT-00009: "CALENDÁRIO - KRAFT" (aprovacao_cliente)
 
 ### Problemas Identificados
 
-#### 1. Race Condition no useDefaultRoute
-O hook `useDefaultRoute` é chamado pelo `ProtectedRoute` **antes** de garantir que as permissões estejam carregadas:
+#### 1. RLS Bloqueando Acesso aos Tickets de Marketing
 
-```typescript
-// ProtectedRoute.tsx linha 31
-const { getDefaultRoute } = useDefaultRoute();
-```
+A tabela `projetos_marketing` tem as seguintes políticas RLS:
 
-Se `getDefaultRoute()` for chamado enquanto `permissions` ainda é um array vazio, o loop de prioridade pode retornar rotas incorretas.
+| Policy | Condição |
+|--------|----------|
+| Admins can manage | `is_admin(auth.uid())` |
+| Supervisores can manage | `is_marketing_supervisor(auth.uid())` |
+| Clientes can view own | `cliente_id = auth.uid()` |
 
-#### 2. Fallback Inconsistente no Index.tsx
-Linha 32-34:
-```typescript
-if (defaultRoute === '/') {
-  return <Navigate to="/marketing" replace />;
-}
-```
+**Problema:** Não existe política para o role `incorporador` visualizar tickets dos seus empreendimentos. A request de rede retorna `[]` (array vazio) mesmo com tickets existentes.
 
-Se o incorporador não tiver acesso ao marketing, isso pode gerar um redirect em loop ou "Acesso Negado".
+#### 2. Dashboard Não Exibe Gestor de Produto
 
-#### 3. useDefaultRoute Não Verifica Loading
-O hook retorna `getDefaultRoute()` sem verificar se as permissões já carregaram:
+O `PortalIncorporadorDashboard.tsx` lista os empreendimentos, mas NÃO exibe quem é o gestor de produto de cada um. Isso é uma informação valiosa para o incorporador saber com quem entrar em contato.
 
-```typescript
-const getDefaultRoute = (): string => {
-  // Verifica role diretamente ✅
-  if (role === 'incorporador') {
-    return '/portal-incorporador';
-  }
-  
-  // Mas se role não estiver carregado...
-  for (const route of routePriority) {
-    if (canAccessModule(route.module, 'view')) { // ← permissions pode estar vazio!
-      return route.path;
-    }
-  }
-  return '/'; // Fallback genérico
-};
-```
+O hook `useGestorEmpreendimento` já existe e funciona corretamente (usa a RPC `get_gestor_empreendimento`), mas não está sendo utilizado no portal.
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Correção 1: Proteger Index.tsx contra race conditions
+### Correção 1: Criar Política RLS para Incorporadores
 
-**Arquivo:** `src/pages/Index.tsx`
+**Localização:** Banco de Dados (via SQL Migration)
 
-Adicionar verificação adicional para garantir que o role foi carregado antes de decidir o redirecionamento:
+Criar uma função helper `is_incorporador()` e adicionar política na tabela `projetos_marketing`:
 
-```typescript
-const Index = () => {
-  const { role, isLoading: authLoading } = useAuth();
-  const { getDefaultRoute, isLoading: permLoading } = useDefaultRoute();
+```sql
+-- Função para verificar se usuário é incorporador
+CREATE OR REPLACE FUNCTION public.is_incorporador(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+    WHERE ur.user_id = _user_id
+    AND r.name = 'incorporador'
+    AND r.is_active = true
+  )
+$$;
 
-  // Aguardar TODAS as informações carregarem
-  // ADICIONAR: verificar se role está definido também
-  if (authLoading || permLoading || role === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Incorporadores vão para o portal dedicado
-  if (role === 'incorporador') {
-    return <Navigate to="/portal-incorporador" replace />;
-  }
-
-  // Para outros usuários, usa getDefaultRoute()
-  const defaultRoute = getDefaultRoute();
-  
-  // Se a rota padrão é "/" evitar loop infinito
-  if (defaultRoute === '/') {
-    // Fallback mais seguro: verificar permissões antes de redirecionar
-    return <Navigate to="/dashboard-executivo" replace />;
-  }
-
-  return <Navigate to={defaultRoute} replace />;
-};
+-- Política para incorporadores visualizarem tickets de seus empreendimentos
+CREATE POLICY "Incorporadores can view tickets of their empreendimentos"
+ON public.projetos_marketing
+FOR SELECT
+TO authenticated
+USING (
+  is_incorporador(auth.uid())
+  AND empreendimento_id IN (
+    SELECT empreendimento_id 
+    FROM user_empreendimentos 
+    WHERE user_id = auth.uid()
+  )
+);
 ```
 
-### Correção 2: Garantir que useDefaultRoute seja robusto
+### Correção 2: Exibir Gestor de Produto no Dashboard
 
-**Arquivo:** `src/hooks/useDefaultRoute.ts`
+**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
 
-Adicionar verificação de loading e fallback mais inteligente:
+Adicionar o nome do gestor de produto em cada card de empreendimento. Para isso:
+
+1. Criar um novo hook `useGestoresEmpreendimentos` que busca os gestores de todos os empreendimentos de uma vez (evitando N+1 queries)
+2. Exibir o nome do gestor no card de cada empreendimento
 
 ```typescript
-export function useDefaultRoute() {
-  const { canAccessModule, isLoading, isAdmin, permissions } = usePermissions();
-  const { role } = useAuth();
-
-  const getDefaultRoute = (): string => {
-    // Admin e Super Admin sempre vão para o dashboard
-    if (isAdmin() || role === 'super_admin' || role === 'admin') {
-      return '/';
-    }
-    
-    // Incorporadores vão para o portal dedicado
-    if (role === 'incorporador') {
-      return '/portal-incorporador';
-    }
-
-    // Corretores vão para o portal do corretor
-    if (role === 'corretor') {
-      return '/portal-corretor';
-    }
-    
-    // Se permissions ainda não carregaram, retornar loading indicator
-    // (o componente que chama deve verificar isLoading antes de usar)
-    if (permissions.length === 0) {
-      return '/'; // Fallback seguro - será verificado pelo ProtectedRoute
-    }
-    
-    for (const route of routePriority) {
-      if (canAccessModule(route.module, 'view')) {
-        return route.path;
-      }
-    }
-    
-    // Fallback final
-    return '/sem-acesso';
-  };
-
-  const canAccessDashboard = (): boolean => {
-    return canAccessModule('dashboard', 'view');
-  };
-
-  return {
-    getDefaultRoute,
-    canAccessDashboard,
-    isLoading,
-  };
+// Novo hook para buscar gestores de múltiplos empreendimentos
+export function useGestoresMultiplosEmpreendimentos(empreendimentoIds: string[]) {
+  return useQuery({
+    queryKey: ['gestores-empreendimentos', empreendimentoIds],
+    queryFn: async () => {
+      if (empreendimentoIds.length === 0) return {};
+      
+      // Buscar role_id do gestor_produto
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'gestor_produto')
+        .single();
+      
+      if (!roleData) return {};
+      
+      // Buscar todos os vínculos de gestores
+      const { data: links } = await supabase
+        .from('user_empreendimentos')
+        .select(`
+          empreendimento_id,
+          user:profiles(id, full_name)
+        `)
+        .in('empreendimento_id', empreendimentoIds)
+        .in('user_id', 
+          supabase.from('user_roles')
+            .select('user_id')
+            .eq('role_id', roleData.id)
+        );
+      
+      // Mapear empreendimento -> nome do gestor
+      const gestorMap: Record<string, string> = {};
+      links?.forEach(link => {
+        if (link.user) {
+          gestorMap[link.empreendimento_id] = link.user.full_name;
+        }
+      });
+      
+      return gestorMap;
+    },
+    enabled: empreendimentoIds.length > 0,
+  });
 }
 ```
 
-### Correção 3: Adicionar verificação explícita no ProtectedRoute para portal_incorporador
+E no componente do Dashboard, adicionar:
 
-**Arquivo:** `src/components/auth/ProtectedRoute.tsx`
-
-Adicionar tratamento especial para roles que têm portais dedicados:
-
-```typescript
-// Após a verificação de loading e autenticação, antes das verificações de módulo:
-
-// Verificar se usuário com role específico está tentando acessar área errada
-if (role === 'incorporador' && !location.pathname.startsWith('/portal-incorporador')) {
-  // Se incorporador tenta acessar área fora do portal, redirecionar
-  return <Navigate to="/portal-incorporador" replace />;
-}
-
-if (role === 'corretor' && !location.pathname.startsWith('/portal-corretor')) {
-  // Se corretor tenta acessar área fora do portal, redirecionar
-  return <Navigate to="/portal-corretor" replace />;
-}
+```tsx
+{/* Card de Empreendimento */}
+<div className="p-4 border rounded-lg bg-card">
+  <div className="flex items-start justify-between gap-2">
+    <div className="flex-1">
+      <h4 className="font-medium">{emp.nome}</h4>
+      {gestorMap[emp.id] && (
+        <p className="text-sm text-muted-foreground flex items-center gap-1">
+          <User className="h-3 w-3" />
+          Gestor: {gestorMap[emp.id]}
+        </p>
+      )}
+    </div>
+    <Badge>{emp.status}</Badge>
+  </div>
+</div>
 ```
 
-### Correção 4: Adicionar logs de debug temporários
+### Correção 3: Melhorar Hook useGestores para Compatibilidade
 
-Para diagnosticar o problema exato em produção, adicionar logs:
+**Arquivo:** `src/hooks/useGestores.ts`
+
+O hook atual usa `.eq('role', 'gestor_produto')` que depende da coluna enum legada. Atualizar para usar join com a tabela `roles`:
 
 ```typescript
-// Em usePermissions.ts, no início do useEffect
-console.log('[usePermissions] Starting fetch:', { user: user?.id, role, isAuthenticated });
+export function useGestoresProduto(options: QueryOptions = {}) {
+  return useQuery({
+    queryKey: ['gestores-produto'],
+    queryFn: async () => {
+      // Buscar role_id do gestor_produto
+      const { data: roleData, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'gestor_produto')
+        .single();
 
-// Em ProtectedRoute.tsx, antes das verificações
-console.log('[ProtectedRoute]', { 
-  moduleName, 
-  role, 
-  isLoading, 
-  permissionsCount: permissions.length,
-  canAccess: moduleName ? canAccessModule(moduleName, requiredAction) : 'N/A'
-});
+      if (roleError || !roleData) return [];
+
+      // Buscar usuários com esse role_id
+      const { data: userRoles, error: urError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role_id', roleData.id);
+
+      if (urError || !userRoles?.length) return [];
+
+      const userIds = userRoles.map(r => r.user_id);
+
+      // Buscar perfis
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, is_active, percentual_comissao')
+        .in('id', userIds)
+        .eq('is_active', true);
+
+      return profiles || [];
+    },
+    // ... options
+  });
+}
 ```
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Modificação |
-|---------|-------------|
-| `src/pages/Index.tsx` | Adicionar verificação `role === null` no loading state |
-| `src/hooks/useDefaultRoute.ts` | Adicionar verificações de fallback mais robustas e tratamento para permissions vazias |
-| `src/components/auth/ProtectedRoute.tsx` | Adicionar redirecionamento explícito para portais de roles específicos (incorporador/corretor) |
-
----
-
-## Critérios de Aceite
-
-1. Ao fazer login como incorporador, o sistema redireciona corretamente para `/portal-incorporador`
-2. O Portal do Incorporador carrega e exibe os dados dos empreendimentos vinculados
-3. Não há mensagem de "Acesso Negado" para incorporadores com permissões configuradas
-4. O fluxo de redirecionamento é determinístico e não depende de timing de carregamento
-5. Outros roles (admin, corretor, gestor_produto) continuam funcionando normalmente
+| Arquivo/Local | Modificação |
+|---------------|-------------|
+| **Banco de Dados** | Criar função `is_incorporador()` e política RLS em `projetos_marketing` para permitir SELECT aos incorporadores |
+| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Adicionar exibição do gestor de produto em cada card de empreendimento |
+| `src/hooks/useGestores.ts` | Atualizar para usar `role_id` via join com tabela `roles` em vez do enum legado |
+| `src/hooks/useGestorEmpreendimento.ts` | (Opcional) Criar variante que busca gestores de múltiplos empreendimentos |
 
 ---
 
 ## Detalhes Técnicos
 
-### Por que isso pode estar falhando?
+### Por que os Tickets Retornam Vazio?
 
-O React Query e os hooks de autenticação operam de forma assíncrona. Durante o carregamento:
+O Supabase aplica Row Level Security antes de retornar os dados. A query em `PortalIncorporadorMarketing.tsx`:
 
-```text
-t=0ms:   authLoading=true, permLoading=true, role=null, permissions=[]
-t=100ms: authLoading=false, permLoading=true, role='incorporador', permissions=[]
-t=200ms: authLoading=false, permLoading=false, role='incorporador', permissions=[...]
+```typescript
+const { data: tickets } = await supabase
+  .from('projetos_marketing')
+  .select('...')
+  .in('empreendimento_id', empreendimentoIds);
 ```
 
-Se o ProtectedRoute avalia `canAccessModule` no t=100ms (quando role carregou mas permissions não), pode retornar `false` e mostrar "Acesso Negado".
+Funciona corretamente no nível de filtro, mas a RLS bloqueia o acesso porque nenhuma das políticas existentes cobre o caso do incorporador:
 
-A correção garante que **ambos** (role E permissions) estejam carregados antes de tomar decisões de redirecionamento.
+```text
+┌─────────────────────────────────────────────────────────┐
+│ is_admin(auth.uid())                 → false           │
+│ is_marketing_supervisor(auth.uid())  → false           │
+│ cliente_id = auth.uid()              → false           │
+│                                                         │
+│ RESULTADO: 0 rows retornadas (RLS bloqueou)            │
+└─────────────────────────────────────────────────────────┘
+```
+
+Com a nova política:
+```text
+┌─────────────────────────────────────────────────────────┐
+│ is_incorporador(auth.uid())          → true ✓          │
+│ empreendimento_id IN user_empreendimentos → true ✓     │
+│                                                         │
+│ RESULTADO: 3 tickets retornados                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Critérios de Aceite
+
+1. Ao acessar `/portal-incorporador/marketing`, os 3 tickets de marketing são exibidos corretamente
+2. Os KPIs (Tickets Ativos, Em Produção, etc.) mostram valores corretos
+3. No Dashboard, cada empreendimento exibe o nome do gestor de produto associado (ex: "Gestor: Michel")
+4. O hook `useGestoresProduto` continua funcionando para outros componentes do sistema
