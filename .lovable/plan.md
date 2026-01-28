@@ -1,186 +1,99 @@
 
-# Plano de Correção: Usabilidade do Kanban de Negociações e Editor de Etapas
+# Plano de Correção: PDF em Branco na Exportação de Contratos
 
-## Problemas Identificados
+## Problema Identificado
 
-### 1. Cards Voltando à Origem ao Arrastar
-**Sintoma:** Ao mover um card de uma coluna para outra, ele não permanece na nova posição - retorna à posição original.
+Ao exportar o contrato CONT-00027_TESTE_MICHEL para PDF, o arquivo é gerado mas vem **completamente em branco**.
 
-**Causa Raiz:**
-O componente `FunilKanbanBoard` não implementa **atualização otimista** do estado. O fluxo atual é:
-1. Usuário arrasta card para nova coluna
-2. `handleKanbanMove` é chamado (linha 171-195)
-3. Se for etapa final, abre dialog (comportamento correto)
-4. Se não for etapa final, chama `moverMutation.mutate()` 
-5. **Problema:** O estado local dos cards NÃO é atualizado enquanto a mutation está pendente
-6. O React Query invalida e re-busca os dados
-7. Durante esse gap, o card "volta" visualmente porque o estado antigo ainda está ativo
+### Causa Raiz
 
-O `KanbanBoard` genérico (linha 23-44 de KanbanBoard.tsx) chama `onMoveWithData`, mas não modifica o array `items` localmente. A biblioteca `@hello-pangea/dnd` espera que o estado seja atualizado de forma síncrona após o drop.
+O código em `ExportarPdfDialog.tsx` cria um container HTML e o posiciona **fora da tela** (`left: -9999px`) antes de passar para o `html2pdf.js`. Isso causa um problema conhecido com a biblioteca `html2canvas` (usada internamente pelo html2pdf) que **não consegue renderizar corretamente elementos invisíveis ou fora da área visível** em alguns navegadores.
 
-### 2. Ordem das Etapas Não Salva
-**Sintoma:** Ao arrastar etapas para reordenar na página de Configuração de Negociações, a nova ordem não persiste.
+Comparando com o `GerarPdfButton.tsx` do simulador (que funciona corretamente):
+- **Simulador**: Cria o elemento e passa diretamente para `html2pdf()` sem adicionar ao DOM
+- **Contratos**: Adiciona ao DOM com `position: absolute; left: -9999px` ← **CAUSA DO PROBLEMA**
 
-**Causa Raiz:**
-No `EtapasEditor.tsx`, o handler `handleDrop` (linhas 121-142):
-1. Constrói corretamente a nova ordem localmente (`newEtapas`)
-2. Chama `reordenarMutation.mutateAsync(updates)`
-3. **Problema Potencial 1:** Não há atualização otimista do estado de exibição - a UI depende exclusivamente do `useQuery`
-4. **Problema Potencial 2:** A query key de invalidação (`['funil_etapas']`) pode não estar sincronizada corretamente
-5. **Problema Potencial 3:** Sem `staleTime` adequado, pode haver race condition entre invalidação e nova busca
+### Código Problemático (linhas 178-184):
 
-O hook `useReordenarEtapas` (linhas 337-355 de useFunis.ts) executa updates individuais via `Promise.all`, o que é correto, mas a invalidação usa `queryKey: ['funil_etapas']` sem o `funilId` específico.
+```typescript
+container.style.position = 'absolute';
+container.style.left = '-9999px';  // ← PROBLEMA: Fora da área visível
+container.style.top = '0';
+container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
+container.style.background = 'white';
+document.body.appendChild(container);
+```
 
 ---
 
 ## Solução
 
-### Correção 1: Atualização Otimista no Kanban de Negociações
+Modificar a abordagem para **NÃO adicionar o elemento ao DOM** antes de processar, seguindo o padrão do `GerarPdfButton.tsx` que funciona corretamente.
 
-**Arquivo:** `src/components/negociacoes/FunilKanbanBoard.tsx`
+### Alteração no Arquivo
 
-Implementar atualização otimista do estado para que o card permaneça visualmente na nova posição enquanto a mutation está em andamento:
+**Arquivo:** `src/components/contratos/ExportarPdfDialog.tsx`
+
+#### Mudanças:
+
+1. **Remover** a adição do container ao DOM antes do processamento
+2. **Configurar** as opções do html2canvas para renderizar o elemento corretamente mesmo sem estar no DOM
+3. **Adicionar** opção `onclone` do html2canvas para aplicar estilos adequados durante a renderização
+
+### Código Corrigido:
 
 ```typescript
-// Estado local para controlar a posição otimista
-const [optimisticNegociacoes, setOptimisticNegociacoes] = useState<Negociacao[] | null>(null);
+// Create a container with proper styling
+const container = document.createElement('div');
+container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
+container.style.background = 'white';
+container.innerHTML = `
+  <style>
+    body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12pt; line-height: 1.6; color: #333; }
+    h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; }
+    h2 { font-size: 16pt; font-weight: bold; margin-bottom: 10pt; }
+    h3 { font-size: 14pt; font-weight: bold; margin-bottom: 8pt; }
+    p { margin-bottom: 8pt; text-align: justify; }
+    table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+    th, td { border: 1px solid #ccc; padding: 8pt; text-align: left; }
+    th { background-color: #f5f5f5; font-weight: bold; }
+    .page-break { page-break-after: always; }
+    img { max-width: 100%; height: auto; }
+  </style>
+  <div style="padding: ${margens}mm; background: white; color: #333;">
+    ${conteudoSanitizado}
+    ${carimboHtml}
+  </div>
+`;
 
-// Usar dados otimistas se disponíveis
-const displayNegociacoes = optimisticNegociacoes ?? negociacoes;
-
-// No handler de move:
-const handleKanbanMove = (negociacao: Negociacao, sourceColumn: string, destinationColumn: string) => {
-  if (sourceColumn === destinationColumn) return;
-
-  const destEtapa = etapas.find(e => e.id === destinationColumn);
-  if (!destEtapa) return;
-
-  // Etapas finais: abrir dialog
-  if (destEtapa.is_final_perda || destEtapa.is_final_sucesso) {
-    setSelectedNegociacao(negociacao);
-    setTargetEtapa(destEtapa);
-    setMoverDialogOpen(true);
-    return;
-  }
-
-  // ATUALIZAÇÃO OTIMISTA: Atualizar estado local imediatamente
-  const updatedNegociacoes = negociacoes.map(n =>
-    n.id === negociacao.id ? { ...n, funil_etapa_id: destinationColumn } : n
-  );
-  setOptimisticNegociacoes(updatedNegociacoes);
-
-  // Fazer a mutation
-  moverMutation.mutate(
-    {
-      id: negociacao.id,
-      etapa_anterior_id: negociacao.funil_etapa_id,
-      targetEtapa: { is_final_sucesso: false, is_final_perda: false },
-      data: { funil_etapa_id: destinationColumn }
-    },
-    {
-      onSettled: () => {
-        // Limpar estado otimista após mutation (sucesso ou erro)
-        setOptimisticNegociacoes(null);
-      }
-    }
-  );
+const opt = {
+  margin: parseInt(margens),
+  filename: `${fileName}.pdf`,
+  image: { type: 'jpeg' as const, quality: 0.98 },
+  html2canvas: { 
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    letterRendering: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    // Força renderização com dimensões corretas
+    width: tamanho === 'a4' ? 794 : 816,  // 210mm ou 216mm em pixels @96dpi
+    windowWidth: tamanho === 'a4' ? 794 : 816,
+  },
+  jsPDF: { 
+    unit: 'mm' as const, 
+    format: tamanho, 
+    orientation: orientacao,
+  },
+  pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
 };
-```
 
-### Correção 2: Atualização Otimista no Editor de Etapas
+// NÃO adicionar ao DOM - passar diretamente
+await html2pdf().set(opt).from(container).save();
 
-**Arquivo:** `src/components/negociacoes/EtapasEditor.tsx`
-
-O problema é similar: o estado visual depende da query que é invalidada, mas não há atualização otimista durante a mutation.
-
-```typescript
-// Estado local para ordem visual durante drag
-const [localEtapas, setLocalEtapas] = useState<FunilEtapa[] | null>(null);
-
-// Usar etapas locais se disponíveis
-const displayEtapas = localEtapas ?? etapas;
-
-// Sincronizar quando a query atualiza
-useEffect(() => {
-  if (etapas.length > 0) {
-    setLocalEtapas(null); // Limpar estado local quando dados frescos chegam
-  }
-}, [etapas]);
-
-// No handleDrop:
-const handleDrop = async (e: React.DragEvent, targetId: string) => {
-  e.preventDefault();
-  if (!draggedId || draggedId === targetId) {
-    setDraggedId(null);
-    return;
-  }
-
-  const draggedIndex = displayEtapas.findIndex((e) => e.id === draggedId);
-  const targetIndex = displayEtapas.findIndex((e) => e.id === targetId);
-
-  // Criar nova ordem
-  const newEtapas = [...displayEtapas];
-  const [dragged] = newEtapas.splice(draggedIndex, 1);
-  newEtapas.splice(targetIndex, 0, dragged);
-
-  // ATUALIZAÇÃO OTIMISTA: Atualizar estado local imediatamente
-  const updatedEtapas = newEtapas.map((etapa, index) => ({
-    ...etapa,
-    ordem: index,
-  }));
-  setLocalEtapas(updatedEtapas);
-
-  // Preparar updates para o banco
-  const updates = newEtapas.map((etapa, index) => ({
-    id: etapa.id,
-    ordem: index,
-  }));
-
-  try {
-    await reordenarMutation.mutateAsync(updates);
-  } catch (error) {
-    // Em caso de erro, reverter para os dados da query
-    setLocalEtapas(null);
-  }
-  
-  setDraggedId(null);
-};
-```
-
-### Correção 3: Melhorar Hook useReordenarEtapas
-
-**Arquivo:** `src/hooks/useFunis.ts`
-
-A invalidação atual usa `['funil_etapas']` que invalida TODAS as queries de etapas. Devemos ser mais específicos:
-
-```typescript
-export function useReordenarEtapas(funilId?: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (etapas: { id: string; ordem: number }[]) => {
-      const promises = etapas.map(({ id, ordem }) =>
-        supabase.from('funil_etapas').update({ ordem }).eq('id', id)
-      );
-
-      await Promise.all(promises);
-    },
-    onSuccess: () => {
-      // Invalidar query específica do funil
-      queryClient.invalidateQueries({ queryKey: ['funil_etapas', funilId] });
-      // E também a de etapas padrão (usada no Kanban)
-      queryClient.invalidateQueries({ queryKey: ['funil_etapas', 'padrao'] });
-    },
-    onError: (error: Error) => {
-      toast.error('Erro ao reordenar etapas: ' + error.message);
-    },
-  });
-}
-```
-
-E atualizar a chamada no `EtapasEditor`:
-```typescript
-const reordenarMutation = useReordenarEtapas(funilId);
+toast.success('PDF gerado com sucesso!');
+onOpenChange(false);
 ```
 
 ---
@@ -189,69 +102,47 @@ const reordenarMutation = useReordenarEtapas(funilId);
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `src/components/negociacoes/FunilKanbanBoard.tsx` | Adicionar estado `optimisticNegociacoes` e atualização otimista no `handleKanbanMove` |
-| `src/components/negociacoes/EtapasEditor.tsx` | Adicionar estado `localEtapas` para ordem visual e atualização otimista no `handleDrop` |
-| `src/hooks/useFunis.ts` | Modificar `useReordenarEtapas` para receber `funilId` e invalidar queries específicas |
+| `src/components/contratos/ExportarPdfDialog.tsx` | Remover appendChild/removeChild do DOM e posicionamento fora da tela. Passar o container diretamente para html2pdf() sem anexar ao DOM. Adicionar configurações de width/windowWidth no html2canvas. |
 
 ---
 
 ## Detalhes Técnicos
 
-### Por que a Atualização Otimista é Necessária?
+### Por que html2canvas falha com elementos fora da tela?
 
-A biblioteca `@hello-pangea/dnd` espera que a lista de itens seja atualizada de forma síncrona após um drop. Se a lista não mudar imediatamente:
+A biblioteca `html2canvas` funciona capturando o estado visual de um elemento DOM. Quando um elemento está posicionado com `left: -9999px`:
 
-1. O React reconcilia o DOM baseado no estado atual (inalterado)
-2. O item arrastado é renderizado na posição original
-3. Quando a query é invalidada e os novos dados chegam, o item "pula" para a nova posição
+1. O navegador pode otimizar e não renderizar o elemento (está fora do viewport)
+2. O canvas gerado pode ter dimensões incorretas ou ser transparente
+3. Em alguns navegadores/versões, o elemento pode ter "computed styles" zerados
 
-Com atualização otimista:
-1. O estado local é atualizado imediatamente
-2. O React reconcilia usando o novo estado
-3. O item permanece na nova posição
-4. Quando a mutation completa, os dados reais substituem o estado otimista
+### A solução do Simulador
 
-### Padrão de Implementação
+O `GerarPdfButton.tsx` **não adiciona o elemento ao DOM** - ele cria um elemento "virtual" e passa diretamente para `html2pdf()`. A biblioteca consegue processar elementos não anexados ao DOM porque ela clona internamente o conteúdo antes de renderizar.
 
-```text
-┌───────────────────┐
-│   Usuário arrasta │
-│      card         │
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│ handleDragEnd()   │
-│ atualiza estado   │◄──── Atualização Otimista (SÍNCRONA)
-│ local             │
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│ moverMutation()   │
-│ (assíncrona)      │◄──── Chamada ao Backend
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│ onSettled()       │
-│ limpa estado      │◄──── Sincronização com dados reais
-│ otimista          │
-└───────────────────┘
-```
+### Cálculo de Dimensões
+
+Para garantir renderização correta:
+- **A4**: 210mm de largura = ~794px @96dpi
+- **Letter**: 216mm de largura = ~816px @96dpi
 
 ---
 
 ## Critérios de Aceite
 
-1. Ao arrastar um card de negociação para outra coluna, o card permanece visualmente na nova posição imediatamente
-2. Se a mutation falhar, o card retorna à posição original com feedback visual
-3. Ao arrastar uma etapa no editor de configuração, a nova ordem é mantida visualmente
-4. A nova ordem das etapas persiste após refresh da página
-5. Não há warnings de React relacionados a refs no console (corrigir console logs existentes)
+1. Ao clicar em "Exportar PDF" no contrato CONT-00027, o PDF é gerado com conteúdo visível
+2. O conteúdo do contrato (texto, tabelas, formatação) aparece corretamente no PDF
+3. O carimbo de autenticidade digital (se habilitado) aparece no final do documento
+4. As opções de tamanho (A4/Letter), orientação e margens continuam funcionando
+5. Não há erros no console durante a geração
 
 ---
 
-## Correção Adicional: Warnings de forwardRef no Console
+## Teste Recomendado
 
-Os logs de console mostram warnings de refs em `PropostaDialog` e `AlertDialog`. Isso pode contribuir para instabilidade visual. Será necessário verificar se esses componentes usam `forwardRef` corretamente.
+Após a correção:
+1. Abrir o contrato CONT-00027_TESTE_MICHEL
+2. Clicar em "Exportar PDF"
+3. Manter as configurações padrão (A4, Retrato, 20mm de margem)
+4. Clicar em "Gerar PDF"
+5. Verificar que o PDF contém todo o conteúdo do contrato
