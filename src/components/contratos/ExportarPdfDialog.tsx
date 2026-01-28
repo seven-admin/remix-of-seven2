@@ -154,8 +154,10 @@ export function ExportarPdfDialog({
         `;
       }
 
-      // Create a container with proper styling
+      // Create a container with proper styling - NÃO adicionar ao DOM
       const container = document.createElement('div');
+      container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
+      container.style.background = 'white';
       container.innerHTML = `
         <style>
           body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12pt; line-height: 1.6; color: #333; }
@@ -175,14 +177,6 @@ export function ExportarPdfDialog({
         </div>
       `;
 
-      // Append temporarily to DOM for proper rendering
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
-      container.style.background = 'white';
-      document.body.appendChild(container);
-
       const opt = {
         margin: parseInt(margens),
         filename: `${fileName}.pdf`,
@@ -194,6 +188,9 @@ export function ExportarPdfDialog({
           letterRendering: true,
           logging: false,
           backgroundColor: '#ffffff',
+          // Força renderização com dimensões corretas
+          width: tamanho === 'a4' ? 794 : 816,
+          windowWidth: tamanho === 'a4' ? 794 : 816,
         },
         jsPDF: { 
           unit: 'mm' as const, 
@@ -203,10 +200,8 @@ export function ExportarPdfDialog({
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
       };
 
+      // NÃO adicionar ao DOM - passar diretamente para html2pdf
       await html2pdf().set(opt).from(container).save();
-      
-      // Cleanup
-      document.body.removeChild(container);
 
       toast.success('PDF gerado com sucesso!');
       onOpenChange(false);
