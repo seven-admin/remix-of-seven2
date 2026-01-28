@@ -20,9 +20,9 @@ const Index = () => {
     );
   }
 
-  // Dashboard específico para incorporadores
+  // Incorporadores vão para o portal dedicado
   if (role === 'incorporador') {
-    return <DashboardIncorporador />;
+    return <Navigate to="/portal-incorporador" replace />;
   }
 
   // Agora as permissões estão carregadas, getDefaultRoute() retorna valor correto
