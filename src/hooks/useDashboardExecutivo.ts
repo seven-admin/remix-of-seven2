@@ -75,12 +75,14 @@ interface LancamentoRow {
   data_pagamento: string | null;
 }
 
-async function fetchLancamentos(empreendimentoId?: string): Promise<LancamentoRow[]> {
+async function fetchLancamentos(empreendimentoId?: string, empreendimentoIds?: string[]): Promise<LancamentoRow[]> {
   let query = supabase
     .from('lancamentos_financeiros')
     .select('id, tipo, valor, status, data_vencimento, data_pagamento, empreendimento_id');
   
-  if (empreendimentoId) {
+  if (empreendimentoIds && empreendimentoIds.length > 0) {
+    query = query.in('empreendimento_id', empreendimentoIds);
+  } else if (empreendimentoId) {
     query = query.eq('empreendimento_id', empreendimentoId);
   }
   
@@ -89,10 +91,10 @@ async function fetchLancamentos(empreendimentoId?: string): Promise<LancamentoRo
   return (data as LancamentoRow[] | null) || [];
 }
 
-export function useDashboardExecutivo(empreendimentoId?: string) {
+export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard-executivo', empreendimentoId],
-    refetchInterval: 60 * 1000, // Atualiza a cada 60 segundos (reduzido de 5 minutos)
+    queryKey: ['dashboard-executivo', empreendimentoId, empreendimentoIds],
+    refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<DashboardExecutivoData> => {
       const hoje = new Date();
@@ -103,15 +105,19 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
       const em30Dias = subDays(hoje, -30);
 
       // ============ VENDAS ============
-      const contratosQuery = supabase
+      let contratosQuery = supabase
         .from('contratos')
         .select('id, valor_contrato, data_assinatura, empreendimento_id, created_at')
         .eq('is_active', true)
         .eq('status', 'assinado');
       
-      const { data: contratos } = empreendimentoId 
-        ? await contratosQuery.eq('empreendimento_id', empreendimentoId)
-        : await contratosQuery;
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        contratosQuery = contratosQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        contratosQuery = contratosQuery.eq('empreendimento_id', empreendimentoId);
+      }
+      
+      const { data: contratos } = await contratosQuery;
 
       const contratosMesAtual = contratos?.filter(c => {
         const data = new Date(c.data_assinatura || c.created_at);
@@ -145,14 +151,18 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
       }
 
       // ============ NEGOCIAÇÕES ============
-      const negociacoesQuery = supabase
+      let negociacoesQuery = supabase
         .from('negociacoes')
         .select('id, etapa, valor_negociacao, funil_etapa_id, created_at')
         .eq('is_active', true);
 
-      const { data: negociacoes } = empreendimentoId 
-        ? await negociacoesQuery.eq('empreendimento_id', empreendimentoId)
-        : await negociacoesQuery;
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        negociacoesQuery = negociacoesQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        negociacoesQuery = negociacoesQuery.eq('empreendimento_id', empreendimentoId);
+      }
+
+      const { data: negociacoes } = await negociacoesQuery;
 
       const { data: etapasFunil } = await supabase
         .from('funil_etapas')
@@ -184,7 +194,7 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
       });
 
       // ============ FINANCEIRO ============
-      const lancamentos = await fetchLancamentos(empreendimentoId);
+      const lancamentos = await fetchLancamentos(empreendimentoId, empreendimentoIds);
 
       const receitasMes = lancamentos
         .filter(l => l.tipo === 'receita' && l.status === 'pago')
@@ -241,14 +251,18 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
       }
 
       // ============ COMISSÕES ============
-      const comissoesQuery = supabase
+      let comissoesQuery = supabase
         .from('comissoes')
         .select('id')
         .eq('is_active', true);
 
-      const { data: comissoes } = empreendimentoId 
-        ? await comissoesQuery.eq('empreendimento_id', empreendimentoId)
-        : await comissoesQuery;
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        comissoesQuery = comissoesQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        comissoesQuery = comissoesQuery.eq('empreendimento_id', empreendimentoId);
+      }
+
+      const { data: comissoes } = await comissoesQuery;
 
       const { data: parcelas } = await supabase
         .from('comissao_parcelas')
@@ -274,14 +288,18 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
         .reduce((acc, p) => acc + (p.valor || 0), 0);
 
       // ============ UNIDADES ============
-      const unidadesQuery = supabase
+      let unidadesQuery = supabase
         .from('unidades')
         .select('id, status, valor, empreendimento_id')
         .eq('is_active', true);
 
-      const { data: unidades } = empreendimentoId 
-        ? await unidadesQuery.eq('empreendimento_id', empreendimentoId)
-        : await unidadesQuery;
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        unidadesQuery = unidadesQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        unidadesQuery = unidadesQuery.eq('empreendimento_id', empreendimentoId);
+      }
+
+      const { data: unidades } = await unidadesQuery;
 
       const { data: empreendimentos } = await supabase
         .from('empreendimentos')
@@ -307,19 +325,31 @@ export function useDashboardExecutivo(empreendimentoId?: string) {
       }).filter(e => e.total > 0) || [];
 
       // ============ MARKETING ============
-      const { data: tickets } = await supabase
+      let ticketsQuery = supabase
         .from('projetos_marketing')
-        .select('id, status, data_previsao')
+        .select('id, status, data_previsao, empreendimento_id')
         .eq('is_active', true);
 
-      const briefingsQuery = supabase
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        ticketsQuery = ticketsQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        ticketsQuery = ticketsQuery.eq('empreendimento_id', empreendimentoId);
+      }
+
+      const { data: tickets } = await ticketsQuery;
+
+      let briefingsQuery = supabase
         .from('briefings')
         .select('id, status')
         .eq('is_active', true);
 
-      const { data: briefings } = empreendimentoId 
-        ? await briefingsQuery.eq('empreendimento_id', empreendimentoId)
-        : await briefingsQuery;
+      if (empreendimentoIds && empreendimentoIds.length > 0) {
+        briefingsQuery = briefingsQuery.in('empreendimento_id', empreendimentoIds);
+      } else if (empreendimentoId) {
+        briefingsQuery = briefingsQuery.eq('empreendimento_id', empreendimentoId);
+      }
+
+      const { data: briefings } = await briefingsQuery;
 
       const ticketsAbertos = tickets?.filter(t => t.status === 'briefing' || t.status === 'triagem').length || 0;
       const ticketsEmAndamento = tickets?.filter(t => 

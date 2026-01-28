@@ -6,6 +6,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PortalLayout } from "@/components/portal/PortalLayout";
+import { PortalIncorporadorLayout } from "@/components/portal-incorporador/PortalIncorporadorLayout";
+import {
+  PortalIncorporadorDashboard,
+  PortalIncorporadorExecutivo,
+  PortalIncorporadorForecast,
+  PortalIncorporadorMarketing,
+} from "@/pages/portal-incorporador";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Empreendimentos from "./pages/Empreendimentos";
@@ -279,6 +286,26 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
+              <Route index element={<PortalDashboard />} />
+              <Route path="empreendimentos" element={<PortalEmpreendimentos />} />
+              <Route path="solicitacoes" element={<PortalSolicitacoes />} />
+              <Route path="clientes" element={<PortalClientes />} />
+            </Route>
+
+            {/* Portal do Incorporador - Layout aninhado */}
+            <Route 
+              path="/portal-incorporador" 
+              element={
+                <ProtectedRoute moduleName="portal_incorporador">
+                  <PortalIncorporadorLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<PortalIncorporadorDashboard />} />
+              <Route path="executivo" element={<PortalIncorporadorExecutivo />} />
+              <Route path="forecast" element={<PortalIncorporadorForecast />} />
+              <Route path="marketing" element={<PortalIncorporadorMarketing />} />
+            </Route>
               <Route index element={<PortalDashboard />} />
               <Route path="empreendimentos" element={<PortalEmpreendimentos />} />
               <Route path="solicitacoes" element={<PortalSolicitacoes />} />
