@@ -9,6 +9,7 @@ interface AtendimentosResumoProps {
   gestorId?: string;
   dataInicio?: Date;
   dataFim?: Date;
+  empreendimentoIds?: string[];
 }
 
 function calcTaxa(concluidos: number, total: number) {
@@ -16,8 +17,8 @@ function calcTaxa(concluidos: number, total: number) {
   return Math.round((concluidos / total) * 100);
 }
 
-export function AtendimentosResumo({ gestorId, dataInicio, dataFim }: AtendimentosResumoProps) {
-  const { data, isLoading } = useResumoAtendimentos(gestorId, dataInicio, dataFim);
+export function AtendimentosResumo({ gestorId, dataInicio, dataFim, empreendimentoIds }: AtendimentosResumoProps) {
+  const { data, isLoading } = useResumoAtendimentos(gestorId, dataInicio, dataFim, empreendimentoIds);
 
   if (isLoading) {
     return (
