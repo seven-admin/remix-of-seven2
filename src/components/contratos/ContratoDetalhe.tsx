@@ -101,6 +101,12 @@ export function ContratoDetalhe({ contratoId, onBack }: ContratoDetalheProps) {
   
   const signatariosPendentes = signatarios.filter(s => s.status !== 'assinado').length;
 
+  // Callback estável para evitar loops de render infinito - ANTES dos early returns
+  const handlePagamentoValidation = useCallback((isValid: boolean, diferenca: number) => {
+    setPagamentoValido(isValid);
+    setDiferencaPagamento(diferenca);
+  }, []);
+
   // Validação completa do contrato
   const validacaoContrato = useMemo(() => {
     if (!contrato) return { valido: true, pendencias: [] };
@@ -132,12 +138,6 @@ export function ContratoDetalhe({ contratoId, onBack }: ContratoDetalheProps) {
   
   // Contrato só pode ser enviado para assinatura se não houver pendências, pagamento estiver correto E validação OK
   const podeEnviarAssinatura = pendenciasAbertas === 0 && documentosPendentes === 0 && pagamentoValido && errosValidacao.length === 0;
-
-  // Callback estável para evitar loops de render infinito
-  const handlePagamentoValidation = useCallback((isValid: boolean, diferenca: number) => {
-    setPagamentoValido(isValid);
-    setDiferencaPagamento(diferenca);
-  }, []);
 
   const unidades = contrato.unidades?.map(u => u.unidade?.numero).filter(Boolean).join(', ') || '-';
   const blocos = [...new Set(contrato.unidades?.map(u => u.unidade?.bloco?.nome).filter(Boolean))].join(', ');
