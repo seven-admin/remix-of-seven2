@@ -306,11 +306,6 @@ const App = () => (
               <Route path="forecast" element={<PortalIncorporadorForecast />} />
               <Route path="marketing" element={<PortalIncorporadorMarketing />} />
             </Route>
-              <Route index element={<PortalDashboard />} />
-              <Route path="empreendimentos" element={<PortalEmpreendimentos />} />
-              <Route path="solicitacoes" element={<PortalSolicitacoes />} />
-              <Route path="clientes" element={<PortalClientes />} />
-            </Route>
             
             {/* Utilidades */}
             <Route path="/simulador" element={
