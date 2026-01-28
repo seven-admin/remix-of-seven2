@@ -1,99 +1,202 @@
 
-# Plano de Correção: PDF em Branco na Exportação de Contratos
+# Plano de Correção: Redirecionamento do Portal do Incorporador
 
-## Problema Identificado
+## Análise Completa
 
-Ao exportar o contrato CONT-00027_TESTE_MICHEL para PDF, o arquivo é gerado mas vem **completamente em branco**.
+### Configuração do Banco de Dados (CORRETA ✅)
+- Módulo `portal_incorporador` existe e está ativo
+- Role `incorporador` existe com `is_active: true`
+- Permissão `role_permissions` para incorporador + portal_incorporador tem `can_view: true`
+- Usuário `mail@mail.com` tem o role `incorporador` corretamente atribuído
+- Usuário tem 2 empreendimentos vinculados (VITHORIA DO SOL e DON INÁCIO)
 
-### Causa Raiz
+### Fluxo Atual (DEVERIA FUNCIONAR)
+1. Login → AuthContext busca role via join `user_roles ↔ roles`
+2. Navega para `/` → ProtectedRoute aguarda loading
+3. Index.tsx verifica `role === 'incorporador'` → Redireciona para `/portal-incorporador`
+4. ProtectedRoute para `/portal-incorporador` verifica `canAccessModule('portal_incorporador', 'view')` → Deveria retornar `true`
+5. Portal renderiza
 
-O código em `ExportarPdfDialog.tsx` cria um container HTML e o posiciona **fora da tela** (`left: -9999px`) antes de passar para o `html2pdf.js`. Isso causa um problema conhecido com a biblioteca `html2canvas` (usada internamente pelo html2pdf) que **não consegue renderizar corretamente elementos invisíveis ou fora da área visível** em alguns navegadores.
+### Problemas Identificados
 
-Comparando com o `GerarPdfButton.tsx` do simulador (que funciona corretamente):
-- **Simulador**: Cria o elemento e passa diretamente para `html2pdf()` sem adicionar ao DOM
-- **Contratos**: Adiciona ao DOM com `position: absolute; left: -9999px` ← **CAUSA DO PROBLEMA**
-
-### Código Problemático (linhas 178-184):
+#### 1. Race Condition no useDefaultRoute
+O hook `useDefaultRoute` é chamado pelo `ProtectedRoute` **antes** de garantir que as permissões estejam carregadas:
 
 ```typescript
-container.style.position = 'absolute';
-container.style.left = '-9999px';  // ← PROBLEMA: Fora da área visível
-container.style.top = '0';
-container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
-container.style.background = 'white';
-document.body.appendChild(container);
+// ProtectedRoute.tsx linha 31
+const { getDefaultRoute } = useDefaultRoute();
+```
+
+Se `getDefaultRoute()` for chamado enquanto `permissions` ainda é um array vazio, o loop de prioridade pode retornar rotas incorretas.
+
+#### 2. Fallback Inconsistente no Index.tsx
+Linha 32-34:
+```typescript
+if (defaultRoute === '/') {
+  return <Navigate to="/marketing" replace />;
+}
+```
+
+Se o incorporador não tiver acesso ao marketing, isso pode gerar um redirect em loop ou "Acesso Negado".
+
+#### 3. useDefaultRoute Não Verifica Loading
+O hook retorna `getDefaultRoute()` sem verificar se as permissões já carregaram:
+
+```typescript
+const getDefaultRoute = (): string => {
+  // Verifica role diretamente ✅
+  if (role === 'incorporador') {
+    return '/portal-incorporador';
+  }
+  
+  // Mas se role não estiver carregado...
+  for (const route of routePriority) {
+    if (canAccessModule(route.module, 'view')) { // ← permissions pode estar vazio!
+      return route.path;
+    }
+  }
+  return '/'; // Fallback genérico
+};
 ```
 
 ---
 
-## Solução
+## Solução Proposta
 
-Modificar a abordagem para **NÃO adicionar o elemento ao DOM** antes de processar, seguindo o padrão do `GerarPdfButton.tsx` que funciona corretamente.
+### Correção 1: Proteger Index.tsx contra race conditions
 
-### Alteração no Arquivo
+**Arquivo:** `src/pages/Index.tsx`
 
-**Arquivo:** `src/components/contratos/ExportarPdfDialog.tsx`
-
-#### Mudanças:
-
-1. **Remover** a adição do container ao DOM antes do processamento
-2. **Configurar** as opções do html2canvas para renderizar o elemento corretamente mesmo sem estar no DOM
-3. **Adicionar** opção `onclone` do html2canvas para aplicar estilos adequados durante a renderização
-
-### Código Corrigido:
+Adicionar verificação adicional para garantir que o role foi carregado antes de decidir o redirecionamento:
 
 ```typescript
-// Create a container with proper styling
-const container = document.createElement('div');
-container.style.width = tamanho === 'a4' ? '210mm' : '216mm';
-container.style.background = 'white';
-container.innerHTML = `
-  <style>
-    body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12pt; line-height: 1.6; color: #333; }
-    h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; }
-    h2 { font-size: 16pt; font-weight: bold; margin-bottom: 10pt; }
-    h3 { font-size: 14pt; font-weight: bold; margin-bottom: 8pt; }
-    p { margin-bottom: 8pt; text-align: justify; }
-    table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-    th, td { border: 1px solid #ccc; padding: 8pt; text-align: left; }
-    th { background-color: #f5f5f5; font-weight: bold; }
-    .page-break { page-break-after: always; }
-    img { max-width: 100%; height: auto; }
-  </style>
-  <div style="padding: ${margens}mm; background: white; color: #333;">
-    ${conteudoSanitizado}
-    ${carimboHtml}
-  </div>
-`;
+const Index = () => {
+  const { role, isLoading: authLoading } = useAuth();
+  const { getDefaultRoute, isLoading: permLoading } = useDefaultRoute();
 
-const opt = {
-  margin: parseInt(margens),
-  filename: `${fileName}.pdf`,
-  image: { type: 'jpeg' as const, quality: 0.98 },
-  html2canvas: { 
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    letterRendering: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-    // Força renderização com dimensões corretas
-    width: tamanho === 'a4' ? 794 : 816,  // 210mm ou 216mm em pixels @96dpi
-    windowWidth: tamanho === 'a4' ? 794 : 816,
-  },
-  jsPDF: { 
-    unit: 'mm' as const, 
-    format: tamanho, 
-    orientation: orientacao,
-  },
-  pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+  // Aguardar TODAS as informações carregarem
+  // ADICIONAR: verificar se role está definido também
+  if (authLoading || permLoading || role === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Incorporadores vão para o portal dedicado
+  if (role === 'incorporador') {
+    return <Navigate to="/portal-incorporador" replace />;
+  }
+
+  // Para outros usuários, usa getDefaultRoute()
+  const defaultRoute = getDefaultRoute();
+  
+  // Se a rota padrão é "/" evitar loop infinito
+  if (defaultRoute === '/') {
+    // Fallback mais seguro: verificar permissões antes de redirecionar
+    return <Navigate to="/dashboard-executivo" replace />;
+  }
+
+  return <Navigate to={defaultRoute} replace />;
 };
+```
 
-// NÃO adicionar ao DOM - passar diretamente
-await html2pdf().set(opt).from(container).save();
+### Correção 2: Garantir que useDefaultRoute seja robusto
 
-toast.success('PDF gerado com sucesso!');
-onOpenChange(false);
+**Arquivo:** `src/hooks/useDefaultRoute.ts`
+
+Adicionar verificação de loading e fallback mais inteligente:
+
+```typescript
+export function useDefaultRoute() {
+  const { canAccessModule, isLoading, isAdmin, permissions } = usePermissions();
+  const { role } = useAuth();
+
+  const getDefaultRoute = (): string => {
+    // Admin e Super Admin sempre vão para o dashboard
+    if (isAdmin() || role === 'super_admin' || role === 'admin') {
+      return '/';
+    }
+    
+    // Incorporadores vão para o portal dedicado
+    if (role === 'incorporador') {
+      return '/portal-incorporador';
+    }
+
+    // Corretores vão para o portal do corretor
+    if (role === 'corretor') {
+      return '/portal-corretor';
+    }
+    
+    // Se permissions ainda não carregaram, retornar loading indicator
+    // (o componente que chama deve verificar isLoading antes de usar)
+    if (permissions.length === 0) {
+      return '/'; // Fallback seguro - será verificado pelo ProtectedRoute
+    }
+    
+    for (const route of routePriority) {
+      if (canAccessModule(route.module, 'view')) {
+        return route.path;
+      }
+    }
+    
+    // Fallback final
+    return '/sem-acesso';
+  };
+
+  const canAccessDashboard = (): boolean => {
+    return canAccessModule('dashboard', 'view');
+  };
+
+  return {
+    getDefaultRoute,
+    canAccessDashboard,
+    isLoading,
+  };
+}
+```
+
+### Correção 3: Adicionar verificação explícita no ProtectedRoute para portal_incorporador
+
+**Arquivo:** `src/components/auth/ProtectedRoute.tsx`
+
+Adicionar tratamento especial para roles que têm portais dedicados:
+
+```typescript
+// Após a verificação de loading e autenticação, antes das verificações de módulo:
+
+// Verificar se usuário com role específico está tentando acessar área errada
+if (role === 'incorporador' && !location.pathname.startsWith('/portal-incorporador')) {
+  // Se incorporador tenta acessar área fora do portal, redirecionar
+  return <Navigate to="/portal-incorporador" replace />;
+}
+
+if (role === 'corretor' && !location.pathname.startsWith('/portal-corretor')) {
+  // Se corretor tenta acessar área fora do portal, redirecionar
+  return <Navigate to="/portal-corretor" replace />;
+}
+```
+
+### Correção 4: Adicionar logs de debug temporários
+
+Para diagnosticar o problema exato em produção, adicionar logs:
+
+```typescript
+// Em usePermissions.ts, no início do useEffect
+console.log('[usePermissions] Starting fetch:', { user: user?.id, role, isAuthenticated });
+
+// Em ProtectedRoute.tsx, antes das verificações
+console.log('[ProtectedRoute]', { 
+  moduleName, 
+  role, 
+  isLoading, 
+  permissionsCount: permissions.length,
+  canAccess: moduleName ? canAccessModule(moduleName, requiredAction) : 'N/A'
+});
 ```
 
 ---
@@ -102,47 +205,34 @@ onOpenChange(false);
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `src/components/contratos/ExportarPdfDialog.tsx` | Remover appendChild/removeChild do DOM e posicionamento fora da tela. Passar o container diretamente para html2pdf() sem anexar ao DOM. Adicionar configurações de width/windowWidth no html2canvas. |
-
----
-
-## Detalhes Técnicos
-
-### Por que html2canvas falha com elementos fora da tela?
-
-A biblioteca `html2canvas` funciona capturando o estado visual de um elemento DOM. Quando um elemento está posicionado com `left: -9999px`:
-
-1. O navegador pode otimizar e não renderizar o elemento (está fora do viewport)
-2. O canvas gerado pode ter dimensões incorretas ou ser transparente
-3. Em alguns navegadores/versões, o elemento pode ter "computed styles" zerados
-
-### A solução do Simulador
-
-O `GerarPdfButton.tsx` **não adiciona o elemento ao DOM** - ele cria um elemento "virtual" e passa diretamente para `html2pdf()`. A biblioteca consegue processar elementos não anexados ao DOM porque ela clona internamente o conteúdo antes de renderizar.
-
-### Cálculo de Dimensões
-
-Para garantir renderização correta:
-- **A4**: 210mm de largura = ~794px @96dpi
-- **Letter**: 216mm de largura = ~816px @96dpi
+| `src/pages/Index.tsx` | Adicionar verificação `role === null` no loading state |
+| `src/hooks/useDefaultRoute.ts` | Adicionar verificações de fallback mais robustas e tratamento para permissions vazias |
+| `src/components/auth/ProtectedRoute.tsx` | Adicionar redirecionamento explícito para portais de roles específicos (incorporador/corretor) |
 
 ---
 
 ## Critérios de Aceite
 
-1. Ao clicar em "Exportar PDF" no contrato CONT-00027, o PDF é gerado com conteúdo visível
-2. O conteúdo do contrato (texto, tabelas, formatação) aparece corretamente no PDF
-3. O carimbo de autenticidade digital (se habilitado) aparece no final do documento
-4. As opções de tamanho (A4/Letter), orientação e margens continuam funcionando
-5. Não há erros no console durante a geração
+1. Ao fazer login como incorporador, o sistema redireciona corretamente para `/portal-incorporador`
+2. O Portal do Incorporador carrega e exibe os dados dos empreendimentos vinculados
+3. Não há mensagem de "Acesso Negado" para incorporadores com permissões configuradas
+4. O fluxo de redirecionamento é determinístico e não depende de timing de carregamento
+5. Outros roles (admin, corretor, gestor_produto) continuam funcionando normalmente
 
 ---
 
-## Teste Recomendado
+## Detalhes Técnicos
 
-Após a correção:
-1. Abrir o contrato CONT-00027_TESTE_MICHEL
-2. Clicar em "Exportar PDF"
-3. Manter as configurações padrão (A4, Retrato, 20mm de margem)
-4. Clicar em "Gerar PDF"
-5. Verificar que o PDF contém todo o conteúdo do contrato
+### Por que isso pode estar falhando?
+
+O React Query e os hooks de autenticação operam de forma assíncrona. Durante o carregamento:
+
+```text
+t=0ms:   authLoading=true, permLoading=true, role=null, permissions=[]
+t=100ms: authLoading=false, permLoading=true, role='incorporador', permissions=[]
+t=200ms: authLoading=false, permLoading=false, role='incorporador', permissions=[...]
+```
+
+Se o ProtectedRoute avalia `canAccessModule` no t=100ms (quando role carregou mas permissions não), pode retornar `false` e mostrar "Acesso Negado".
+
+A correção garante que **ambos** (role E permissions) estejam carregados antes de tomar decisões de redirecionamento.
