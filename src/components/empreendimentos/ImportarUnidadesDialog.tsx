@@ -162,6 +162,7 @@ export function ImportarUnidadesDialog({
   const [resultado, setResultado] = useState<{ sucesso: number; erros: number; atualizados: number }>({ sucesso: 0, erros: 0, atualizados: 0 });
   const [acaoDuplicatas, setAcaoDuplicatas] = useState<'ignorar' | 'atualizar'>('ignorar');
   const [criandoEntidades, setCriandoEntidades] = useState(false);
+  const [erroImportacaoGeral, setErroImportacaoGeral] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { data: blocos = [] } = useBlocos(empreendimentoId);
@@ -191,6 +192,7 @@ export function ImportarUnidadesDialog({
     setLinhas([]);
     setResultado({ sucesso: 0, erros: 0, atualizados: 0 });
     setAcaoDuplicatas('ignorar');
+    setErroImportacaoGeral(null);
   }, []);
 
   const handleClose = useCallback((open: boolean) => {
@@ -433,7 +435,7 @@ export function ImportarUnidadesDialog({
       if (statusRaw) {
         const statusLower = statusRaw.toLowerCase();
         if (!STATUS_VALIDOS.includes(statusLower as UnidadeStatus)) {
-          erros.push(`Status inválido: "${statusRaw}"`);
+          erros.push(`Status inválido: "${statusRaw}". Valores aceitos: ${STATUS_VALIDOS.join(', ')}`);
         } else {
           status = statusLower as UnidadeStatus;
         }
@@ -548,6 +550,9 @@ export function ImportarUnidadesDialog({
   };
 
   const handleImportar = async () => {
+    // Limpar erro anterior
+    setErroImportacaoGeral(null);
+    
     // Separar linhas novas e atualizações
     const linhasNovas = linhasValidas.filter(l => !l.duplicata);
     const linhasAtualizar = linhasValidas.filter(l => l.duplicata && acaoDuplicatas === 'atualizar');
@@ -593,8 +598,10 @@ export function ImportarUnidadesDialog({
       queryClient.invalidateQueries({ queryKey: ['tipologias', empreendimentoId] });
       
       setEtapa('resultado');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro na importação:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao salvar no banco de dados';
+      setErroImportacaoGeral(errorMessage);
     }
   };
 
@@ -904,7 +911,17 @@ export function ImportarUnidadesDialog({
 
           {/* Etapa 4: Preview */}
           {etapa === 'preview' && (
-            <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+            <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-0">
+              {/* Alerta de erro geral do banco */}
+              {erroImportacaoGeral && (
+                <Alert variant="destructive" className="flex-shrink-0">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Erro ao salvar no banco:</strong> {erroImportacaoGeral}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex items-center gap-4 flex-shrink-0 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
                   <FileSpreadsheet className="h-3 w-3" />
@@ -946,19 +963,20 @@ export function ImportarUnidadesDialog({
                 </Alert>
               )}
 
-              <ScrollArea className="flex-1 border rounded-lg">
+              {/* Container scrollável usando CSS puro em vez de Radix ScrollArea */}
+              <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">Linha</TableHead>
-                      <TableHead className="w-12">Status</TableHead>
-                      <TableHead>Número</TableHead>
-                      <TableHead>{agrupamentoLabel}</TableHead>
-                      <TableHead>Tipologia</TableHead>
-                      {!isLoteamento && <TableHead>Andar</TableHead>}
-                      <TableHead>Área (m²)</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Erros/Avisos</TableHead>
+                      <TableHead className="w-12 sticky top-0 bg-background">Linha</TableHead>
+                      <TableHead className="w-12 sticky top-0 bg-background">Status</TableHead>
+                      <TableHead className="sticky top-0 bg-background">Número</TableHead>
+                      <TableHead className="sticky top-0 bg-background">{agrupamentoLabel}</TableHead>
+                      <TableHead className="sticky top-0 bg-background">Tipologia</TableHead>
+                      {!isLoteamento && <TableHead className="sticky top-0 bg-background">Andar</TableHead>}
+                      <TableHead className="sticky top-0 bg-background">Área (m²)</TableHead>
+                      <TableHead className="sticky top-0 bg-background">Valor</TableHead>
+                      <TableHead className="sticky top-0 bg-background">Erros/Avisos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -996,7 +1014,7 @@ export function ImportarUnidadesDialog({
                           <TableCell>
                             {linha.dados.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || '-'}
                           </TableCell>
-                          <TableCell className="max-w-[200px]">
+                          <TableCell className="max-w-[320px] whitespace-normal break-words">
                             {linha.duplicata && (
                               <div className="text-xs text-amber-600 flex items-start gap-1 mb-1">
                                 <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
@@ -1004,15 +1022,24 @@ export function ImportarUnidadesDialog({
                               </div>
                             )}
                             {linha.erros.length > 0 && (
-                              <div className="text-xs text-destructive">
-                                {linha.erros.join('; ')}
-                              </div>
+                              <ul className="text-xs text-destructive space-y-0.5 list-none p-0 m-0">
+                                {linha.erros.map((erro, idx) => (
+                                  <li key={idx} className="flex items-start gap-1">
+                                    <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                    <span>{erro}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                             {linha.avisos.length > 0 && (
-                              <div className="text-xs text-amber-600 flex items-start gap-1">
-                                <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                {linha.avisos.join('; ')}
-                              </div>
+                              <ul className="text-xs text-amber-600 space-y-0.5 list-none p-0 m-0 mt-1">
+                                {linha.avisos.map((aviso, idx) => (
+                                  <li key={idx} className="flex items-start gap-1">
+                                    <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                    <span>{aviso}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                           </TableCell>
                         </TableRow>
@@ -1020,7 +1047,7 @@ export function ImportarUnidadesDialog({
                     })}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
 
               <DialogFooter className="flex-shrink-0">
                 <Button variant="outline" onClick={() => setEtapa('mapear-valores')}>
@@ -1039,26 +1066,78 @@ export function ImportarUnidadesDialog({
 
           {/* Etapa 5: Resultado */}
           {etapa === 'resultado' && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-8">
-              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="h-10 w-10 text-green-600" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xl font-semibold mb-2">Importação Concluída!</h3>
-                <p className="text-muted-foreground">
-                  {resultado.sucesso} {isLoteamento ? 'lote(s)' : 'unidade(s)'} importad{isLoteamento ? 'o(s)' : 'a(s)'} com sucesso.
-                </p>
-                {resultado.atualizados > 0 && (
-                  <p className="text-muted-foreground">
-                    {resultado.atualizados} atualizado(s).
+            <div className="flex-1 flex flex-col gap-6 py-4 min-h-0 overflow-hidden">
+              {/* Resumo no topo */}
+              <div className="flex-shrink-0 flex flex-col items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-1">Importação Concluída!</h3>
+                  <p className="text-muted-foreground text-sm">
+                    {resultado.sucesso} {isLoteamento ? 'lote(s)' : 'unidade(s)'} importad{isLoteamento ? 'o(s)' : 'a(s)'} com sucesso.
                   </p>
-                )}
-                {resultado.erros > 0 && (
-                  <p className="text-amber-600">
-                    {resultado.erros} linha(s) ignorada(s) por erros.
-                  </p>
-                )}
+                  {resultado.atualizados > 0 && (
+                    <p className="text-muted-foreground text-sm">
+                      {resultado.atualizados} atualizado(s).
+                    </p>
+                  )}
+                  {resultado.erros > 0 && (
+                    <p className="text-amber-600 text-sm">
+                      {resultado.erros} linha(s) ignorada(s) por erros.
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Lista detalhada de linhas com erro */}
+              {linhasComErro.length > 0 && (
+                <div className="flex-1 min-h-0 flex flex-col border rounded-lg overflow-hidden">
+                  <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-destructive/5 border-b">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <span className="font-medium text-sm">Linhas com erro</span>
+                    <Badge variant="destructive" className="ml-auto">
+                      {linhasComErro.length}
+                    </Badge>
+                  </div>
+                  <div className="flex-1 min-h-0 max-h-[40vh] overflow-y-auto">
+                    <div className="divide-y">
+                      {linhasComErro.map((linha) => (
+                        <div key={linha.linha} className="px-4 py-3 flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-destructive/10 text-destructive font-mono text-sm">
+                              {linha.linha}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm mb-1">
+                              {isLoteamento ? 'Lote' : 'Unidade'}: {linha.dados.numero || '(sem número)'}
+                            </div>
+                            <ul className="text-xs text-destructive space-y-1 list-none p-0 m-0">
+                              {linha.erros.map((erro, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                  <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  <span className="break-words">{erro}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            {linha.avisos.length > 0 && (
+                              <ul className="text-xs text-amber-600 space-y-1 list-none p-0 m-0 mt-2">
+                                {linha.avisos.map((aviso, idx) => (
+                                  <li key={idx} className="flex items-start gap-1.5">
+                                    <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                    <span className="break-words">{aviso}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
