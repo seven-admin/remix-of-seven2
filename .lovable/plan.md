@@ -1,82 +1,293 @@
 
-Objetivo
-- Fazer a etapa “Preview” e principalmente a etapa “Resultado” mostrarem claramente:
-  1) Qual(is) linha(s) deram erro
-  2) Qual foi o motivo do erro (mensagem legível e completa)
-  3) Permitir rolar (scroll) quando houver muitos erros/linhas
+# Plano: Portal do Incorporador
 
-Diagnóstico (com base no código atual)
-- A etapa 4 (Preview) já tenta exibir `linha.erros.join('; ')` e `linha.avisos.join('; ')`, então “mensagem não aparece” normalmente acontece por um destes motivos:
-  - (A) O erro está acontecendo no momento do INSERT (handleImportar) e não na validação (processarDadosFinais). Nesse caso, a UI não tem como mostrar “qual linha falhou”, porque o INSERT em lote falha como um todo e o catch só dá `console.error`.
-  - (B) A mensagem existe, mas fica visualmente “inacessível”:
-    - a célula tem `max-w-[200px]` e não força quebra de linha (`whitespace-normal / break-words`), então pode parecer “sumiu” dependendo do layout.
-    - o ScrollArea do Preview pode não estar calculando altura corretamente por falta de `min-h-0` no container flex da etapa 4, fazendo a área ficar “travada” (sem scroll real) quando há muita coisa.
-- A etapa 5 (Resultado) hoje só mostra um resumo (quantidades). Não existe lista detalhada de erros/linhas com scroll. Então, mesmo que o Preview tenha algo, após importar você perde a visão detalhada.
+## Objetivo
+Criar um portal dedicado para usuários com role "incorporador" (display_name: "Contratante"), similar ao Portal do Corretor existente, com layout próprio e acesso restrito aos dashboards: **Executivo**, **Forecast** e **Produção de Marketing**.
 
-Solução proposta (mudanças no frontend)
-1) Corrigir scroll de forma garantida na etapa 4 (Preview)
-   - Ajustar o wrapper da etapa preview para permitir que o filho com `flex-1` realmente encolha e ative overflow:
-     - Em `{etapa === 'preview'}`: adicionar `min-h-0` no container principal da etapa:
-       - De: `className="flex-1 overflow-hidden flex flex-col gap-4 py-4"`
-       - Para: `className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-0"`
-   - Ajustar o próprio container scrollável:
-     - Em vez de depender do Radix ScrollArea (que já deu dor de cabeça antes), trocar o ScrollArea da tabela do Preview por um `div` com `overflow-auto` e altura limitada, igual foi feito na etapa 3:
-       - Ex: `div className="flex-1 min-h-0 border rounded-lg overflow-auto"`
-     - Isso evita a classe de viewport/h-full do Radix e resolve o scroll de tabela de forma determinística.
+---
 
-2) Garantir que a mensagem do erro “apareça” visualmente (sem ficar truncada/“sumida”)
-   - Na célula “Erros/Avisos” (TableCell):
-     - Trocar de `className="max-w-[200px]"` para algo que quebre linha:
-       - `className="max-w-[320px] whitespace-normal break-words"`
-     - Renderizar erros e avisos em lista (um por linha) em vez de `join('; ')`, deixando mais legível:
-       - erros: `<ul className="space-y-1"> <li>...</li> </ul>`
-       - avisos idem (com ícone)
-   - Melhorar as mensagens geradas pelo validador para serem autoexplicativas:
-     - Ex: status inválido hoje: `Status inválido: "Disponível"`
-       - Passar a: `Status inválido: "Disponível". Valores aceitos: disponivel, reservada, vendida, bloqueada`
-     - Isso elimina a dúvida “qual é o válido” diretamente no erro.
+## Arquitetura Proposta
 
-3) Criar “Lista de erros com scroll” na etapa 5 (Resultado)
-   - Na etapa `resultado`, além do resumo, adicionar um bloco “Linhas com erro” quando `resultado.erros > 0` (ou `linhasComErro.length > 0`):
-     - Um painel com:
-       - título + badge com quantidade
-       - um container com `max-h-[40vh] overflow-y-auto` (scroll garantido)
-       - listar cada linha com:
-         - número da linha (linha.linha)
-         - número da unidade/lote (linha.dados.numero)
-         - lista de erros (e opcional avisos)
-   - Benefício: após a importação, você consegue ver exatamente quais linhas foram ignoradas e por quê, com scroll funcionando.
+### Layout Comparativo
 
-4) (Opcional, recomendado) Mostrar erro “do banco” quando o INSERT em lote falhar
-   - Problema: se o INSERT em lote falha, hoje não vira erro por linha; vira um erro geral (ex.: constraint, tipo inválido, etc).
-   - Ajuste:
-     - Adicionar um estado `erroImportacaoGeral: string | null`
-     - No `catch` de `handleImportar`, preencher `erroImportacaoGeral` com `error.message` (ou mensagem tratada)
-     - Exibir um `<Alert variant="destructive">` no topo do Preview/Resultado com esse detalhe.
-   - Observação importante: identificar “qual linha” falhou em um insert em lote não é confiável sem mudar a estratégia (inserir em batches menores ou linha-a-linha). Este plano foca em deixar claro:
-     - erros de validação (por linha) e
-     - erro geral do backend (quando for o caso).
+| Componente | Portal do Corretor | Portal do Incorporador |
+|------------|-------------------|------------------------|
+| Rota base | `/portal-corretor` | `/portal-incorporador` |
+| Layout | `PortalLayout.tsx` | `PortalIncorporadorLayout.tsx` |
+| Menu | Dashboard, Empreendimentos, Solicitações, Clientes | Dashboard, Executivo, Forecast, Marketing |
+| Filtro de dados | Próprio corretor | Empreendimentos vinculados |
 
-Arquivos a alterar
-- src/components/empreendimentos/ImportarUnidadesDialog.tsx
-  - Etapa 4 (preview): ajustar layout/scroll e renderização de erros/avisos
-  - Etapa 5 (resultado): adicionar lista detalhada e scrollável de erros
-  - Validação: melhorar texto de erros (status inválido com lista de válidos)
+### Fluxo de Dados
 
-Critérios de aceite (o que você deve conseguir fazer depois)
-- Importar um arquivo com muitas linhas com erro:
-  - No Preview:
-    - A coluna “Erros/Avisos” mostra mensagens completas, quebrando linha, sem “sumir”
-    - A tabela é rolável (scroll) dentro do modal
-  - No Resultado:
-    - Existe uma seção “Linhas com erro”
-    - A lista tem scroll e mostra linha + motivo claramente
-- Se ocorrer falha no INSERT em lote (ex.: constraint), aparece um alerta com a mensagem do erro geral do banco.
+```
+USUÁRIO INCORPORADOR
+       ↓
+Login → AuthContext detecta role = "incorporador"
+       ↓
+useDefaultRoute() retorna "/portal-incorporador"
+       ↓
+Hook useIncorporadorEmpreendimentos() busca user_empreendimentos
+       ↓
+Todos os dashboards filtram dados automaticamente
+```
 
-Plano de teste (passo a passo)
-1) Testar um Excel com 15+ linhas com erros variados (status inválido, valor não numérico, área inválida, número vazio):
-   - Confirmar que Preview mostra as mensagens completas e que a tabela rola.
-2) Executar a importação:
-   - Confirmar que a etapa Resultado mostra a lista de linhas com erro com scroll.
-3) Testar responsividade:
-   - Abrir o modal em viewport menor (ex.: notebook) e confirmar que a lista/tabela continua rolável e legível.
+---
+
+## Estrutura de Arquivos
+
+### Novos Arquivos a Criar
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/components/portal-incorporador/PortalIncorporadorLayout.tsx` | Layout com header/nav específico |
+| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Dashboard principal com KPIs consolidados |
+| `src/pages/portal-incorporador/PortalIncorporadorExecutivo.tsx` | Dashboard Executivo filtrado |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Forecast filtrado por empreendimentos |
+| `src/pages/portal-incorporador/PortalIncorporadorMarketing.tsx` | Tickets de marketing filtrados |
+| `src/hooks/useIncorporadorEmpreendimentos.ts` | Hook para buscar empreendimentos do incorporador |
+
+### Arquivos a Modificar
+
+| Arquivo | Modificação |
+|---------|-------------|
+| `src/App.tsx` | Adicionar rotas do portal incorporador |
+| `src/hooks/useDefaultRoute.ts` | Redirecionar incorporadores para `/portal-incorporador` |
+| `src/hooks/useDashboardExecutivo.ts` | Aceitar array de `empreendimentoIds` |
+| `src/hooks/useForecast.ts` | Adicionar filtro por `empreendimentoIds` |
+| `src/hooks/useDashboardMarketing.ts` | Adicionar filtro por `empreendimentoIds` |
+
+---
+
+## Detalhamento Técnico
+
+### 1. Hook `useIncorporadorEmpreendimentos`
+
+```typescript
+// src/hooks/useIncorporadorEmpreendimentos.ts
+export function useIncorporadorEmpreendimentos() {
+  const { user, role } = useAuth();
+  
+  const query = useQuery({
+    queryKey: ['incorporador-empreendimentos', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_empreendimentos')
+        .select(`
+          empreendimento_id,
+          empreendimento:empreendimentos(id, nome, status)
+        `)
+        .eq('user_id', user!.id);
+      
+      return {
+        ids: data?.map(d => d.empreendimento_id) || [],
+        empreendimentos: data?.map(d => d.empreendimento) || []
+      };
+    },
+    enabled: !!user && role === 'incorporador',
+  });
+  
+  return {
+    empreendimentoIds: query.data?.ids || [],
+    empreendimentos: query.data?.empreendimentos || [],
+    isLoading: query.isLoading,
+    isIncorporador: role === 'incorporador',
+  };
+}
+```
+
+### 2. Layout do Portal
+
+```typescript
+// src/components/portal-incorporador/PortalIncorporadorLayout.tsx
+const menuItems = [
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/portal-incorporador' },
+  { icon: BarChart3, label: 'Executivo', path: '/portal-incorporador/executivo' },
+  { icon: TrendingUp, label: 'Forecast', path: '/portal-incorporador/forecast' },
+  { icon: Palette, label: 'Marketing', path: '/portal-incorporador/marketing' },
+];
+```
+
+### 3. Modificação nos Hooks de Dashboard
+
+#### useDashboardExecutivo
+Aceitar `empreendimentoIds?: string[]` e filtrar todas as queries:
+```typescript
+// Antes
+.eq('empreendimento_id', empreendimentoId)
+
+// Depois
+.in('empreendimento_id', empreendimentoIds)
+```
+
+#### useForecast hooks
+Adicionar parâmetro `empreendimentoIds` para filtrar atividades:
+```typescript
+// Buscar clientes vinculados aos empreendimentos via negociações
+// ou atividades com empreendimento_id no array
+```
+
+#### useDashboardMarketing
+Adicionar filtro `empreendimentoIds` para `projetos_marketing`:
+```typescript
+if (empreendimentoIds?.length) {
+  query = query.in('empreendimento_id', empreendimentoIds);
+}
+```
+
+### 4. Rotas no App.tsx
+
+```typescript
+{/* Portal do Incorporador */}
+<Route 
+  path="/portal-incorporador" 
+  element={
+    <ProtectedRoute moduleName="portal_incorporador">
+      <PortalIncorporadorLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route index element={<PortalIncorporadorDashboard />} />
+  <Route path="executivo" element={<PortalIncorporadorExecutivo />} />
+  <Route path="forecast" element={<PortalIncorporadorForecast />} />
+  <Route path="marketing" element={<PortalIncorporadorMarketing />} />
+</Route>
+```
+
+### 5. Redirecionamento Automático
+
+```typescript
+// useDefaultRoute.ts - adicionar
+const routePriority = [
+  { path: '/', module: 'dashboard' },
+  { path: '/portal-incorporador', module: 'portal_incorporador' }, // Nova entrada
+  { path: '/marketing', module: 'projetos_marketing' },
+  // ...
+];
+
+// E na função getDefaultRoute:
+if (role === 'incorporador') {
+  return '/portal-incorporador';
+}
+```
+
+---
+
+## Configuração de Banco de Dados
+
+### 1. Criar módulo `portal_incorporador`
+
+```sql
+INSERT INTO modules (name, display_name, route, is_active)
+VALUES ('portal_incorporador', 'Portal do Contratante', '/portal-incorporador', true);
+```
+
+### 2. Configurar permissões para o role incorporador
+
+```sql
+-- Buscar IDs
+-- role_id do incorporador: 7ffff9af-4793-4f70-9ae1-c7211eccb579
+
+INSERT INTO role_permissions (role_id, module_id, can_view, can_create, can_edit, can_delete, scope)
+SELECT 
+  '7ffff9af-4793-4f70-9ae1-c7211eccb579',
+  m.id,
+  true,  -- can_view
+  false, -- can_create
+  false, -- can_edit
+  false, -- can_delete
+  'empreendimento'
+FROM modules m
+WHERE m.name = 'portal_incorporador';
+```
+
+---
+
+## Páginas do Portal
+
+### Dashboard Principal (`/portal-incorporador`)
+- **KPIs Consolidados**: Total de empreendimentos, unidades disponíveis, vendidas, valor vendido
+- **Ações Rápidas**: Links para Executivo, Forecast, Marketing
+- **Lista de Empreendimentos**: Cards com status de cada empreendimento vinculado
+
+### Dashboard Executivo (`/portal-incorporador/executivo`)
+- Reutiliza componentes do `DashboardExecutivo.tsx`
+- Remove seletor de empreendimento (usa automático)
+- Oculta informações sensíveis se necessário (ex: comissões detalhadas)
+
+### Forecast (`/portal-incorporador/forecast`)
+- Reutiliza componentes do `Forecast.tsx`
+- Filtrado automaticamente pelos empreendimentos
+- Remove seletor de gestor (visualização consolidada)
+
+### Marketing (`/portal-incorporador/marketing`)
+- Lista de tickets vinculados aos empreendimentos
+- Somente visualização (sem criar/editar)
+- Status de produção e prazos
+
+---
+
+## Considerações de Segurança
+
+### RLS para projetos_marketing
+Adicionar policy para incorporadores visualizarem tickets:
+
+```sql
+CREATE POLICY "incorporadores_view_tickets"
+ON projetos_marketing
+FOR SELECT
+TO authenticated
+USING (
+  public.is_admin(auth.uid()) 
+  OR (
+    public.has_role(auth.uid(), 'incorporador')
+    AND empreendimento_id IN (
+      SELECT empreendimento_id 
+      FROM user_empreendimentos 
+      WHERE user_id = auth.uid()
+    )
+  )
+  OR -- políticas existentes...
+);
+```
+
+### Dados Sensíveis
+Os incorporadores NÃO devem ver:
+- Detalhes de comissões de corretores
+- Dados de outros clientes/negociações fora dos seus empreendimentos
+- Configurações internas do sistema
+
+---
+
+## Fluxo de Cadastro
+
+1. Admin cria usuário com role "incorporador" (Contratante)
+2. Admin vincula empreendimentos via aba "Empreendimentos" na edição do usuário
+3. Incorporador faz login
+4. Sistema detecta role e redireciona para `/portal-incorporador`
+5. Portal exibe dados filtrados automaticamente
+
+---
+
+## Fases de Implementação
+
+| Fase | Entregáveis | Estimativa |
+|------|-------------|------------|
+| 1 | Hook `useIncorporadorEmpreendimentos` + módulo no banco | 15 min |
+| 2 | Layout `PortalIncorporadorLayout` + Dashboard principal | 30 min |
+| 3 | Modificar hooks para aceitar array de empreendimentos | 30 min |
+| 4 | Páginas Executivo, Forecast, Marketing | 45 min |
+| 5 | Rotas, redirecionamento e RLS | 20 min |
+| 6 | Testes e ajustes | 20 min |
+
+**Total estimado: ~2h30**
+
+---
+
+## Critérios de Aceite
+
+1. Usuário com role "incorporador" é redirecionado automaticamente para `/portal-incorporador`
+2. Portal exibe apenas dados dos empreendimentos vinculados ao usuário
+3. Menu mostra apenas: Dashboard, Executivo, Forecast, Marketing
+4. Não é possível acessar rotas administrativas do sistema principal
+5. Dashboards funcionam corretamente com filtro automático
+6. Layout responsivo (desktop e mobile)
