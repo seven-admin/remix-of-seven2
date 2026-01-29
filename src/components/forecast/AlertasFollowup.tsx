@@ -44,7 +44,8 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
       corretor_id: atividade.corretor_id || undefined,
       empreendimento_id: atividade.empreendimento_id || undefined,
       gestor_id: atividade.gestor_id || undefined,
-      data_hora: new Date().toISOString(),
+      data_inicio: new Date().toISOString().split('T')[0],
+      data_fim: new Date().toISOString().split('T')[0],
     };
     
     // Primeiro marca como realizado, depois cria a nova
@@ -59,8 +60,8 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
     ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
     ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
   ].sort((a, b) => {
-    const dataA = a.tipo_alerta === 'vencida' ? a.data_hora : a.data_followup;
-    const dataB = b.tipo_alerta === 'vencida' ? b.data_hora : b.data_followup;
+    const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
+    const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
     return new Date(dataA!).getTime() - new Date(dataB!).getTime();
   });
 
@@ -107,9 +108,9 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
             <div className="space-y-3">
               {alertas.map((alerta) => {
                 const dataRef = alerta.tipo_alerta === 'vencida' 
-                  ? alerta.data_hora 
+                  ? alerta.data_fim 
                   : alerta.data_followup;
-                const atraso = formatDistanceToNow(new Date(dataRef!), {
+                const atraso = formatDistanceToNow(new Date(`${dataRef}T00:00:00`), {
                   addSuffix: true,
                   locale: ptBR,
                 });

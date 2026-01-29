@@ -12,6 +12,7 @@ import {
   isToday,
   addMonths,
   subMonths,
+  parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -33,14 +34,21 @@ export function AgendaCalendario({
 }: AgendaCalendarioProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
 
+  // Mapeia atividades por dia, considerando intervalo de datas
   const atividadesPorDia = useMemo(() => {
     const map = new Map<string, Atividade[]>();
     atividades.forEach((ativ) => {
-      const key = format(new Date(ativ.data_hora), 'yyyy-MM-dd');
-      if (!map.has(key)) {
-        map.set(key, []);
-      }
-      map.get(key)!.push(ativ);
+      const inicio = parseISO(ativ.data_inicio);
+      const fim = parseISO(ativ.data_fim);
+      const dias = eachDayOfInterval({ start: inicio, end: fim });
+      
+      dias.forEach((dia) => {
+        const key = format(dia, 'yyyy-MM-dd');
+        if (!map.has(key)) {
+          map.set(key, []);
+        }
+        map.get(key)!.push(ativ);
+      });
     });
     return map;
   }, [atividades]);
@@ -101,7 +109,7 @@ export function AgendaCalendario({
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const hasAtividades = dayAtividades.length > 0;
           const hasVencidas = dayAtividades.some(
-            (a) => a.status === 'pendente' && new Date(a.data_hora) < new Date()
+            (a) => a.status === 'pendente' && new Date(a.data_fim) < new Date()
           );
 
           return (

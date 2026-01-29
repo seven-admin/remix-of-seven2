@@ -59,9 +59,8 @@ const formSchema = z
     corretor_id: z.string().optional(),
     imobiliaria_id: z.string().optional(),
     empreendimento_id: z.string().optional(),
-    data: z.date({ required_error: 'Data é obrigatória' }),
-    hora: z.string().min(1, 'Hora é obrigatória'),
-    duracao_minutos: z.coerce.number().min(5).max(480).optional(),
+    data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
+    data_fim: z.date({ required_error: 'Data de fim é obrigatória' }),
     observacoes: z.string().optional(),
     temperatura_cliente: z.enum(['frio', 'morno', 'quente']).optional(),
     requer_followup: z.boolean().default(false),
@@ -75,6 +74,14 @@ const formSchema = z
         code: z.ZodIssueCode.custom,
         path: ['categoria'],
         message: 'Selecione uma categoria',
+      });
+    }
+    // Validar que data_fim >= data_inicio
+    if (values.data_inicio && values.data_fim && values.data_fim < values.data_inicio) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['data_fim'],
+        message: 'Data de fim deve ser igual ou posterior à data de início',
       });
     }
   });
@@ -124,20 +131,19 @@ export function AtividadeForm(props: AtividadeFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipo: initialData?.tipo || 'ligacao',
-        categoria: (initialData?.categoria as AtividadeCategoria) || undefined,
+      categoria: (initialData?.categoria as AtividadeCategoria) || undefined,
       titulo: initialData?.titulo || '',
       cliente_id: initialData?.cliente_id || defaultClienteId || undefined,
       corretor_id: initialData?.corretor_id || undefined,
       imobiliaria_id: initialData?.imobiliaria_id || undefined,
       empreendimento_id: initialData?.empreendimento_id || undefined,
-      data: initialData ? new Date(initialData.data_hora) : new Date(),
-      hora: initialData ? format(new Date(initialData.data_hora), 'HH:mm') : '09:00',
-      duracao_minutos: initialData?.duracao_minutos || 30,
+      data_inicio: initialData ? new Date(`${initialData.data_inicio}T00:00:00`) : new Date(),
+      data_fim: initialData ? new Date(`${initialData.data_fim}T00:00:00`) : new Date(),
       observacoes: initialData?.observacoes || '',
       temperatura_cliente: initialData?.temperatura_cliente || undefined,
       requer_followup: initialData?.requer_followup || false,
       data_followup: initialData?.data_followup ? new Date(initialData.data_followup) : undefined,
-        deadline_date: initialData?.deadline_date ? new Date(initialData.deadline_date) : undefined,
+      deadline_date: initialData?.deadline_date ? new Date(initialData.deadline_date) : undefined,
     },
   });
 
@@ -168,10 +174,6 @@ export function AtividadeForm(props: AtividadeFormProps) {
   }, [gestorData?.autoSelectedId, form, initialData]);
 
   const handleFormSubmit = (values: FormValues) => {
-    const [hours, minutes] = values.hora.split(':').map(Number);
-    const dataHora = new Date(values.data);
-    dataHora.setHours(hours, minutes, 0, 0);
-
     const formData: AtividadeFormData = {
       tipo: values.tipo,
       ...(values.cliente_id && values.categoria
@@ -184,8 +186,8 @@ export function AtividadeForm(props: AtividadeFormProps) {
       empreendimento_id: values.empreendimento_id || undefined,
       // gestor_id só é definido na CRIAÇÃO - nunca no update (imutável)
       ...(initialData ? {} : { gestor_id: user?.id }),
-      data_hora: dataHora.toISOString(),
-      duracao_minutos: values.duracao_minutos,
+      data_inicio: format(values.data_inicio, 'yyyy-MM-dd'),
+      data_fim: format(values.data_fim, 'yyyy-MM-dd'),
       observacoes: values.observacoes || undefined,
       temperatura_cliente: values.temperatura_cliente as ClienteTemperatura | undefined,
       requer_followup: values.requer_followup,
@@ -374,14 +376,57 @@ export function AtividadeForm(props: AtividadeFormProps) {
           </Card>
         )}
 
-        {/* Data e Hora */}
+        {/* Datas: Início e Fim */}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="data"
+            name="data_inicio"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Data</FormLabel>
+                <FormLabel>Data de Início</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !field.value && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, 'dd/MM/yyyy') : 'Selecione'}
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        // Se data_fim é anterior, ajusta para mesma data
+                        const dataFim = form.getValues('data_fim');
+                        if (date && dataFim && date > dataFim) {
+                          form.setValue('data_fim', date);
+                        }
+                      }}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="data_fim"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data de Fim</FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -402,25 +447,15 @@ export function AtividadeForm(props: AtividadeFormProps) {
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      disabled={(date) => {
+                        const dataInicio = form.getValues('data_inicio');
+                        return dataInicio ? date < dataInicio : false;
+                      }}
                       initialFocus
                       className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="hora"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Hora</FormLabel>
-                <FormControl>
-                  <Input type="time" {...field} />
-                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

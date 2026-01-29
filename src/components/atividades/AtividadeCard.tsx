@@ -1,5 +1,5 @@
-import { Phone, Users, MapPin, MessageSquare, Clock, Building2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Phone, Users, MapPin, MessageSquare, Clock, Building2, Calendar } from 'lucide-react';
+import { format, parseISO, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,23 @@ const TIPO_COLORS: Record<AtividadeTipo, string> = {
   atendimento: 'bg-orange-500',
 };
 
+// Formata intervalo de datas para exibição
+function formatDateRange(dataInicio: string, dataFim: string): string {
+  const inicio = parseISO(dataInicio);
+  const fim = parseISO(dataFim);
+  
+  if (isSameDay(inicio, fim)) {
+    return format(inicio, 'dd/MM/yyyy', { locale: ptBR });
+  }
+  
+  // Se mesmo mês e ano, simplifica
+  if (inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear()) {
+    return `${format(inicio, 'dd', { locale: ptBR })} - ${format(fim, 'dd/MM/yyyy', { locale: ptBR })}`;
+  }
+  
+  return `${format(inicio, 'dd/MM', { locale: ptBR })} - ${format(fim, 'dd/MM/yyyy', { locale: ptBR })}`;
+}
+
 interface AtividadeCardProps {
   atividade: Atividade;
   compact?: boolean;
@@ -29,10 +46,9 @@ interface AtividadeCardProps {
 
 export function AtividadeCard({ atividade, compact = false, onClick }: AtividadeCardProps) {
   const Icon = TIPO_ICONS[atividade.tipo];
-  const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
+  const isVencida = atividade.status === 'pendente' && new Date(atividade.data_fim) < new Date();
 
   if (compact) {
-    const data = new Date(atividade.data_hora);
     return (
       <div
         onClick={onClick}
@@ -51,7 +67,7 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
               {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
             </p>
             <p className="text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
-              {format(data, "dd/MM 'às' HH:mm", { locale: ptBR })}
+              {formatDateRange(atividade.data_inicio, atividade.data_fim)}
             </p>
           </div>
 
@@ -111,9 +127,9 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
 
           <div className="mt-2 space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
+              <Calendar className="h-3 w-3" />
               <span>
-                {format(new Date(atividade.data_hora), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                {formatDateRange(atividade.data_inicio, atividade.data_fim)}
               </span>
             </div>
 

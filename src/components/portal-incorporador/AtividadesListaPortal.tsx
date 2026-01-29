@@ -73,9 +73,9 @@ export function AtividadesListaPortal({ empreendimentoIds, dataSelecionada, onLi
     pageSize 
   });
 
-  const isAtrasada = (dataHora: string, status: string) => {
+  const isAtrasada = (dataFim: string, status: string) => {
     if (status !== 'pendente') return false;
-    return isBefore(parseISO(dataHora), new Date());
+    return isBefore(parseISO(dataFim), new Date());
   };
 
   if (isLoading) {
@@ -168,7 +168,7 @@ export function AtividadesListaPortal({ empreendimentoIds, dataSelecionada, onLi
               <div className="space-y-2">
                 {atividades.map((atividade) => {
                   const Icon = TIPO_ICONS[atividade.tipo] || Headphones;
-                  const atrasada = isAtrasada(atividade.data_hora, atividade.status);
+                  const atrasada = isAtrasada(atividade.data_fim, atividade.status);
                   
                   return (
                     <div
@@ -206,7 +206,10 @@ export function AtividadesListaPortal({ empreendimentoIds, dataSelecionada, onLi
                             <span>🏢 {atividade.empreendimento.nome}</span>
                           )}
                           <span>
-                            📅 {format(parseISO(atividade.data_hora), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                            📅 {atividade.data_inicio === atividade.data_fim 
+                              ? format(parseISO(atividade.data_inicio), "dd/MM/yyyy", { locale: ptBR })
+                              : `${format(parseISO(atividade.data_inicio), "dd/MM", { locale: ptBR })} - ${format(parseISO(atividade.data_fim), "dd/MM/yyyy", { locale: ptBR })}`
+                            }
                           </span>
                         </div>
                       </div>

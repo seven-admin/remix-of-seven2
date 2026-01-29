@@ -1,6 +1,6 @@
-import { format } from 'date-fns';
+import { format, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, Clock, Plus } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,17 +22,18 @@ export function AgendaDia({
   onNovaAtividade,
   className,
 }: AgendaDiaProps) {
-  // Agrupar por hora
-  const atividadesPorHora = atividades.reduce((acc, ativ) => {
-    const hora = format(new Date(ativ.data_hora), 'HH:00');
-    if (!acc[hora]) {
-      acc[hora] = [];
-    }
-    acc[hora].push(ativ);
-    return acc;
-  }, {} as Record<string, Atividade[]>);
+  // Filtrar atividades que se sobrepõem ao dia selecionado
+  const dataStr = format(data, 'yyyy-MM-dd');
+  const atividadesDoDia = atividades.filter((ativ) => {
+    const inicio = ativ.data_inicio;
+    const fim = ativ.data_fim;
+    return inicio <= dataStr && fim >= dataStr;
+  });
 
-  const horas = Object.keys(atividadesPorHora).sort();
+  // Ordenar por título (sem hora, não há agrupamento por hora)
+  const atividadesOrdenadas = [...atividadesDoDia].sort((a, b) => 
+    a.titulo.localeCompare(b.titulo)
+  );
 
   return (
     <div
@@ -50,7 +51,7 @@ export function AgendaDia({
               {format(data, "EEEE, d 'de' MMMM", { locale: ptBR })}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {atividades.length} {atividades.length === 1 ? 'atividade' : 'atividades'}
+              {atividadesOrdenadas.length} {atividadesOrdenadas.length === 1 ? 'atividade' : 'atividades'}
             </p>
           </div>
         </div>
@@ -62,9 +63,9 @@ export function AgendaDia({
         )}
       </div>
 
-      {/* Timeline */}
+      {/* Lista de atividades */}
       <ScrollArea className="flex-1 min-h-0">
-        {atividades.length === 0 ? (
+        {atividadesOrdenadas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <CalendarDays className="h-12 w-12 mb-4 opacity-50" />
             <p>Nenhuma atividade para este dia</p>
@@ -75,34 +76,14 @@ export function AgendaDia({
             )}
           </div>
         ) : (
-          <div className="p-3 space-y-3">
-            {horas.map((hora) => (
-              <div key={hora} className="flex gap-3">
-                {/* Hora */}
-                <div className="w-12 flex-shrink-0">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>{hora}</span>
-                  </div>
-                </div>
-
-                {/* Linha do tempo */}
-                <div className="relative flex-shrink-0 w-px bg-border">
-                  <div className="absolute top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary" />
-                </div>
-
-                {/* Atividades */}
-                <div className="flex-1 min-w-0 space-y-1.5 pb-3">
-                  {atividadesPorHora[hora].map((atividade) => (
-                    <AtividadeCard
-                      key={atividade.id}
-                      atividade={atividade}
-                      compact
-                      onClick={() => onAtividadeClick?.(atividade)}
-                    />
-                  ))}
-                </div>
-              </div>
+          <div className="p-3 space-y-2">
+            {atividadesOrdenadas.map((atividade) => (
+              <AtividadeCard
+                key={atividade.id}
+                atividade={atividade}
+                compact
+                onClick={() => onAtividadeClick?.(atividade)}
+              />
             ))}
           </div>
         )}

@@ -46,8 +46,9 @@ function applyAtividadesFilters(query: any, filters?: AtividadeFilters) {
     q = q.eq('empreendimento_id', filters.empreendimento_id);
   }
   if (filters?.cliente_id) q = q.eq('cliente_id', filters.cliente_id);
-  if (filters?.data_inicio) q = q.gte('data_hora', filters.data_inicio);
-  if (filters?.data_fim) q = q.lte('data_hora', filters.data_fim);
+  // Filtrar por período: atividades que se sobrepõem ao intervalo solicitado
+  if (filters?.data_inicio) q = q.lte('data_inicio', filters.data_inicio);
+  if (filters?.data_fim) q = q.gte('data_fim', filters.data_fim);
   return q;
 }
 
@@ -88,7 +89,7 @@ export function useAtividades(options: UseAtividadesOptions = {}) {
 
       dataQuery = dataQuery
         // Lista em /atividades: sempre mais recentes primeiro
-        .order('data_hora', { ascending: false })
+        .order('data_inicio', { ascending: false })
         .range(from, to);
 
       const { data, error } = await dataQuery;
@@ -375,10 +376,10 @@ export function useAgendaMensal(ano: number, mes: number, gestorId?: string, fil
       let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo), empreendimento:empreendimentos(id, nome)`)
-        .gte('data_hora', dataInicio.toISOString())
-        .lte('data_hora', dataFim.toISOString())
+        .lte('data_inicio', dataFim.toISOString())
+        .gte('data_fim', dataInicio.toISOString())
         .neq('status', 'cancelada')
-        .order('data_hora', { ascending: true });
+        .order('data_inicio', { ascending: true });
 
       if (gestorId) query = query.eq('gestor_id', gestorId);
 
@@ -404,10 +405,10 @@ export function useAgendaDia(data: Date, gestorId?: string) {
       let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo), empreendimento:empreendimentos(id, nome)`)
-        .gte('data_hora', `${dataStr}T00:00:00`)
-        .lte('data_hora', `${dataStr}T23:59:59`)
+        .lte('data_inicio', dataStr)
+        .gte('data_fim', dataStr)
         .neq('status', 'cancelada')
-        .order('data_hora', { ascending: true });
+        .order('data_inicio', { ascending: true });
 
       if (gestorId) query = query.eq('gestor_id', gestorId);
 
@@ -427,10 +428,10 @@ export function useAtividadesHoje(filters?: AtividadeFilters) {
       let query = supabase
         .from('atividades')
         .select(`*, cliente:clientes(id, nome, temperatura), corretor:corretores(id, nome_completo)`)
-        .gte('data_hora', `${hoje}T00:00:00`)
-        .lte('data_hora', `${hoje}T23:59:59`)
+        .lte('data_inicio', hoje)
+        .gte('data_fim', hoje)
         .neq('status', 'cancelada')
-        .order('data_hora', { ascending: true });
+        .order('data_inicio', { ascending: true });
 
       // Aplicar filtros opcionais (exceto data, já aplicada acima)
       if (filters) {
@@ -461,8 +462,8 @@ export function useAtividadesVencidas(gestorId?: string) {
           gestor:profiles(id, full_name)
         `)
         .eq('status', 'pendente')
-        .lt('data_hora', new Date().toISOString())
-        .order('data_hora', { ascending: true });
+        .lt('data_fim', new Date().toISOString().split('T')[0])
+        .order('data_fim', { ascending: true });
 
       if (gestorId) query = query.eq('gestor_id', gestorId);
 

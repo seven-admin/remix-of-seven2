@@ -170,21 +170,18 @@ export function AtividadeDetalheDialog({ atividade, loading = false, open, onOpe
 
             <Separator />
 
-            {/* Data e Hora */}
+            {/* Data de Início e Fim */}
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>{format(new Date(atividade.data_hora), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                <span className="text-sm text-muted-foreground">Início:</span>
+                <span>{format(new Date(`${atividade.data_inicio}T00:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{format(new Date(atividade.data_hora), 'HH:mm')}</span>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Fim:</span>
+                <span>{format(new Date(`${atividade.data_fim}T00:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
               </div>
-              {atividade.duracao_minutos && (
-                <span className="text-sm text-muted-foreground">
-                  ({atividade.duracao_minutos} min)
-                </span>
-              )}
             </div>
 
             {/* Prazo (deadline) */}
