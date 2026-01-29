@@ -22,6 +22,7 @@ import {
 
 export default function PortalIncorporadorForecast() {
   const [tab, setTab] = useState<'dashboard' | 'atividades'>('dashboard');
+  const [dataSelecionada, setDataSelecionada] = useState<Date | null>(null);
   const { empreendimentoIds, isLoading: loadingEmps } = useIncorporadorEmpreendimentos();
   
   // Passar empreendimentoIds para filtrar os dados do incorporador
@@ -156,10 +157,18 @@ export default function PortalIncorporadorForecast() {
         <TabsContent value="atividades" className="space-y-6 mt-6">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="lg:col-span-1">
-              <CalendarioCompacto empreendimentoIds={empreendimentoIds} />
+              <CalendarioCompacto 
+                empreendimentoIds={empreendimentoIds} 
+                onDayClick={setDataSelecionada}
+                selectedDate={dataSelecionada}
+              />
             </div>
             <div className="lg:col-span-2">
-              <AtividadesListaPortal empreendimentoIds={empreendimentoIds} />
+              <AtividadesListaPortal 
+                empreendimentoIds={empreendimentoIds}
+                dataSelecionada={dataSelecionada}
+                onLimparData={() => setDataSelecionada(null)}
+              />
             </div>
           </div>
         </TabsContent>

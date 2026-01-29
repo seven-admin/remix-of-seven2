@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils';
 interface CalendarioCompactoProps {
   gestorId?: string;
   empreendimentoIds?: string[];
+  onDayClick?: (date: Date) => void;
+  selectedDate?: Date | null;
 }
 
-export function CalendarioCompacto({ gestorId, empreendimentoIds }: CalendarioCompactoProps) {
+export function CalendarioCompacto({ gestorId, empreendimentoIds, onDayClick, selectedDate }: CalendarioCompactoProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const { data: diasComAtividades, isLoading } = useCalendarioAtividades(
     currentMonth.getFullYear(),
@@ -113,25 +115,28 @@ export function CalendarioCompacto({ gestorId, empreendimentoIds }: CalendarioCo
           {days.map((day) => {
             const quantidade = getQuantidadeByDay(day);
             const intensity = getIntensity(quantidade);
+            const isSelected = selectedDate && isSameDay(day, selectedDate);
 
             return (
               <div
                 key={day.toISOString()}
+                onClick={() => onDayClick?.(day)}
                 className={cn(
                   'aspect-square flex items-center justify-center rounded-md text-xs relative transition-all',
                   'hover:ring-1 hover:ring-primary/50',
                   isToday(day) && 'ring-2 ring-primary font-bold',
-                  intensity,
-                  quantidade > 0 && 'cursor-pointer'
+                  isSelected && 'bg-primary text-primary-foreground ring-2 ring-primary',
+                  !isSelected && intensity,
+                  (quantidade > 0 || onDayClick) && 'cursor-pointer'
                 )}
                 title={quantidade > 0 ? `${quantidade} atividade(s)` : undefined}
               >
                 <span className={cn(
-                  isToday(day) && 'text-primary'
+                  isToday(day) && !isSelected && 'text-primary'
                 )}>
                   {format(day, 'd')}
                 </span>
-                {quantidade > 0 && (
+                {quantidade > 0 && !isSelected && (
                   <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
                 )}
               </div>

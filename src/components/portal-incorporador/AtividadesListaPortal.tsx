@@ -15,7 +15,7 @@ import {
   type AtividadeStatus,
   type AtividadeFilters 
 } from '@/types/atividades.types';
-import { format, isBefore, parseISO } from 'date-fns';
+import { format, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Phone, 
@@ -25,11 +25,14 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  ListFilter
+  ListFilter,
+  X
 } from 'lucide-react';
 
 interface AtividadesListaPortalProps {
   empreendimentoIds: string[];
+  dataSelecionada?: Date | null;
+  onLimparData?: () => void;
 }
 
 const TIPO_ICONS: Record<string, React.ElementType> = {
@@ -39,7 +42,7 @@ const TIPO_ICONS: Record<string, React.ElementType> = {
   atendimento: Headphones,
 };
 
-export function AtividadesListaPortal({ empreendimentoIds }: AtividadesListaPortalProps) {
+export function AtividadesListaPortal({ empreendimentoIds, dataSelecionada, onLimparData }: AtividadesListaPortalProps) {
   const [tipoFiltro, setTipoFiltro] = useState<AtividadeTipo | 'todos'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<AtividadeStatus | 'todos'>('todos');
   const [page, setPage] = useState(1);
@@ -52,12 +55,16 @@ export function AtividadesListaPortal({ empreendimentoIds }: AtividadesListaPort
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [tipoFiltro, statusFiltro]);
+  }, [tipoFiltro, statusFiltro, dataSelecionada]);
 
   const filters: AtividadeFilters = {
     empreendimento_ids: empreendimentoIds,
     ...(tipoFiltro !== 'todos' && { tipo: tipoFiltro }),
     ...(statusFiltro !== 'todos' && { status: statusFiltro }),
+    ...(dataSelecionada && {
+      data_inicio: startOfDay(dataSelecionada).toISOString(),
+      data_fim: endOfDay(dataSelecionada).toISOString(),
+    }),
   };
 
   const { data: atividadesData, isLoading } = useAtividades({ 
@@ -105,7 +112,7 @@ export function AtividadesListaPortal({ empreendimentoIds }: AtividadesListaPort
               Lista de Atividades
               <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as AtividadeTipo | 'todos')}>
                 <SelectTrigger className="w-[130px] h-8 text-xs">
                   <SelectValue placeholder="Tipo" />
@@ -130,12 +137,32 @@ export function AtividadesListaPortal({ empreendimentoIds }: AtividadesListaPort
               </Select>
             </div>
           </div>
+          
+          {/* Badge de data selecionada */}
+          {dataSelecionada && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="gap-1">
+                📅 {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
+                  onClick={onLimparData}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="flex-1 min-h-0">
           <ScrollArea className="h-[400px] pr-3">
             {atividades.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Nenhuma atividade encontrada
+                {dataSelecionada 
+                  ? `Nenhuma atividade em ${format(dataSelecionada, "dd/MM/yyyy", { locale: ptBR })}`
+                  : 'Nenhuma atividade encontrada'
+                }
               </div>
             ) : (
               <div className="space-y-2">
