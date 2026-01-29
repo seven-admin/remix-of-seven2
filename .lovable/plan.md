@@ -1,267 +1,139 @@
 
 
-# Plano: Implementar Aba "Criativo" com Upload de Imagens nos Tickets de Marketing
+# Plano: Corrigir Listagem de Membros da Equipe de Criação
 
-## Objetivo
+## Problema Identificado
 
-Criar uma nova aba "Criativo" na página de detalhes do ticket de marketing (`MarketingDetalhe.tsx`) onde os usuários poderão fazer upload de imagens relacionadas ao ticket (renders, artes, vídeos, etc.).
+O hook `useEquipeMarketing.ts` busca membros da equipe apenas na tabela `user_module_permissions`, que armazena **permissões customizadas por usuário**. 
+
+A maioria dos usuários herda suas permissões através do **role** (via `role_permissions`), e não tem registros em `user_module_permissions`.
+
+### Dados do Banco
+
+| Fonte | Usuários encontrados |
+|-------|---------------------|
+| `user_module_permissions` | 1 (Jéssica) |
+| `role_permissions` via role | 5 (Priscila, Jéssica, Rafael, Jonas, Kalebe) |
+
+### Resultado Atual
+Apenas Jéssica aparece em `/marketing/equipe`
 
 ---
 
-## Arquitetura da Solução
+## Solução
+
+Atualizar a lógica do hook para buscar membros de **ambas as fontes**:
+1. Usuários com permissões customizadas (`user_module_permissions`)
+2. Usuários com roles que possuem acesso ao módulo (`role_permissions` + `user_roles`)
+
+---
+
+## Alterações Necessárias
+
+### Arquivo: `src/hooks/useEquipeMarketing.ts`
+
+Modificar a query de busca de membros da equipe:
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    MarketingDetalhe.tsx                        │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ Tabs: Tarefas | Comentários | Histórico | [CRIATIVO]     │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                              ↓                                  │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │              ProjetoCriativos.tsx (novo)                  │ │
-│  │  - Grid de imagens/vídeos                                 │ │
-│  │  - Upload múltiplo                                        │ │
-│  │  - Preview e exclusão                                     │ │
-│  │  - Marcar imagem como "final"                             │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  useTicketCriativos.ts (novo)                  │
-│  - Buscar criativos do ticket                                  │
-│  - Upload para Supabase Storage                                │
-│  - Criar/atualizar/deletar registros                           │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                   Supabase Storage                             │
-│  Bucket: projetos-arquivos (já existe, privado)                │
-│  Path: {projeto_id}/{timestamp}.{ext}                          │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│               Tabela: ticket_criativos (novo)                  │
-│  - id, projeto_id, tipo, nome, url, is_final, created_at       │
-└─────────────────────────────────────────────────────────────────┘
+ANTES (linha 65-77):
+- Busca apenas em user_module_permissions
+- Resultado: 1 usuário
+
+DEPOIS:
+- Busca em user_module_permissions (permissões customizadas)
+- Busca em user_roles + role_permissions (permissões via role)
+- Combina resultados removendo duplicatas
+- Exclui admin/super_admin
+- Resultado: 5 usuários
 ```
 
----
-
-## Etapa 1: Criar Tabela no Banco de Dados
-
-**Arquivo**: Migration SQL
-
-```sql
-CREATE TABLE public.ticket_criativos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  projeto_id UUID NOT NULL REFERENCES public.projetos_marketing(id) ON DELETE CASCADE,
-  tipo TEXT NOT NULL DEFAULT 'imagem', -- 'imagem' ou 'video'
-  nome TEXT,
-  url TEXT NOT NULL,
-  is_final BOOLEAN DEFAULT false,
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Índice para busca rápida
-CREATE INDEX idx_ticket_criativos_projeto ON public.ticket_criativos(projeto_id);
-
--- RLS
-ALTER TABLE public.ticket_criativos ENABLE ROW LEVEL SECURITY;
-
--- Políticas de acesso
-CREATE POLICY "Admins podem tudo em criativos"
-  ON public.ticket_criativos FOR ALL
-  USING (public.is_admin(auth.uid()));
-
-CREATE POLICY "Marketing supervisors podem gerenciar criativos"
-  ON public.ticket_criativos FOR ALL
-  USING (public.is_marketing_supervisor(auth.uid()));
-
-CREATE POLICY "Usuários autenticados podem visualizar criativos"
-  ON public.ticket_criativos FOR SELECT
-  TO authenticated
-  USING (true);
-```
-
----
-
-## Etapa 2: Configurar Políticas do Bucket Storage
-
-**Arquivo**: Migration SQL
-
-```sql
--- Permitir upload para usuários de marketing
-CREATE POLICY "Marketing team can upload"
-  ON storage.objects FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    bucket_id = 'projetos-arquivos' 
-    AND (public.is_admin(auth.uid()) OR public.is_marketing_supervisor(auth.uid()))
-  );
-
--- Permitir leitura para usuários autenticados
-CREATE POLICY "Authenticated users can view"
-  ON storage.objects FOR SELECT
-  TO authenticated
-  USING (bucket_id = 'projetos-arquivos');
-
--- Permitir exclusão para marketing
-CREATE POLICY "Marketing team can delete"
-  ON storage.objects FOR DELETE
-  TO authenticated
-  USING (
-    bucket_id = 'projetos-arquivos' 
-    AND (public.is_admin(auth.uid()) OR public.is_marketing_supervisor(auth.uid()))
-  );
-```
-
----
-
-## Etapa 3: Criar Type para Criativo
-
-**Arquivo**: `src/types/marketing.types.ts`
-
-Adicionar novo type:
+### Nova Lógica
 
 ```typescript
-export interface TicketCriativo {
-  id: string;
-  projeto_id: string;
-  tipo: 'imagem' | 'video';
-  nome: string | null;
-  url: string;
-  is_final: boolean;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// 1. Buscar usuários COM permissões customizadas no módulo
+const { data: permissoesCustomizadas } = await supabase
+  .from('user_module_permissions')
+  .select('user_id')
+  .eq('module_id', moduloMarketing.id)
+  .eq('can_view', true);
+
+// 2. Buscar usuários COM permissões via ROLE
+const { data: permissoesViaRole } = await supabase
+  .from('user_roles')
+  .select('user_id, role_id')
+  .in('role_id', roleIdsComAcessoMarketing);
+
+// 3. Combinar IDs únicos
+const todosUserIds = new Set([
+  ...(permissoesCustomizadas || []).map(p => p.user_id),
+  ...(permissoesViaRole || []).map(p => p.user_id)
+]);
+
+// 4. Buscar profiles e filtrar admins
 ```
 
 ---
 
-## Etapa 4: Criar Hook `useTicketCriativos`
+## Diagrama do Fluxo Corrigido
 
-**Arquivo**: `src/hooks/useTicketCriativos.ts`
-
-Funcionalidades:
-- `useTicketCriativos(projetoId)` - Buscar criativos
-- `uploadCriativo` - Upload de arquivo para storage + insert na tabela
-- `deleteCriativo` - Remover do storage + delete na tabela
-- `setAsFinal` - Marcar/desmarcar criativo como versão final
-
-Padrão baseado no `useEmpreendimentoMidias.ts` existente.
-
----
-
-## Etapa 5: Criar Componente `ProjetoCriativos`
-
-**Arquivo**: `src/components/marketing/ProjetoCriativos.tsx`
-
-Layout:
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Criativos                            [+ Enviar Arquivo]     │
-│ 3 arquivos                                                  │
-├─────────────────────────────────────────────────────────────┤
-│ ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐         │
-│ │         │  │         │  │         │  │         │         │
-│ │  IMG 1  │  │  IMG 2  │  │  VIDEO  │  │  IMG 3  │         │
-│ │ [FINAL] │  │         │  │         │  │         │         │
-│ └─────────┘  └─────────┘  └─────────┘  └─────────┘         │
-│                                                             │
-│ Hover: [⭐ Definir Final] [🗑️ Excluir] [↗️ Abrir]          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Funcionalidades:
-- Grid responsivo de thumbnails
-- Upload múltiplo (arrastar e soltar ou clique)
-- Preview ao clicar (lightbox simples)
-- Badge "FINAL" para versão aprovada
-- Botões de ação no hover
-
----
-
-## Etapa 6: Integrar na Página de Detalhes
-
-**Arquivo**: `src/pages/MarketingDetalhe.tsx`
-
-Alterações:
-1. Importar `ProjetoCriativos`
-2. Adicionar aba "Criativo" ao `TabsList`
-3. Adicionar `TabsContent` para a nova aba
-
-```tsx
-import { Image } from 'lucide-react';
-import { ProjetoCriativos } from '@/components/marketing/ProjetoCriativos';
-
-// Na TabsList:
-<TabsTrigger value="criativo" className="gap-2">
-  <Image className="h-4 w-4" />
-  Criativo
-</TabsTrigger>
-
-// No TabsContent:
-<TabsContent value="criativo" className="mt-4">
-  <ProjetoCriativos projetoId={projeto.id} />
-</TabsContent>
+┌─────────────────────────────────────────────────────────────────┐
+│                    useEquipeMarketing.ts                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Buscar módulo projetos_marketing                           │
+│                     ↓                                           │
+│  2. Buscar roles com acesso ao módulo                          │
+│     └─→ role_permissions WHERE module_id = X AND can_view      │
+│                     ↓                                           │
+│  3. Buscar usuários com esses roles                            │
+│     └─→ user_roles WHERE role_id IN (roles_com_acesso)         │
+│                     ↓                                           │
+│  4. Buscar usuários com permissões customizadas                │
+│     └─→ user_module_permissions WHERE module_id = X            │
+│                     ↓                                           │
+│  5. Combinar (UNION de user_ids)                               │
+│                     ↓                                           │
+│  6. Excluir admin/super_admin                                  │
+│                     ↓                                           │
+│  7. Buscar profiles e métricas                                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Resumo de Arquivos a Criar/Modificar
+## Resultado Esperado
 
-| Arquivo | Ação |
-|---------|------|
-| Migration SQL | Criar tabela `ticket_criativos` + RLS + políticas storage |
-| `src/types/marketing.types.ts` | Adicionar interface `TicketCriativo` |
-| `src/hooks/useTicketCriativos.ts` | Criar hook completo |
-| `src/components/marketing/ProjetoCriativos.tsx` | Criar componente de galeria |
-| `src/pages/MarketingDetalhe.tsx` | Adicionar aba "Criativo" |
+| Antes | Depois |
+|-------|--------|
+| 1 membro (Jéssica) | 5 membros (Priscila, Jéssica, Rafael, Jonas, Kalebe) |
 
 ---
 
 ## Detalhes Técnicos
 
-### Upload de Arquivos
+### Roles que devem aparecer
 
-O bucket `projetos-arquivos` já existe e é privado. Os arquivos serão organizados por projeto:
+Os roles de marketing ativos são:
+- `supervisão_de_criação` 
+- `diretor_de_marketing`
 
-```
-projetos-arquivos/
-  └── {projeto_id}/
-      ├── 1706540000000.jpg
-      ├── 1706540001000.png
-      └── 1706540002000.mp4
-```
+### Exclusões
 
-### URLs de Acesso
+Serão excluídos usuários com roles:
+- `admin`
+- `super_admin`
 
-Como o bucket é privado, usaremos `createSignedUrl` para gerar URLs temporárias:
-
-```typescript
-const { data } = await supabase.storage
-  .from('projetos-arquivos')
-  .createSignedUrl(filePath, 3600); // 1 hora de validade
-```
-
-### Formatos Aceitos
-
-- Imagens: JPG, PNG, WEBP, GIF
-- Vídeos: MP4, MOV, WEBM
+Isso garante que apenas membros executores apareçam na listagem, não gestores/administradores.
 
 ---
 
 ## Critérios de Aceite
 
-1. Usuários podem acessar a aba "Criativo" no detalhe do ticket
-2. Usuários podem fazer upload de imagens e vídeos
-3. Thumbnails são exibidos em um grid responsivo
-4. Usuários podem marcar uma imagem como "versão final"
-5. Usuários podem excluir arquivos
-6. Usuários podem visualizar arquivos em tamanho maior
-7. Apenas usuários de marketing podem fazer upload/exclusão
-8. Políticas RLS protegem os dados adequadamente
+1. Todos os usuários com role de marketing aparecem na página
+2. Usuários com permissões customizadas também aparecem
+3. Não há duplicatas na listagem
+4. Admins/super_admins não aparecem
+5. Métricas de tickets são calculadas corretamente para cada membro
 
