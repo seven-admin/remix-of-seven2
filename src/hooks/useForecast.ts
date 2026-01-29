@@ -354,21 +354,36 @@ export function useAtividadesPorCorretor(
 }
 
 // Novo hook: Calendário de atividades (por dia)
-export function useCalendarioAtividades(ano: number, mes: number) {
+export function useCalendarioAtividades(
+  ano: number, 
+  mes: number,
+  gestorId?: string,
+  empreendimentoIds?: string[]
+) {
   return useQuery({
-    queryKey: ['forecast', 'calendario-atividades', ano, mes],
+    queryKey: ['forecast', 'calendario-atividades', ano, mes, gestorId || 'all', empreendimentoIds?.join(',') || 'all'],
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: true,
     queryFn: async () => {
       const inicioMes = new Date(ano, mes - 1, 1);
       const fimMes = new Date(ano, mes, 0, 23, 59, 59);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('atividades' as any)
         .select('data_hora')
         .gte('data_hora', inicioMes.toISOString())
         .lte('data_hora', fimMes.toISOString())
         .neq('status', 'cancelada');
+
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
