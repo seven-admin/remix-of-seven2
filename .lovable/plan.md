@@ -1,177 +1,181 @@
 
+# Plano: Filtro por Mês no Dashboard de Marketing
 
-# Plano: Corrigir Visibilidade da Equipe de Criação para Supervisores de Marketing
+## Objetivo
 
-## Problema Identificado
-
-Os membros da equipe de criação **não aparecem** para usuários com perfis de `diretor_de_marketing` ou `supervisão_de_criação` devido a políticas RLS restritivas.
-
-### Análise das Políticas Atuais
-
-| Tabela | Política | Quem pode ver |
-|--------|----------|---------------|
-| `profiles` | "Admins can view all profiles" | Apenas `admin` e `super_admin` |
-| `profiles` | "Users can view their own profile" | Apenas o próprio perfil |
-| `user_roles` | "Admins can view all roles" | Apenas `admin` e `super_admin` |
-| `user_roles` | "Users can view their own role" | Apenas a própria role |
-
-### Resultado
-
-Quando a Jéssica (Diretora de Marketing) acessa `/marketing/equipe`:
-1. O hook busca roles com acesso ao módulo de marketing - funciona
-2. O hook busca `user_roles` para encontrar usuários - **só retorna a própria Jéssica**
-3. O hook busca `profiles` dos usuários - **só retorna o perfil da Jéssica**
-4. O hook exclui admins da lista - Jéssica não é admin
-5. **Resultado**: Apenas 1 membro (Jéssica) aparece, sem os outros da equipe
+Substituir o filtro de período (7d, 30d, 90d, todos) por um **seletor de mês** similar ao usado no Forecast, mantendo consistência visual com os outros dashboards do sistema.
 
 ---
 
-## Solução Proposta
+## Comparação: Antes e Depois
 
-Adicionar políticas RLS que permitam que **supervisores de marketing** vejam os perfis e roles de **outros membros com acesso ao módulo de marketing**.
+| Aspecto | Antes | Depois |
+|---------|-------|--------|
+| Tipo de filtro | Período relativo (7d, 30d, 90d, all) | Mês calendário (Janeiro 2025, etc.) |
+| Navegação | Dropdown select | Setas + botões de atalho |
+| Lógica de dados | Data início/fim calculada com `subDays`/`subMonths` | `startOfMonth`/`endOfMonth` do mês selecionado |
+| Comparação | Não tem | Pode adicionar variação vs mês anterior |
 
-### Opção Recomendada: Políticas Específicas para Marketing
+---
 
-Criar políticas que usam a função existente `is_marketing_supervisor()` para permitir que supervisores de marketing vejam profiles e roles relevantes.
+## Interface Proposta
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Dashboard Marketing                                                      │
+│ Visão consolidada de tickets, prazos e produtividade                    │
+│                                                                          │
+│                     Atualizado: 14:21:18  [30s]                         │
+│                                                                          │
+│  [🔄] [<] Janeiro de 2025 [>] [Este mês] [Mês anterior]                 │
+│       [Categoria ▼] [Tipo ▼]                        [📺 Modo TV]        │
+│                                                                          │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐     │
+│  │Ativos  │ │Produção│ │Aprovação│ │Concluídos│ │Atrasados│ │Tempo   │  │
+│  │   12   │ │   5    │ │   3     │ │    8    │ │   2    │ │  4.5d  │   │
+│  └────────┘ └────────┘ └────────┘ └────────────┘ └────────┘ └────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Alterações Técnicas
 
-### 1. Nova Política RLS na tabela `profiles`
+### 1. Estado de Competência (src/pages/DashboardMarketing.tsx)
 
-```sql
--- Supervisores de marketing podem ver profiles de usuários com acesso ao módulo de marketing
-CREATE POLICY "Marketing supervisors can view marketing team profiles"
-ON public.profiles
-FOR SELECT
-TO authenticated
-USING (
-  -- O usuário logado é um supervisor de marketing
-  public.is_marketing_supervisor(auth.uid())
-  AND
-  -- E o perfil pertence a alguém com acesso ao módulo de marketing
-  id IN (
-    SELECT ur.user_id 
-    FROM public.user_roles ur
-    JOIN public.role_permissions rp ON rp.role_id = ur.role_id
-    JOIN public.modules m ON m.id = rp.module_id
-    WHERE m.name = 'projetos_marketing'
-    AND rp.can_view = true
-    UNION
-    SELECT ump.user_id
-    FROM public.user_module_permissions ump
-    JOIN public.modules m ON m.id = ump.module_id
-    WHERE m.name = 'projetos_marketing'
-    AND ump.can_view = true
-  )
-);
+```typescript
+// REMOVER
+type PeriodoFilter = '7d' | '30d' | '90d' | 'all';
+const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
+
+// ADICIONAR
+const [competencia, setCompetencia] = useState(new Date());
+
+// Calcular período baseado no mês selecionado
+const filters = useMemo(() => {
+  const periodoInicio = startOfMonth(competencia);
+  const periodoFim = endOfMonth(competencia);
+  
+  return {
+    periodoInicio,
+    periodoFim,
+    categoria: categoria === 'all' ? undefined : categoria,
+    tipo: tipo === 'all' ? undefined : tipo,
+  };
+}, [competencia, categoria, tipo]);
 ```
 
-### 2. Nova Política RLS na tabela `user_roles`
+### 2. Componente de Seletor de Mês (no PageHeader actions)
 
-```sql
--- Supervisores de marketing podem ver roles de usuários com acesso ao módulo de marketing
-CREATE POLICY "Marketing supervisors can view marketing team roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (
-  -- O usuário logado é um supervisor de marketing
-  public.is_marketing_supervisor(auth.uid())
-  AND
-  -- E a role pertence a alguém com acesso ao módulo de marketing
-  user_id IN (
-    SELECT ur2.user_id 
-    FROM public.user_roles ur2
-    JOIN public.role_permissions rp ON rp.role_id = ur2.role_id
-    JOIN public.modules m ON m.id = rp.module_id
-    WHERE m.name = 'projetos_marketing'
-    AND rp.can_view = true
-    UNION
-    SELECT ump.user_id
-    FROM public.user_module_permissions ump
-    JOIN public.modules m ON m.id = ump.module_id
-    WHERE m.name = 'projetos_marketing'
-    AND ump.can_view = true
-  )
-);
+Reutilizar o mesmo padrão visual do Forecast:
+
+```typescript
+<div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+  <Button 
+    variant="ghost" 
+    size="icon" 
+    className="h-8 w-8"
+    onClick={() => setCompetencia(subMonths(competencia, 1))}
+  >
+    <ChevronLeft className="h-4 w-4" />
+  </Button>
+  <div className="min-w-[140px] text-center font-medium text-sm capitalize">
+    {format(competencia, "MMMM 'de' yyyy", { locale: ptBR })}
+  </div>
+  <Button 
+    variant="ghost" 
+    size="icon" 
+    className="h-8 w-8"
+    onClick={() => setCompetencia(addMonths(competencia, 1))}
+  >
+    <ChevronRight className="h-4 w-4" />
+  </Button>
+</div>
+
+{/* Atalhos rápidos */}
+<div className="flex gap-1">
+  <Button 
+    variant={format(competencia, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'default' : 'outline'} 
+    size="sm"
+    onClick={() => setCompetencia(new Date())}
+  >
+    Este mês
+  </Button>
+  <Button 
+    variant={format(competencia, 'yyyy-MM') === format(subMonths(new Date(), 1), 'yyyy-MM') ? 'default' : 'outline'} 
+    size="sm"
+    onClick={() => setCompetencia(subMonths(new Date(), 1))}
+  >
+    Mês anterior
+  </Button>
+</div>
 ```
 
----
+### 3. Imports a Adicionar
 
-## Alternativa Simplificada
-
-Se as subqueries forem muito complexas, podemos usar uma abordagem mais simples:
-
-### Permitir que supervisores de marketing vejam TODOS os profiles (somente leitura)
-
-```sql
--- Supervisores de marketing podem ver todos os profiles
-CREATE POLICY "Marketing supervisors can view all profiles"
-ON public.profiles
-FOR SELECT
-TO authenticated
-USING (public.is_marketing_supervisor(auth.uid()));
+```typescript
+import { startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 ```
 
-```sql
--- Supervisores de marketing podem ver todos os user_roles
-CREATE POLICY "Marketing supervisors can view all user_roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (public.is_marketing_supervisor(auth.uid()));
-```
+### 4. Remover Código Obsoleto
 
-Esta opção é **mais simples** e **mais segura** em termos de performance, mas dá acesso a mais dados do que o estritamente necessário.
-
----
-
-## Resultado Esperado
-
-Após a aplicação das políticas:
-
-1. Jéssica (Diretora de Marketing) poderá ver todos os membros da equipe
-2. Jonas, Kalebe, Priscila, Rafael (Supervisão de Criação) também verão a equipe completa
-3. Admins e Super Admins continuam vendo normalmente
-4. Usuários sem perfil de marketing não conseguem ver a equipe
+- Remover a constante `PERIODO_OPTIONS`
+- Remover o tipo `PeriodoFilter`
+- Remover o estado `periodo`
+- Remover o `<Select>` de período do PageHeader
 
 ---
 
 ## Arquivos a Modificar
 
-| Tipo | Ação |
-|------|------|
-| Migração SQL | Criar nova migração com as políticas RLS |
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/DashboardMarketing.tsx` | Substituir filtro de período por seletor de mês |
 
 ---
 
-## SQL Completo para Migração
+## Comportamento do Hook (sem alterações)
 
-```sql
--- Política para profiles: supervisores de marketing podem ver profiles da equipe
-CREATE POLICY "Marketing supervisors can view all profiles"
-ON public.profiles
-FOR SELECT
-TO authenticated
-USING (public.is_marketing_supervisor(auth.uid()));
+O hook `useDashboardMarketing` já recebe `periodoInicio` e `periodoFim` como `Date`, portanto **não precisa de alterações**:
 
--- Política para user_roles: supervisores de marketing podem ver roles da equipe
-CREATE POLICY "Marketing supervisors can view all user_roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (public.is_marketing_supervisor(auth.uid()));
+```typescript
+// Hook já funciona assim:
+const periodoInicio = filters?.periodoInicio || subWeeks(hoje, 4);
+const periodoFim = filters?.periodoFim || hoje;
 ```
+
+Apenas passaremos as datas do mês selecionado em vez de datas relativas.
+
+---
+
+## Modo TV
+
+O modo TV também será atualizado para exibir o mês selecionado no header:
+
+```typescript
+<span className="text-sm font-medium text-primary uppercase">
+  {format(competencia, "MMM/yyyy", { locale: ptBR })}
+</span>
+```
+
+---
+
+## Resultado Esperado
+
+1. Seletor de mês com navegação por setas (← Janeiro de 2025 →)
+2. Botões de atalho "Este mês" e "Mês anterior" com destaque visual quando ativos
+3. Todos os KPIs e gráficos filtrados pelo mês selecionado
+4. Consistência visual com o Dashboard de Forecast
+5. Modo TV exibe o mês selecionado no header
 
 ---
 
 ## Critérios de Aceite
 
-1. Diretora de Marketing vê todos os 5 membros da equipe (Jéssica, Jonas, Kalebe, Priscila, Rafael)
-2. Supervisores de Criação veem todos os membros da equipe
-3. Super Admins e Admins continuam vendo a equipe normalmente
-4. Usuários sem acesso ao módulo de marketing não conseguem ver a página
-5. As políticas são apenas para SELECT (leitura), não afetam edição
-
+1. Navegação por setas funciona corretamente
+2. Botões de atalho destacam quando o período correspondente está selecionado
+3. KPIs refletem apenas dados do mês selecionado
+4. Gráfico "Entregas por Semana" mostra semanas do mês selecionado
+5. Listas de atrasados e próximas entregas respeitam o filtro de mês
+6. Modo TV exibe o mês no header
