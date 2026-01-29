@@ -1,193 +1,237 @@
 
-# Plano: Adicionar Calendário de Atividades ao Portal do Incorporador
+# Plano: Nova Aba "Atividades" no Forecast do Portal do Incorporador
 
 ## Objetivo
 
-Adicionar o **Calendário Compacto de Atividades** à página de Forecast do Portal do Incorporador, garantindo que exiba apenas atividades vinculadas aos empreendimentos do incorporador logado.
+Criar uma nova aba no Forecast do Portal do Incorporador com:
+1. **Lista funcional de atividades** com clique para ver detalhes
+2. **Calendário de atividades** integrado
+3. Filtros por tipo, status e período
+4. Todos os dados filtrados pelos empreendimentos vinculados ao incorporador
 
 ---
 
-## Análise do Código Atual
+## Estrutura Proposta
 
-| Componente/Hook | Status | Problema |
-|-----------------|--------|----------|
-| `CalendarioCompacto` | Existe | Não aceita filtro por `empreendimentoIds` |
-| `useCalendarioAtividades` | Existe | Não filtra por `empreendimentoIds` |
-| `PortalIncorporadorForecast` | Existe | Não inclui o calendário |
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Forecast do Incorporador                                                │
+│                                                                          │
+│  [Dashboard]  [Atividades]     ← Nova aba com Tabs                      │
+│                                                                          │
+│  ──────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+│  Quando "Atividades" selecionada:                                       │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │ Filtros: [Tipo ▼] [Status ▼] [Mês ▼]                               │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌──────────────────────────┐ ┌──────────────────────────────────────┐  │
+│  │  Calendário Compacto     │ │        Lista de Atividades           │  │
+│  │  [< Janeiro 2025 >]      │ │  ┌────────────────────────────────┐  │  │
+│  │  D S T Q Q S S           │ │  │ 📞 Ligação - João Silva       │  │  │
+│  │  • • •   •               │ │  │    29/01 14:00 - Pendente      │  │  │
+│  │     •    • •             │ │  └────────────────────────────────┘  │  │
+│  │                          │ │  ┌────────────────────────────────┐  │  │
+│  │  [Legenda: 1-2, 3-5...]  │ │  │ 🏠 Visita - Maria Souza        │  │  │
+│  │                          │ │  │    28/01 10:00 - Concluída     │  │  │
+│  └──────────────────────────┘ │  └────────────────────────────────┘  │  │
+│                               │         ...mais atividades...        │  │
+│                               └──────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Alterações Técnicas
 
-### 1. Atualizar Hook `useCalendarioAtividades` (src/hooks/useForecast.ts)
-
-Adicionar parâmetros opcionais para `gestorId` e `empreendimentoIds`:
+### 1. Adicionar `empreendimento_ids` ao tipo de filtro (src/types/atividades.types.ts)
 
 ```typescript
-export function useCalendarioAtividades(
-  ano: number, 
-  mes: number,
-  gestorId?: string,           // NOVO
-  empreendimentoIds?: string[] // NOVO
-) {
-  return useQuery({
-    queryKey: ['forecast', 'calendario-atividades', ano, mes, gestorId || 'all', empreendimentoIds?.join(',') || 'all'],
-    refetchInterval: 60 * 1000,
-    refetchIntervalInBackground: true,
-    queryFn: async () => {
-      const inicioMes = new Date(ano, mes - 1, 1);
-      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+export interface AtividadeFilters {
+  // ... campos existentes ...
+  empreendimento_id?: string;
+  empreendimento_ids?: string[]; // NOVO: suporte a múltiplos empreendimentos
+}
+```
 
-      let query = supabase
-        .from('atividades' as any)
-        .select('data_hora')
-        .gte('data_hora', inicioMes.toISOString())
-        .lte('data_hora', fimMes.toISOString())
-        .neq('status', 'cancelada');
+### 2. Atualizar função de filtros (src/hooks/useAtividades.ts)
 
-      // NOVOS FILTROS
-      if (gestorId) {
-        query = query.eq('gestor_id', gestorId);
-      }
-      
-      if (empreendimentoIds?.length) {
-        query = query.in('empreendimento_id', empreendimentoIds);
-      }
+```typescript
+function applyAtividadesFilters(query: any, filters?: AtividadeFilters) {
+  let q = query as any;
+  // ... filtros existentes ...
+  
+  // Suporte a múltiplos empreendimentos (novo)
+  if (filters?.empreendimento_ids?.length) {
+    q = q.in('empreendimento_id', filters.empreendimento_ids);
+  } else if (filters?.empreendimento_id) {
+    q = q.eq('empreendimento_id', filters.empreendimento_id);
+  }
+  
+  // ... resto dos filtros ...
+}
+```
 
-      const { data, error } = await query;
-      if (error) throw error;
+### 3. Criar componente de Lista de Atividades para Portal (src/components/portal-incorporador/AtividadesListaPortal.tsx)
 
-      const contagem = new Map<number, number>();
-      (data || []).forEach((ativ: any) => {
-        const dia = new Date(ativ.data_hora).getDate();
-        contagem.set(dia, (contagem.get(dia) || 0) + 1);
-      });
+Componente dedicado com:
+- Lista de atividades com scroll
+- Clique para abrir diálogo de detalhes
+- Badge de status e tipo
+- Indicador de atraso
+- Filtros inline (tipo, status)
 
-      return Array.from(contagem.entries())
-        .map(([dia, quantidade]) => ({ dia, quantidade }))
-        .sort((a, b) => a.dia - b.dia);
-    },
+```typescript
+interface AtividadesListaPortalProps {
+  empreendimentoIds: string[];
+}
+
+export function AtividadesListaPortal({ empreendimentoIds }: AtividadesListaPortalProps) {
+  const [filters, setFilters] = useState<AtividadeFilters>({
+    empreendimento_ids: empreendimentoIds
   });
+  const [page, setPage] = useState(1);
+  const [detalheAtividadeId, setDetalheAtividadeId] = useState<string | null>(null);
+  
+  const { data: atividadesData, isLoading } = useAtividades({ 
+    filters, 
+    page, 
+    pageSize: 20 
+  });
+  
+  // ... renderização da lista com clique para detalhes
 }
 ```
 
-### 2. Atualizar Componente `CalendarioCompacto` (src/components/forecast/CalendarioCompacto.tsx)
+### 4. Atualizar página do Forecast do Portal (src/pages/portal-incorporador/PortalIncorporadorForecast.tsx)
 
-Adicionar props opcionais:
+Adicionar sistema de abas:
 
 ```typescript
-interface CalendarioCompactoProps {
-  gestorId?: string;
-  empreendimentoIds?: string[];
-}
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
-export function CalendarioCompacto({ gestorId, empreendimentoIds }: CalendarioCompactoProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const { data: diasComAtividades, isLoading } = useCalendarioAtividades(
-    currentMonth.getFullYear(),
-    currentMonth.getMonth() + 1,
-    gestorId,           // NOVO
-    empreendimentoIds   // NOVO
+export default function PortalIncorporadorForecast() {
+  const [tab, setTab] = useState<'dashboard' | 'atividades'>('dashboard');
+  
+  return (
+    <div className="space-y-6">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList>
+          <TabsTrigger value="dashboard" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="atividades" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Atividades
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
+      {tab === 'dashboard' && (
+        // Conteúdo atual do dashboard
+      )}
+      
+      {tab === 'atividades' && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <CalendarioCompacto empreendimentoIds={empreendimentoIds} />
+          </div>
+          <div className="lg:col-span-2">
+            <AtividadesListaPortal empreendimentoIds={empreendimentoIds} />
+          </div>
+        </div>
+      )}
+    </div>
   );
-  // ... restante do código permanece igual
 }
-```
-
-### 3. Adicionar Calendário ao Portal do Incorporador (src/pages/portal-incorporador/PortalIncorporadorForecast.tsx)
-
-Importar e renderizar o calendário passando os IDs dos empreendimentos:
-
-```typescript
-import { CalendarioCompacto } from '@/components/forecast/CalendarioCompacto';
-
-// ... dentro do return
-<div className="grid gap-4 lg:grid-cols-2">
-  <AtividadesPorTipo empreendimentoIds={empreendimentoIds} />
-  <ProximasAtividades empreendimentoIds={empreendimentoIds} />
-</div>
-
-{/* NOVO: Calendário Compacto */}
-<div className="grid gap-4 lg:grid-cols-2">
-  <CalendarioCompacto empreendimentoIds={empreendimentoIds} />
-  <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
-</div>
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivos a Modificar/Criar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useForecast.ts` | Adicionar parâmetros `gestorId` e `empreendimentoIds` ao hook `useCalendarioAtividades` |
-| `src/components/forecast/CalendarioCompacto.tsx` | Adicionar props e passá-las ao hook |
-| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Importar e renderizar `CalendarioCompacto` com filtro |
+| Arquivo | Acao |
+|---------|------|
+| `src/types/atividades.types.ts` | Adicionar `empreendimento_ids` ao tipo `AtividadeFilters` |
+| `src/hooks/useAtividades.ts` | Atualizar `applyAtividadesFilters` para suportar array de IDs |
+| `src/components/portal-incorporador/AtividadesListaPortal.tsx` | **CRIAR** - Componente de lista de atividades |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Adicionar sistema de abas e integrar componentes |
 
 ---
 
 ## Fluxo de Dados
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ useIncorporadorEmpreendimentos()                                │
-│   → Retorna lista de empreendimentoIds vinculados ao usuário   │
-└─────────────────────────────────────┬───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ useIncorporadorEmpreendimentos()                                        │
+│   → Retorna empreendimentoIds vinculados ao incorporador                │
+└─────────────────────────────────────┬───────────────────────────────────┘
                                       │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ CalendarioCompacto({ empreendimentoIds })                       │
-│   → Passa IDs para o hook                                       │
-└─────────────────────────────────────┬───────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ useCalendarioAtividades(ano, mes, undefined, empreendimentoIds) │
-│   → Query filtra: .in('empreendimento_id', empreendimentoIds)   │
-└─────────────────────────────────────┬───────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Resultado: Apenas atividades dos empreendimentos do incorporador│
-└─────────────────────────────────────────────────────────────────┘
+                    ┌─────────────────┴─────────────────┐
+                    ▼                                   ▼
+┌───────────────────────────────────┐   ┌───────────────────────────────────┐
+│ CalendarioCompacto                │   │ AtividadesListaPortal             │
+│   empreendimentoIds=[...]         │   │   empreendimentoIds=[...]         │
+└─────────────────────┬─────────────┘   └─────────────────────┬─────────────┘
+                      │                                       │
+                      ▼                                       ▼
+┌───────────────────────────────────┐   ┌───────────────────────────────────┐
+│ useCalendarioAtividades           │   │ useAtividades                     │
+│   .in('empreendimento_id', ids)   │   │   .in('empreendimento_id', ids)   │
+└───────────────────────────────────┘   └───────────────────────────────────┘
 ```
 
 ---
 
-## Segurança
+## Componente AtividadesListaPortal - Detalhes
 
-As políticas RLS existentes na tabela `atividades` já garantem que o incorporador só veja atividades de seus empreendimentos:
+### Funcionalidades
 
-```sql
--- Política existente para incorporadores
-CREATE POLICY "Incorporadores can view their project activities"
-ON public.atividades FOR SELECT
-USING (
-  public.is_incorporador(auth.uid())
-  AND empreendimento_id IN (
-    SELECT empreendimento_id FROM public.user_empreendimentos
-    WHERE user_id = auth.uid()
-  )
-);
+1. **Lista com scroll** - ScrollArea com altura definida
+2. **Card de atividade clicável** - Abre `AtividadeDetalheDialog`
+3. **Badges visuais** - Tipo, status, indicador de atraso
+4. **Filtros inline** - Tipo e Status como Select
+5. **Paginacao** - Controles de pagina no rodape
+
+### Layout do Card de Atividade
+
+```text
+┌────────────────────────────────────────────────────────────────┐
+│ 📞 [Ligação]  [Pendente]                           [Atrasada!] │
+│ Contato inicial com cliente                                    │
+│ 👤 João Silva  •  🏢 Residencial Aurora  •  29/01 às 14:00    │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-O filtro adicional no frontend é uma camada extra de segurança e otimização de performance.
+---
+
+## Seguranca
+
+- RLS existente na tabela `atividades` garante que incorporadores so vejam atividades dos seus empreendimentos
+- Filtro no frontend e uma camada extra de seguranca e otimizacao
 
 ---
 
 ## Resultado Esperado
 
-1. O calendário aparece na página de Forecast do Portal do Incorporador
-2. Exibe apenas atividades dos empreendimentos vinculados ao usuário
-3. Navegação por mês funciona corretamente
-4. Intensidade visual (cores) reflete a quantidade de atividades por dia
-5. Layout responsivo em grid com outros componentes
+1. Nova aba "Atividades" visivel no Forecast do Portal do Incorporador
+2. Calendario compacto na lateral esquerda
+3. Lista de atividades clicavel na direita
+4. Filtros por tipo e status funcionais
+5. Clique em atividade abre dialogo de detalhes completo
+6. Todos os dados filtrados pelos empreendimentos do incorporador
 
 ---
 
-## Critérios de Aceite
+## Criterios de Aceite
 
-1. Calendário visível na página `/portal-incorporador/forecast`
-2. Apenas atividades dos empreendimentos do incorporador são contabilizadas
-3. Navegação entre meses funciona
-4. Dias com atividades exibem indicador visual
-5. Tooltip mostra quantidade de atividades ao passar o mouse
+1. Abas "Dashboard" e "Atividades" funcionam corretamente
+2. Lista exibe apenas atividades dos empreendimentos vinculados
+3. Calendario sincronizado com a lista
+4. Clique em atividade abre detalhes
+5. Filtros de tipo e status funcionam
+6. Paginacao funciona corretamente
+7. Layout responsivo em mobile
