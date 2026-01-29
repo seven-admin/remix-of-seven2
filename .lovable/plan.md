@@ -1,53 +1,22 @@
 
 
-# Plano: Mover Título para o Header
+# Plano: Corrigir Alinhamento do Header
 
-## Objetivo
+## Problema Identificado
 
-Posicionar "Portal do Incorporador" ao lado da logo no header e remover o título duplicado da área de conteúdo na página principal.
-
----
-
-## Mudança Visual
-
-### Antes (Atual)
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ [Logo]                                       Nome Usuário   [Sair]  │
-└─────────────────────────────────────────────────────────────────────┘
-
-  Portal do Incorporador          <-- Título abaixo do header
-  Visão geral dos seus empreendimentos
-```
-
-### Depois (Proposto)
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ [Logo]  Portal do Incorporador               Nome Usuário   [Sair]  │
-└─────────────────────────────────────────────────────────────────────┘
-
-  Visão geral dos seus empreendimentos    <-- Apenas subtitle
-```
+O texto "Portal do Incorporador" não está centralizado verticalmente com o logo. O logo contém duas linhas de texto (nome + tagline) o que o torna mais alto, e o texto do título está ficando desalinhado.
 
 ---
 
-## Comportamento por Página
+## Solução
 
-| Página | Header | Área de Conteúdo |
-|--------|--------|------------------|
-| `/portal-incorporador` | Logo + "Portal do Incorporador" | Apenas subtitle |
-| `/portal-incorporador/executivo` | Logo + "Portal do Incorporador" | "Voltar" + "Dashboard Executivo" + subtitle |
-| `/portal-incorporador/forecast` | Logo + "Portal do Incorporador" | "Voltar" + "Forecast" + subtitle |
-| `/portal-incorporador/marketing` | Logo + "Portal do Incorporador" | "Voltar" + "Produção de Marketing" + subtitle |
+Ajustar o CSS para garantir alinhamento vertical central entre logo e texto:
 
----
+### Mudanças no Header
 
-## Alterações Técnicas
+**Arquivo:** `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
 
-### Arquivo: `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
-
-**1. Adicionar título ao lado da logo no header:**
-
+**Antes:**
 ```tsx
 <Link to="/portal-incorporador" className="flex items-center gap-3">
   <img src={logo} alt="Logo" className="h-8" />
@@ -57,31 +26,36 @@ Posicionar "Portal do Incorporador" ao lado da logo no header e remover o títul
 </Link>
 ```
 
-**2. Ajustar área de conteúdo:**
-
-- Na página principal (`/portal-incorporador`): exibir apenas o subtitle
-- Nas páginas internas: manter título específico (Dashboard Executivo, Forecast, etc.)
-
+**Depois:**
 ```tsx
-<div className="mb-6">
-  {isInternalPage && (
-    <>
-      <Link to="/portal-incorporador" className="...">
-        <ArrowLeft /> Voltar
-      </Link>
-      <h1 className="text-2xl font-bold">{title}</h1>
-    </>
-  )}
-  {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
-</div>
+<Link to="/portal-incorporador" className="flex items-center gap-3">
+  <img src={logo} alt="Logo" className="h-10" />
+  <span className="font-semibold text-xl hidden sm:inline leading-none">
+    Portal do Incorporador
+  </span>
+</Link>
 ```
+
+### Alterações:
+
+| Elemento | Antes | Depois | Motivo |
+|----------|-------|--------|--------|
+| Logo altura | `h-8` (32px) | `h-10` (40px) | Aumentar para melhor legibilidade e proporção |
+| Texto tamanho | `text-lg` | `text-xl` | Proporção visual com logo maior |
+| Line-height | padrão | `leading-none` | Remove espaçamento extra que causa desalinhamento |
 
 ---
 
-## Resultado Final
+## Resultado Esperado
 
-- Header mais informativo com identificação clara do portal
-- Página principal sem título duplicado (apenas subtitle)
-- Páginas internas mantêm seus títulos específicos
-- Título "Portal do Incorporador" oculto em mobile (para não ocupar espaço)
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ [sevengroup     ]                                                   │
+│ [ACELERADORA...]   Portal do Incorporador       Nome Usuário [Sair] │
+└─────────────────────────────────────────────────────────────────────┘
+         ↑                    ↑
+    Logo centrado        Texto centrado verticalmente
+```
+
+O `items-center` do flex garantirá que ambos fiquem alinhados pelo centro vertical.
 
