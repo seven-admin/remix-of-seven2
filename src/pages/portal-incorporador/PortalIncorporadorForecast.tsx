@@ -3,6 +3,7 @@ import { useIncorporadorEmpreendimentos } from '@/hooks/useIncorporadorEmpreendi
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FunilTemperatura } from '@/components/forecast/FunilTemperatura';
 import { VisitasPorEmpreendimento } from '@/components/forecast/VisitasPorEmpreendimento';
 import { AtividadesPorTipo } from '@/components/forecast/AtividadesPorTipo';
@@ -18,6 +19,7 @@ import {
   AlertTriangle,
   BarChart3,
   ListTodo,
+  Info,
 } from 'lucide-react';
 
 export default function PortalIncorporadorForecast() {
@@ -59,8 +61,24 @@ export default function PortalIncorporadorForecast() {
     );
   }
 
+  // Verificar se há dados de atividades
+  const hasAtividadesData = (resumoAtividades?.total || 0) > 0;
+
   return (
     <div className="space-y-6">
+      {/* Alerta quando não há atividades */}
+      {!hasAtividadesData && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Nenhuma atividade encontrada</AlertTitle>
+          <AlertDescription>
+            Não há atividades registradas para seus empreendimentos no momento. 
+            As informações de forecast serão exibidas aqui quando atividades forem agendadas, 
+            negociações forem iniciadas ou leads forem registrados.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Tabs Navigation */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'dashboard' | 'atividades')}>
         <TabsList>
