@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Upload, Trash2, Star, ExternalLink, Image, Video, Loader2, Link2, Plus } from 'lucide-react';
+import { Trash2, Star, ExternalLink, Loader2, Link2, Plus } from 'lucide-react';
 import { useTicketCriativos } from '@/hooks/useTicketCriativos';
 import type { TicketCriativo } from '@/types/marketing.types';
 
@@ -31,64 +31,20 @@ interface ProjetoCriativosProps {
 }
 
 export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const {
     criativos,
     isLoading,
-    uploadCriativo,
     addLink,
     deleteCriativo,
     toggleFinal,
-    getSignedUrl,
   } = useTicketCriativos(projetoId);
 
   const [deleteTarget, setDeleteTarget] = useState<TicketCriativo | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<'imagem' | 'video'>('imagem');
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   // Estado do dialog de link
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkNome, setLinkNome] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
-
-  // Carregar URLs assinadas para os criativos (exceto links)
-  useEffect(() => {
-    const loadUrls = async () => {
-      const urls: Record<string, string> = {};
-      for (const criativo of criativos) {
-        if (criativo.tipo !== 'link') {
-          const url = await getSignedUrl(criativo.url);
-          if (url) {
-            urls[criativo.id] = url;
-          }
-        }
-      }
-      setSignedUrls(urls);
-    };
-
-    if (criativos.length > 0) {
-      loadUrls();
-    }
-  }, [criativos]);
-
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    for (const file of Array.from(files)) {
-      await uploadCriativo.mutateAsync(file);
-    }
-
-    // Limpar input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -96,30 +52,8 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
     setDeleteTarget(null);
   };
 
-  const handlePreview = async (criativo: TicketCriativo) => {
-    // Links abrem diretamente em nova aba
-    if (criativo.tipo === 'link') {
-      window.open(criativo.url, '_blank');
-      return;
-    }
-
-    const url = signedUrls[criativo.id] || await getSignedUrl(criativo.url);
-    if (url) {
-      setPreviewUrl(url);
-      setPreviewType(criativo.tipo as 'imagem' | 'video');
-    }
-  };
-
-  const handleOpenExternal = async (criativo: TicketCriativo) => {
-    if (criativo.tipo === 'link') {
-      window.open(criativo.url, '_blank');
-      return;
-    }
-
-    const url = signedUrls[criativo.id] || await getSignedUrl(criativo.url);
-    if (url) {
-      window.open(url, '_blank');
-    }
+  const handleOpenLink = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleAddLink = async () => {
@@ -134,7 +68,7 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Criativos</CardTitle>
+          <CardTitle className="text-lg">Links</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -152,50 +86,30 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Criativos</CardTitle>
+            <CardTitle className="text-lg">Links</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {criativos.length} {criativos.length === 1 ? 'item' : 'itens'}
+              {criativos.length} {criativos.length === 1 ? 'link' : 'links'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowLinkForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Link
-            </Button>
-            <Button onClick={handleFileSelect} disabled={uploadCriativo.isPending}>
-              {uploadCriativo.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
-              )}
-              Enviar Arquivo
-            </Button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-          />
+          <Button onClick={() => setShowLinkForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Link
+          </Button>
         </CardHeader>
         <CardContent>
           {criativos.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Image className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum arquivo ou link</p>
-              <p className="text-sm">Clique em "Enviar Arquivo" ou "Adicionar Link"</p>
+              <Link2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhum link cadastrado</p>
+              <p className="text-sm">Clique em "Adicionar Link" para começar</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {criativos.map((criativo) => (
-                <CriativoCard
+                <LinkCard
                   key={criativo.id}
                   criativo={criativo}
-                  signedUrl={signedUrls[criativo.id]}
-                  onPreview={() => handlePreview(criativo)}
-                  onOpenExternal={() => handleOpenExternal(criativo)}
+                  onOpenLink={() => handleOpenLink(criativo.url)}
                   onDelete={() => setDeleteTarget(criativo)}
                   onToggleFinal={() =>
                     toggleFinal.mutate({ id: criativo.id, is_final: !criativo.is_final })
@@ -211,7 +125,7 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir item</AlertDialogTitle>
+            <AlertDialogTitle>Excluir link</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir "{deleteTarget?.nome}"? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
@@ -227,26 +141,6 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Dialog de preview */}
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden">
-          {previewType === 'imagem' ? (
-            <img
-              src={previewUrl || ''}
-              alt="Preview"
-              className="w-full h-auto max-h-[80vh] object-contain"
-            />
-          ) : (
-            <video
-              src={previewUrl || ''}
-              controls
-              autoPlay
-              className="w-full h-auto max-h-[80vh]"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog de adicionar link */}
       <Dialog open={showLinkForm} onOpenChange={setShowLinkForm}>
@@ -297,54 +191,27 @@ export function ProjetoCriativos({ projetoId }: ProjetoCriativosProps) {
   );
 }
 
-interface CriativoCardProps {
+interface LinkCardProps {
   criativo: TicketCriativo;
-  signedUrl?: string;
-  onPreview: () => void;
-  onOpenExternal: () => void;
+  onOpenLink: () => void;
   onDelete: () => void;
   onToggleFinal: () => void;
 }
 
-function CriativoCard({
+function LinkCard({
   criativo,
-  signedUrl,
-  onPreview,
-  onOpenExternal,
+  onOpenLink,
   onDelete,
   onToggleFinal,
-}: CriativoCardProps) {
-  const isVideo = criativo.tipo === 'video';
-  const isLink = criativo.tipo === 'link';
-
+}: LinkCardProps) {
   return (
     <div className="group relative aspect-square rounded-lg overflow-hidden border bg-muted">
-      {/* Thumbnail */}
+      {/* Thumbnail - Ícone de link */}
       <div
-        className="w-full h-full cursor-pointer"
-        onClick={onPreview}
+        className="w-full h-full cursor-pointer flex items-center justify-center"
+        onClick={onOpenLink}
       >
-        {isLink ? (
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            <Link2 className="h-12 w-12 text-muted-foreground" />
-          </div>
-        ) : signedUrl ? (
-          isVideo ? (
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <Video className="h-12 w-12 text-muted-foreground" />
-            </div>
-          ) : (
-            <img
-              src={signedUrl}
-              alt={criativo.nome || 'Criativo'}
-              className="w-full h-full object-cover"
-            />
-          )
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
+        <Link2 className="h-12 w-12 text-muted-foreground" />
       </div>
 
       {/* Badge Final */}
@@ -378,7 +245,7 @@ function CriativoCard({
           className="h-8 w-8"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenExternal();
+            onOpenLink();
           }}
           title="Abrir em nova aba"
         >
@@ -399,7 +266,7 @@ function CriativoCard({
         </Button>
       </div>
 
-      {/* Nome do arquivo/link */}
+      {/* Nome do link */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
         <p className="text-xs text-white truncate" title={criativo.nome || undefined}>
           {criativo.nome || 'Sem nome'}
