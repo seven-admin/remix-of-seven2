@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format, subDays, subWeeks, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ClipboardList,
@@ -15,6 +15,8 @@ import {
   Users,
   Palette,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -48,15 +50,7 @@ import {
 
 const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
-type PeriodoFilter = '7d' | '30d' | '90d' | 'all';
 type TipoFilter = 'all' | 'interno' | 'externo';
-
-const PERIODO_OPTIONS: { value: PeriodoFilter; label: string }[] = [
-  { value: '7d', label: 'Últimos 7 dias' },
-  { value: '30d', label: 'Últimos 30 dias' },
-  { value: '90d', label: 'Últimos 90 dias' },
-  { value: 'all', label: 'Todo o período' },
-];
 
 const CATEGORIA_OPTIONS: { value: CategoriaTicket | 'all'; label: string }[] = [
   { value: 'all', label: 'Todas as categorias' },
@@ -68,7 +62,7 @@ const CATEGORIA_OPTIONS: { value: CategoriaTicket | 'all'; label: string }[] = [
 ];
 
 export default function DashboardMarketing() {
-  const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
+  const [competencia, setCompetencia] = useState(new Date());
   const [categoria, setCategoria] = useState<CategoriaTicket | 'all'>('all');
   const [tipo, setTipo] = useState<TipoFilter>('all');
   const [modoTV, setModoTV] = useState(false);
@@ -78,30 +72,16 @@ export default function DashboardMarketing() {
   const { config, visibleItems, toggleVisibility, reorder, resetToDefault } = useTVLayoutConfig('forecast');
 
   const filters = useMemo(() => {
-    const hoje = new Date();
-    let periodoInicio: Date | undefined;
-
-    switch (periodo) {
-      case '7d':
-        periodoInicio = subDays(hoje, 7);
-        break;
-      case '30d':
-        periodoInicio = subMonths(hoje, 1);
-        break;
-      case '90d':
-        periodoInicio = subMonths(hoje, 3);
-        break;
-      default:
-        periodoInicio = undefined;
-    }
+    const periodoInicio = startOfMonth(competencia);
+    const periodoFim = endOfMonth(competencia);
 
     return {
       periodoInicio,
-      periodoFim: hoje,
+      periodoFim,
       categoria: categoria === 'all' ? undefined : categoria,
       tipo: tipo === 'all' ? undefined : tipo,
     };
-  }, [periodo, categoria, tipo]);
+  }, [competencia, categoria, tipo]);
 
   const { data, isLoading, isFetching, refetch } = useDashboardMarketing(filters);
   const [countdown, setCountdown] = useState(AUTO_REFRESH_INTERVAL / 1000);
@@ -192,6 +172,9 @@ export default function DashboardMarketing() {
           <div className="flex items-center gap-4">
             <Palette className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">Dashboard Marketing</h1>
+            <span className="text-sm font-medium text-primary uppercase">
+              {format(competencia, "MMM/yyyy", { locale: ptBR })}
+            </span>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Atualizado: {format(lastUpdate, "HH:mm:ss", { locale: ptBR })}
@@ -364,7 +347,7 @@ export default function DashboardMarketing() {
           </div>
         }
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -375,18 +358,46 @@ export default function DashboardMarketing() {
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
 
-            <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoFilter)}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PERIODO_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Seletor de mês */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCompetencia(subMonths(competencia, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-[140px] text-center font-medium text-sm capitalize">
+                {format(competencia, "MMMM 'de' yyyy", { locale: ptBR })}
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCompetencia(addMonths(competencia, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Atalhos rápidos */}
+            <div className="flex gap-1">
+              <Button 
+                variant={format(competencia, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setCompetencia(new Date())}
+              >
+                Este mês
+              </Button>
+              <Button 
+                variant={format(competencia, 'yyyy-MM') === format(subMonths(new Date(), 1), 'yyyy-MM') ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setCompetencia(subMonths(new Date(), 1))}
+              >
+                Mês anterior
+              </Button>
+            </div>
 
             <Select value={categoria} onValueChange={(v) => setCategoria(v as CategoriaTicket | 'all')}>
               <SelectTrigger className="w-[180px]">
