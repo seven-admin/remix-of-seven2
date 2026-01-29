@@ -41,9 +41,12 @@ export function PortalIncorporadorLayout() {
       {/* Header - Simplified */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link to="/portal-incorporador" className="flex items-center gap-2">
+          {/* Logo + Title */}
+          <Link to="/portal-incorporador" className="flex items-center gap-3">
             <img src={logo} alt="Logo" className="h-8" />
+            <span className="font-semibold text-lg hidden sm:inline">
+              Portal do Incorporador
+            </span>
           </Link>
           
           {/* User Info + Logout */}
@@ -66,19 +69,20 @@ export function PortalIncorporadorLayout() {
       {/* Main Content */}
       <main className="container py-6">
         <div className="mb-6">
-          {/* Back link for internal pages */}
           {isInternalPage && (
-            <Link 
-              to="/portal-incorporador" 
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Link>
+            <>
+              <Link 
+                to="/portal-incorporador" 
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Link>
+              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+            </>
           )}
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
-      </div>
+          {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
+        </div>
       
       {/* Cards de navegação - apenas na página principal */}
       {!isInternalPage && (
