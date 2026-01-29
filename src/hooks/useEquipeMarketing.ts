@@ -61,41 +61,77 @@ export function useEquipeMarketing(filters?: Filters) {
         return { membros: [], kpis: { totalMembros: 0, totalEmProducao: 0, totalConcluidos: 0, tempoMedioGeral: null, taxaNoPrazoGeral: 0 }, ticketsRecentes: [] };
       }
 
-      // Buscar usuários com permissão específica no módulo (excluindo admin/super_admin)
-      const { data: permissoes } = await supabase
-        .from('user_module_permissions')
-        .select(`
-          user_id,
-          profiles!inner(
-            id,
-            full_name,
-            avatar_url,
-            cargo
-          )
-        `)
+      // 1. Buscar roles com acesso ao módulo projetos_marketing
+      const { data: rolesComAcesso } = await supabase
+        .from('role_permissions')
+        .select('role_id')
         .eq('module_id', moduloMarketing.id)
         .eq('can_view', true);
 
-      // Buscar usuários que são admin/super_admin para excluí-los
-      const { data: admins } = await supabase
-        .from('user_roles')
+      const roleIdsComAcesso = rolesComAcesso?.map(r => r.role_id).filter(Boolean) || [];
+
+      // 2. Buscar usuários com esses roles (via role_id)
+      const { data: usuariosViaRole } = roleIdsComAcesso.length > 0
+        ? await supabase
+            .from('user_roles')
+            .select('user_id')
+            .in('role_id', roleIdsComAcesso)
+        : { data: [] };
+
+      // 3. Buscar usuários com permissões customizadas no módulo
+      const { data: usuariosCustom } = await supabase
+        .from('user_module_permissions')
         .select('user_id')
-        .in('role', ['admin', 'super_admin']);
+        .eq('module_id', moduloMarketing.id)
+        .eq('can_view', true);
 
-      const adminIds = new Set(admins?.map(a => a.user_id) || []);
+      // 4. Combinar IDs únicos de ambas as fontes
+      const todosUserIds = new Set<string>([
+        ...(usuariosViaRole || []).map(u => u.user_id),
+        ...(usuariosCustom || []).map(u => u.user_id)
+      ]);
 
-      // Filtrar membros da equipe (excluir admins)
-      const membrosEquipe = (permissoes || [])
-        .filter(p => !adminIds.has(p.user_id))
-        .map(p => {
-          const profile = p.profiles as { id: string; full_name: string; avatar_url: string | null; cargo: string | null };
-          return {
-            id: profile.id,
-            nome: profile.full_name || 'Sem nome',
-            avatar_url: profile.avatar_url,
-            cargo: profile.cargo
-          };
-        });
+      if (todosUserIds.size === 0) {
+        return { membros: [], kpis: { totalMembros: 0, totalEmProducao: 0, totalConcluidos: 0, tempoMedioGeral: null, taxaNoPrazoGeral: 0 }, ticketsRecentes: [] };
+      }
+
+      // 5. Buscar roles admin/super_admin para exclusão
+      const { data: rolesAdmin } = await supabase
+        .from('roles')
+        .select('id')
+        .in('name', ['admin', 'super_admin']);
+
+      const adminRoleIds = new Set(rolesAdmin?.map(r => r.id) || []);
+
+      // 6. Buscar quais usuários têm roles de admin
+      const { data: adminsUsers } = adminRoleIds.size > 0
+        ? await supabase
+            .from('user_roles')
+            .select('user_id')
+            .in('role_id', Array.from(adminRoleIds))
+        : { data: [] };
+
+      const adminUserIds = new Set(adminsUsers?.map(a => a.user_id) || []);
+
+      // 7. Filtrar removendo admins
+      const userIdsFiltrados = Array.from(todosUserIds).filter(id => !adminUserIds.has(id));
+
+      if (userIdsFiltrados.length === 0) {
+        return { membros: [], kpis: { totalMembros: 0, totalEmProducao: 0, totalConcluidos: 0, tempoMedioGeral: null, taxaNoPrazoGeral: 0 }, ticketsRecentes: [] };
+      }
+
+      // 8. Buscar profiles dos usuários filtrados
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, cargo')
+        .in('id', userIdsFiltrados);
+
+      const membrosEquipe = (profiles || []).map(p => ({
+        id: p.id,
+        nome: p.full_name || 'Sem nome',
+        avatar_url: p.avatar_url,
+        cargo: p.cargo
+      }));
 
       // Buscar todos os tickets ativos
       const { data: tickets, error } = await supabase
