@@ -1,154 +1,195 @@
 
 
-# Plano: Ordenar Dropdown de Vínculo por Quadra/Andar e Número
+# Plano: Adicionar Campo de Link na Aba Criativo
 
-## Problema Identificado
+## Objetivo
 
-A lista de unidades no dropdown de vínculo de polígonos/marcadores no Editor de Mapa (`MapaEditor.tsx`) não está ordenada de forma organizada. Atualmente:
+Adicionar um formulário simples com input de texto para cadastrar links externos na aba "Criativo" dos tickets de marketing, complementando a funcionalidade de upload de arquivos já existente.
 
-1. **Os grupos de blocos/quadras** não estão sendo ordenados (aparecem na ordem que a `Map` inseriu)
-2. **As unidades dentro de cada grupo** são ordenadas apenas por número, mas sem considerar o andar
+---
 
-## Solução
+## Arquitetura da Solução
 
-Refatorar a função `groupUnidadesByBloco` no arquivo `src/lib/mapaUtils.ts` para:
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    ProjetoCriativos.tsx                        │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ [Enviar Arquivo] [+ Adicionar Link]                       │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                              ↓                                  │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ Dialog: Adicionar Link                                    │ │
+│  │  ┌─────────────────────────────────────────────────────┐  │ │
+│  │  │ Nome (opcional): [_________________________]        │  │ │
+│  │  │ URL:             [_________________________]        │  │ │
+│  │  │            [Cancelar]  [Salvar Link]                │  │ │
+│  │  └─────────────────────────────────────────────────────┘  │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                              ↓                                  │
+│  Grid de criativos (imagens, vídeos e links)                   │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐                         │
+│  │  IMG    │  │  LINK   │  │  VIDEO  │                         │
+│  │ [FINAL] │  │ 🔗      │  │         │                         │
+│  └─────────┘  └─────────┘  └─────────┘                         │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-1. **Ordenar os grupos (blocos/quadras)** usando ordenação natural (Quadra 2 antes de Quadra 10)
-2. **Ordenar as unidades dentro de cada grupo** por **andar** primeiro, depois por **número**
+---
 
 ## Alterações Necessárias
 
-### Arquivo: `src/lib/mapaUtils.ts`
+### 1. Atualizar Tipo `TicketCriativo`
 
-Modificar a função `groupUnidadesByBloco`:
+**Arquivo**: `src/types/marketing.types.ts`
 
-```text
-ANTES (linhas 143-167):
-- Grupos não ordenados (ordem de inserção do Map)
-- Unidades ordenadas apenas por número
-
-DEPOIS:
-- Grupos ordenados por nome (ordenação natural: "Quadra 2" < "Quadra 10")
-- Unidades ordenadas por: 1º andar (se existir), 2º número (ordenação natural)
-- Retorna Map com chaves ordenadas
-```
-
-### Nova Implementação
+Adicionar `'link'` como opção de tipo:
 
 ```typescript
-export function groupUnidadesByBloco(unidades: Unidade[]): Map<string, Unidade[]> {
-  const groups = new Map<string, Unidade[]>();
-  
-  unidades.forEach((unidade) => {
-    const key = unidade.bloco?.nome || 'Sem Bloco';
-    const existing = groups.get(key) || [];
-    existing.push(unidade);
-    groups.set(key, existing);
-  });
-
-  // 1. Ordenar unidades dentro de cada grupo: por andar, depois por número
-  groups.forEach((units) => {
-    units.sort((a, b) => {
-      // Primeiro ordenar por andar (se existir)
-      const andarA = a.andar ?? -Infinity;
-      const andarB = b.andar ?? -Infinity;
-      if (andarA !== andarB) {
-        return andarA - andarB;
-      }
-      // Depois ordenar por número (ordenação natural)
-      return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
-    });
-  });
-
-  // 2. Criar novo Map com chaves ordenadas (blocos/quadras em ordem natural)
-  const sortedKeys = Array.from(groups.keys()).sort((a, b) => 
-    a.localeCompare(b, 'pt-BR', { numeric: true })
-  );
-  
-  const sortedGroups = new Map<string, Unidade[]>();
-  
-  // "Sem Bloco" sempre por último
-  const semBlocoKey = 'Sem Bloco';
-  const keysWithoutSemBloco = sortedKeys.filter(k => k !== semBlocoKey);
-  
-  keysWithoutSemBloco.forEach(key => {
-    sortedGroups.set(key, groups.get(key)!);
-  });
-  
-  // Adicionar "Sem Bloco" no final se existir
-  if (groups.has(semBlocoKey)) {
-    sortedGroups.set(semBlocoKey, groups.get(semBlocoKey)!);
-  }
-
-  return sortedGroups;
+export interface TicketCriativo {
+  id: string;
+  projeto_id: string;
+  tipo: 'imagem' | 'video' | 'link';  // Adicionar 'link'
+  nome: string | null;
+  url: string;
+  is_final: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 ```
 
-## Resultado Esperado
+---
 
-### Antes (ordem atual, ruim):
-```
-Quadra A
-  ├─ 10
-  ├─ 1
-  └─ 2
-Quadra B
-  ├─ 5
-  └─ 3
-Quadra 10
-  └─ 1
-Quadra 2
-  └─ 1
+### 2. Adicionar Mutation de Criação de Link
+
+**Arquivo**: `src/hooks/useTicketCriativos.ts`
+
+Adicionar nova mutation `addLink`:
+
+```typescript
+// Adicionar link externo
+const addLink = useMutation({
+  mutationFn: async ({ nome, url }: { nome?: string; url: string }) => {
+    const { data, error } = await supabase
+      .from('ticket_criativos')
+      .insert({
+        projeto_id: projetoId,
+        tipo: 'link',
+        nome: nome || url,
+        url: url,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['ticket-criativos', projetoId] });
+    toast.success('Link adicionado com sucesso');
+  },
+  onError: (error: Error) => {
+    console.error('Erro ao adicionar link:', error);
+    toast.error('Erro ao adicionar link');
+  },
+});
 ```
 
-### Depois (ordenado):
-```
-Quadra 2
-  └─ 1
-Quadra 10
-  └─ 1
-Quadra A
-  ├─ 1
-  ├─ 2
-  └─ 10
-Quadra B
-  ├─ 3
-  └─ 5
+---
+
+### 3. Atualizar Componente `ProjetoCriativos`
+
+**Arquivo**: `src/components/marketing/ProjetoCriativos.tsx`
+
+Alterações:
+1. Adicionar botão "Adicionar Link" ao lado do "Enviar Arquivo"
+2. Criar Dialog com formulário simples (nome + url)
+3. Atualizar o `CriativoCard` para exibir links com ícone diferente
+4. Ao clicar em link, abrir em nova aba (não preview)
+
+#### Novo Dialog para Link
+
+```typescript
+const [showLinkForm, setShowLinkForm] = useState(false);
+const [linkNome, setLinkNome] = useState('');
+const [linkUrl, setLinkUrl] = useState('');
+
+const handleAddLink = async () => {
+  if (!linkUrl.trim()) return;
+  await addLink.mutateAsync({ nome: linkNome || undefined, url: linkUrl });
+  setLinkNome('');
+  setLinkUrl('');
+  setShowLinkForm(false);
+};
 ```
 
-Para prédios com andares:
-```
-Torre 1
-  ├─ 1º andar
-  │   ├─ 101
-  │   └─ 102
-  ├─ 2º andar
-  │   ├─ 201
-  │   └─ 202
-```
+#### Card de Link
+
+Para criativos do tipo `link`, exibir:
+- Ícone de link (🔗) ao invés de thumbnail
+- Ao clicar, abrir URL em nova aba
+- Manter ações de marcar como final e excluir
+
+---
 
 ## Resumo de Arquivos
 
 | Arquivo | Ação |
 |---------|------|
-| `src/lib/mapaUtils.ts` | Modificar função `groupUnidadesByBloco` |
+| `src/types/marketing.types.ts` | Adicionar `'link'` ao tipo |
+| `src/hooks/useTicketCriativos.ts` | Adicionar mutation `addLink` |
+| `src/components/marketing/ProjetoCriativos.tsx` | Adicionar botão, dialog e card de link |
 
-## Detalhes Técnicos
+---
 
-### Ordenação Natural
-Usando `localeCompare` com `{ numeric: true }` para que:
-- "Quadra 2" venha antes de "Quadra 10"
-- "Lote 1" venha antes de "Lote 12"
+## Interface Visual
 
-### Tratamento de Nulos
-- Unidades sem andar (`andar = null`) ficam antes das que têm andar
-- Unidades sem bloco vão para o grupo "Sem Bloco" no final
+### Header com botões
+
+```text
+Criativos                    [+ Adicionar Link] [Enviar Arquivo]
+3 arquivos
+```
+
+### Dialog de Adicionar Link
+
+```text
+┌────────────────────────────────────────┐
+│ Adicionar Link                         │
+├────────────────────────────────────────┤
+│                                        │
+│ Nome (opcional)                        │
+│ [________________________________]     │
+│                                        │
+│ URL *                                  │
+│ [________________________________]     │
+│                                        │
+│                [Cancelar] [Salvar]     │
+└────────────────────────────────────────┘
+```
+
+### Card de Link no Grid
+
+```text
+┌─────────────┐
+│             │
+│    🔗       │  ← Ícone de link centralizado
+│             │
+│ [FINAL]     │  ← Badge se marcado como final
+├─────────────┤
+│ Nome do link│  ← Nome ou URL truncado
+└─────────────┘
+```
+
+---
 
 ## Critérios de Aceite
 
-1. Grupos de blocos/quadras aparecem em ordem alfabética/numérica natural
-2. Unidades dentro de cada grupo são ordenadas por andar primeiro
-3. Unidades com mesmo andar são ordenadas por número
-4. "Sem Bloco" aparece por último
-5. A busca no dropdown continua funcionando normalmente
+1. Novo botão "Adicionar Link" visível ao lado de "Enviar Arquivo"
+2. Dialog abre com formulário de nome (opcional) e URL (obrigatório)
+3. Validação básica: URL não pode estar vazio
+4. Link salvo aparece no grid com ícone diferenciado
+5. Clicar no card de link abre URL em nova aba
+6. Ações de marcar como final e excluir funcionam para links
+7. Mensagens de sucesso/erro exibidas via toast
 
