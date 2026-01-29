@@ -112,12 +112,17 @@ export function useDashboardMarketing(filters?: Filters) {
       const periodoInicio = filters?.periodoInicio || subWeeks(hoje, 4);
       const periodoFim = filters?.periodoFim || hoje;
       
-      // Buscar etapas de tickets
+      // Buscar etapas de tickets (incluindo is_final para lógica de atrasados)
       const { data: etapas } = await supabase
         .from('ticket_etapas')
-        .select('id, nome, cor, ordem')
+        .select('id, nome, cor, ordem, is_final')
         .eq('is_active', true)
         .order('ordem', { ascending: true });
+      
+      // Criar set de IDs de etapas finais para verificação rápida
+      const etapasFinaisIds = new Set(
+        (etapas || []).filter(e => e.is_final).map(e => e.id)
+      );
       
       // Buscar todos os tickets
       let query = supabase
@@ -181,7 +186,10 @@ export function useDashboardMarketing(filters?: Filters) {
       
       const ticketsAtrasados: TicketResumo[] = allTickets
         .filter(t => {
+          // Ignorar se status legado é final
           if (['concluido', 'arquivado'].includes(t.status)) return false;
+          // Ignorar se está numa etapa dinâmica marcada como final
+          if (t.ticket_etapa_id && etapasFinaisIds.has(t.ticket_etapa_id)) return false;
           if (!t.data_previsao) return false;
           return t.data_previsao < hojeStr;
         })

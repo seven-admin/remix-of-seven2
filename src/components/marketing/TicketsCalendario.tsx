@@ -34,9 +34,11 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 // Helper to check if ticket is overdue
-function isTicketOverdue(ticket: Ticket): boolean {
+function isTicketOverdue(ticket: Ticket, etapasFinaisIds?: Set<string>): boolean {
   if (!ticket.data_previsao) return false;
   if (['concluido', 'arquivado'].includes(ticket.status)) return false;
+  // Verificar se está numa etapa final dinâmica
+  if (etapasFinaisIds && ticket.ticket_etapa_id && etapasFinaisIds.has(ticket.ticket_etapa_id)) return false;
   return isBefore(new Date(ticket.data_previsao), startOfDay(new Date()));
 }
 
@@ -45,6 +47,7 @@ interface TicketsCalendarioProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
+  etapasFinaisIds?: Set<string>;
 }
 
 export function TicketsCalendario({
@@ -52,6 +55,7 @@ export function TicketsCalendario({
   selectedDate,
   onDateSelect,
   onMonthChange,
+  etapasFinaisIds,
 }: TicketsCalendarioProps) {
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(selectedDate));
 
@@ -174,10 +178,10 @@ export function TicketsCalendario({
                       <Badge variant="secondary" className="text-xs h-5 px-1.5">
                         {dayTickets.length}
                       </Badge>
-                      {dayTickets.some(isTicketOverdue) && (
-                        <Badge variant="destructive" className="text-xs h-5 px-1.5">
-                          {dayTickets.filter(isTicketOverdue).length} <AlertTriangle className="h-3 w-3 ml-0.5" />
-                        </Badge>
+                      {dayTickets.some(t => isTicketOverdue(t, etapasFinaisIds)) && (
+                      <Badge variant="destructive" className="text-xs h-5 px-1.5">
+                        {dayTickets.filter(t => isTicketOverdue(t, etapasFinaisIds)).length} <AlertTriangle className="h-3 w-3 ml-0.5" />
+                      </Badge>
                       )}
                     </div>
                   )}
@@ -186,7 +190,7 @@ export function TicketsCalendario({
                 {/* Preview dos tickets */}
                 <div className="mt-1 space-y-0.5 overflow-hidden">
                   {dayTickets.slice(0, 3).map((ticket) => {
-                    const overdue = isTicketOverdue(ticket);
+                    const overdue = isTicketOverdue(ticket, etapasFinaisIds);
                     return (
                       <div
                         key={ticket.id}
@@ -234,7 +238,7 @@ export function TicketsCalendario({
                       </div>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {dayTickets.map((ticket) => {
-                          const overdue = isTicketOverdue(ticket);
+                          const overdue = isTicketOverdue(ticket, etapasFinaisIds);
                           return (
                             <div
                               key={ticket.id}
