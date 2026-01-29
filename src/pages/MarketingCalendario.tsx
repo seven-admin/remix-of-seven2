@@ -6,6 +6,7 @@ import { CalendarDays, Plus, Tag } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { TicketsCalendario } from '@/components/marketing/TicketsCalendario';
 import { useTickets } from '@/hooks/useTickets';
+import { useTicketEtapas } from '@/hooks/useTicketEtapas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +25,14 @@ function hexToRgba(hex: string, alpha: number): string {
 export default function MarketingCalendario() {
   const navigate = useNavigate();
   const { tickets, isLoading } = useTickets();
+  const { data: etapas } = useTicketEtapas();
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Set de etapas finais
+  const etapasFinaisIds = useMemo(() => 
+    new Set((etapas || []).filter(e => e.is_final).map(e => e.id)),
+    [etapas]
+  );
 
   // Tickets do dia selecionado (por data_previsao)
   const ticketsDoDia = useMemo(() => {
@@ -134,6 +142,7 @@ export default function MarketingCalendario() {
               tickets={tickets || []}
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
+              etapasFinaisIds={etapasFinaisIds}
             />
           </div>
 

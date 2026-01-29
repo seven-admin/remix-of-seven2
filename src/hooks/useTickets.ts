@@ -285,6 +285,72 @@ export function useTickets(filters?: TicketFilters) {
     }
   });
 
+  // Alterar etapa de um ticket (sincroniza status legado)
+  const alterarEtapa = useMutation({
+    mutationFn: async ({ ticketId, etapaId }: { ticketId: string; etapaId: string }) => {
+      // Buscar info da etapa para atualizar status legado também
+      const { data: etapa } = await supabase
+        .from('ticket_etapas')
+        .select('is_final, nome')
+        .eq('id', etapaId)
+        .single();
+      
+      const novoStatus = etapa?.is_final ? 'concluido' : 'em_producao';
+      
+      const { error } = await supabase
+        .from('projetos_marketing')
+        .update({ 
+          ticket_etapa_id: etapaId,
+          status: novoStatus as StatusProjetoDB,
+          ...(etapa?.is_final && { data_entrega: new Date().toISOString().split('T')[0] })
+        })
+        .eq('id', ticketId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      toast.success('Etapa alterada!');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao alterar etapa: ' + error.message);
+    }
+  });
+
+  // Alterar etapa de múltiplos tickets em lote
+  const alterarEtapaEmLote = useMutation({
+    mutationFn: async ({ ticketIds, etapaId }: { ticketIds: string[]; etapaId: string }) => {
+      // Buscar info da etapa para atualizar status legado também
+      const { data: etapa } = await supabase
+        .from('ticket_etapas')
+        .select('is_final, nome')
+        .eq('id', etapaId)
+        .single();
+      
+      const novoStatus = etapa?.is_final ? 'concluido' : 'em_producao';
+      
+      const { error } = await supabase
+        .from('projetos_marketing')
+        .update({ 
+          ticket_etapa_id: etapaId,
+          status: novoStatus as StatusProjetoDB,
+          ...(etapa?.is_final && { data_entrega: new Date().toISOString().split('T')[0] })
+        })
+        .in('id', ticketIds);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      toast.success('Tickets atualizados!');
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao alterar etapas: ' + error.message);
+    }
+  });
+
   return {
     tickets,
     isLoading,
@@ -294,6 +360,8 @@ export function useTickets(filters?: TicketFilters) {
     updateTicket,
     moveTicketKanban,
     arquivarTicket,
+    alterarEtapa,
+    alterarEtapaEmLote,
     // Aliases para compatibilidade
     projetos: tickets,
     useProjeto: useTicket,
