@@ -1,82 +1,57 @@
 
 
-# Plano: Título Abaixo da Logo (Layout Empilhado)
+# Plano: Remover Label "Contratante"
 
 ## Objetivo
 
-Reorganizar o header para que "Portal do Incorporador" fique **abaixo** da logo, criando um layout empilhado e alinhado à esquerda.
+Remover a informação "Contratante" que aparece abaixo do nome do usuário no header do Portal do Incorporador.
 
 ---
 
 ## Mudança Visual
 
-### Antes (Atual - Lado a Lado)
+### Antes (Atual)
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│ [Logo]  Portal do Incorporador               Nome Usuário   [Sair]  │
+│ [Logo]                                       Artur Gonzales [Sair]  │
+│ Portal do Incorporador                       Contratante           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Depois (Proposto - Empilhado)
+### Depois (Proposto)
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│ [sevengroup LOGO]                            Nome Usuário   [Sair]  │
+│ [Logo]                                       Artur Gonzales [Sair]  │
 │ Portal do Incorporador                                              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Alterações Técnicas
+## Alteração Técnica
 
 ### Arquivo: `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
 
-**Mudança no Link/Logo:**
-
+**Antes:**
 ```tsx
-// ANTES (flex horizontal)
-<Link to="/portal-incorporador" className="flex items-center gap-3">
-  <img src={logo} alt="Logo" className="h-10" />
-  <span className="font-semibold text-xl hidden sm:inline leading-none">
-    Portal do Incorporador
-  </span>
-</Link>
-
-// DEPOIS (flex vertical/empilhado)
-<Link to="/portal-incorporador" className="flex flex-col">
-  <img src={logo} alt="Logo" className="h-8" />
-  <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
-    Portal do Incorporador
-  </span>
-</Link>
+<div className="text-right hidden sm:block">
+  <p className="text-sm font-medium">{profile?.full_name}</p>
+  <p className="text-xs text-muted-foreground">Contratante</p>
+</div>
 ```
 
-**Ajuste no Header (altura):**
-
-Como teremos duas linhas, precisamos aumentar a altura do header:
-
+**Depois:**
 ```tsx
-// ANTES
-<div className="container flex h-16 items-center justify-between">
-
-// DEPOIS  
-<div className="container flex h-20 items-center justify-between">
+<div className="text-right hidden sm:block">
+  <p className="text-sm font-medium">{profile?.full_name}</p>
+</div>
 ```
 
 ---
 
-## Detalhes de Estilo
+## Resultado
 
-| Elemento | Valor | Motivo |
-|----------|-------|--------|
-| Container | `flex flex-col` | Empilhar logo + texto |
-| Logo | `h-8` | Volta ao tamanho menor pois terá texto abaixo |
-| Texto | `text-sm font-medium text-muted-foreground` | Secundário, mais discreto |
-| Header altura | `h-20` (80px) | Acomodar duas linhas |
-
----
-
-## Resultado Esperado
-
-Layout mais clean com identificação clara do portal, mantendo o texto visualmente subordinado à logo principal da Seven Group.
+- Header mais limpo
+- Apenas o nome do usuário será exibido
+- Mantém o layout responsivo (hidden sm:block)
 
