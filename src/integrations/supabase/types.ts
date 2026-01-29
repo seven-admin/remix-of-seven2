@@ -4645,6 +4645,50 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_criativos: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_final: boolean | null
+          nome: string | null
+          projeto_id: string
+          tipo: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_final?: boolean | null
+          nome?: string | null
+          projeto_id: string
+          tipo?: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_final?: boolean | null
+          nome?: string | null
+          projeto_id?: string
+          tipo?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_criativos_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos_marketing"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_etapas: {
         Row: {
           categoria: string | null

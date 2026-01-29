@@ -113,6 +113,18 @@ export interface TicketComentario {
 // Alias
 export type ProjetoComentario = TicketComentario;
 
+export interface TicketCriativo {
+  id: string;
+  projeto_id: string;
+  tipo: 'imagem' | 'video';
+  nome: string | null;
+  url: string;
+  is_final: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Evento {
   id: string;
   codigo: string;

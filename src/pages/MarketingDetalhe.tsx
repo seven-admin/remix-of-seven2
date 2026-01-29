@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2, Image } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
@@ -26,6 +26,7 @@ import { ProjetoTarefas } from '@/components/marketing/ProjetoTarefas';
 import { ProjetoComentarios } from '@/components/marketing/ProjetoComentarios';
 import { ProjetoTimeline } from '@/components/marketing/ProjetoTimeline';
 import { ProjetoEditForm } from '@/components/marketing/ProjetoEditForm';
+import { ProjetoCriativos } from '@/components/marketing/ProjetoCriativos';
 
 export default function MarketingDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -166,6 +167,10 @@ export default function MarketingDetalhe() {
                 <CheckSquare className="h-4 w-4" />
                 Tarefas
               </TabsTrigger>
+              <TabsTrigger value="criativo" className="gap-2">
+                <Image className="h-4 w-4" />
+                Criativo
+              </TabsTrigger>
               <TabsTrigger value="comentarios" className="gap-2">
                 <MessageSquare className="h-4 w-4" />
                 Comentários
@@ -178,6 +183,10 @@ export default function MarketingDetalhe() {
 
             <TabsContent value="tarefas" className="mt-4">
               <ProjetoTarefas projetoId={projeto.id} />
+            </TabsContent>
+
+            <TabsContent value="criativo" className="mt-4">
+              <ProjetoCriativos projetoId={projeto.id} />
             </TabsContent>
 
             <TabsContent value="comentarios" className="mt-4">
