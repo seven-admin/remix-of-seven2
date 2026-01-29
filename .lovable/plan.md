@@ -1,61 +1,82 @@
 
 
-# Plano: Corrigir Alinhamento do Header
+# Plano: Título Abaixo da Logo (Layout Empilhado)
 
-## Problema Identificado
+## Objetivo
 
-O texto "Portal do Incorporador" não está centralizado verticalmente com o logo. O logo contém duas linhas de texto (nome + tagline) o que o torna mais alto, e o texto do título está ficando desalinhado.
+Reorganizar o header para que "Portal do Incorporador" fique **abaixo** da logo, criando um layout empilhado e alinhado à esquerda.
 
 ---
 
-## Solução
+## Mudança Visual
 
-Ajustar o CSS para garantir alinhamento vertical central entre logo e texto:
-
-### Mudanças no Header
-
-**Arquivo:** `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
-
-**Antes:**
-```tsx
-<Link to="/portal-incorporador" className="flex items-center gap-3">
-  <img src={logo} alt="Logo" className="h-8" />
-  <span className="font-semibold text-lg hidden sm:inline">
-    Portal do Incorporador
-  </span>
-</Link>
+### Antes (Atual - Lado a Lado)
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Logo]  Portal do Incorporador               Nome Usuário   [Sair]  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Depois:**
+### Depois (Proposto - Empilhado)
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ [sevengroup LOGO]                            Nome Usuário   [Sair]  │
+│ Portal do Incorporador                                              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Alterações Técnicas
+
+### Arquivo: `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
+
+**Mudança no Link/Logo:**
+
 ```tsx
+// ANTES (flex horizontal)
 <Link to="/portal-incorporador" className="flex items-center gap-3">
   <img src={logo} alt="Logo" className="h-10" />
   <span className="font-semibold text-xl hidden sm:inline leading-none">
     Portal do Incorporador
   </span>
 </Link>
+
+// DEPOIS (flex vertical/empilhado)
+<Link to="/portal-incorporador" className="flex flex-col">
+  <img src={logo} alt="Logo" className="h-8" />
+  <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
+    Portal do Incorporador
+  </span>
+</Link>
 ```
 
-### Alterações:
+**Ajuste no Header (altura):**
 
-| Elemento | Antes | Depois | Motivo |
-|----------|-------|--------|--------|
-| Logo altura | `h-8` (32px) | `h-10` (40px) | Aumentar para melhor legibilidade e proporção |
-| Texto tamanho | `text-lg` | `text-xl` | Proporção visual com logo maior |
-| Line-height | padrão | `leading-none` | Remove espaçamento extra que causa desalinhamento |
+Como teremos duas linhas, precisamos aumentar a altura do header:
+
+```tsx
+// ANTES
+<div className="container flex h-16 items-center justify-between">
+
+// DEPOIS  
+<div className="container flex h-20 items-center justify-between">
+```
+
+---
+
+## Detalhes de Estilo
+
+| Elemento | Valor | Motivo |
+|----------|-------|--------|
+| Container | `flex flex-col` | Empilhar logo + texto |
+| Logo | `h-8` | Volta ao tamanho menor pois terá texto abaixo |
+| Texto | `text-sm font-medium text-muted-foreground` | Secundário, mais discreto |
+| Header altura | `h-20` (80px) | Acomodar duas linhas |
 
 ---
 
 ## Resultado Esperado
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ [sevengroup     ]                                                   │
-│ [ACELERADORA...]   Portal do Incorporador       Nome Usuário [Sair] │
-└─────────────────────────────────────────────────────────────────────┘
-         ↑                    ↑
-    Logo centrado        Texto centrado verticalmente
-```
-
-O `items-center` do flex garantirá que ambos fiquem alinhados pelo centro vertical.
+Layout mais clean com identificação clara do portal, mantendo o texto visualmente subordinado à logo principal da Seven Group.
 
