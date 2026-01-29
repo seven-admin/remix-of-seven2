@@ -40,11 +40,11 @@ export function PortalIncorporadorLayout() {
     <div className="min-h-screen bg-background">
       {/* Header - Simplified */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-20 items-center justify-between">
           {/* Logo + Title */}
-          <Link to="/portal-incorporador" className="flex items-center gap-3">
-            <img src={logo} alt="Logo" className="h-10" />
-            <span className="font-semibold text-xl hidden sm:inline leading-none">
+          <Link to="/portal-incorporador" className="flex flex-col">
+            <img src={logo} alt="Logo" className="h-8" />
+            <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
               Portal do Incorporador
             </span>
           </Link>
