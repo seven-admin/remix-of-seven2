@@ -116,7 +116,7 @@ export type ProjetoComentario = TicketComentario;
 export interface TicketCriativo {
   id: string;
   projeto_id: string;
-  tipo: 'imagem' | 'video';
+  tipo: 'imagem' | 'video' | 'link';
   nome: string | null;
   url: string;
   is_final: boolean;

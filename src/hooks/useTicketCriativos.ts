@@ -70,16 +70,45 @@ export function useTicketCriativos(projetoId: string) {
     },
   });
 
+  // Adicionar link externo
+  const addLink = useMutation({
+    mutationFn: async ({ nome, url }: { nome?: string; url: string }) => {
+      const { data, error } = await supabase
+        .from('ticket_criativos')
+        .insert({
+          projeto_id: projetoId,
+          tipo: 'link',
+          nome: nome || url,
+          url: url,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-criativos', projetoId] });
+      toast.success('Link adicionado com sucesso');
+    },
+    onError: (error: Error) => {
+      console.error('Erro ao adicionar link:', error);
+      toast.error('Erro ao adicionar link');
+    },
+  });
+
   // Deletar criativo
   const deleteCriativo = useMutation({
     mutationFn: async (criativo: TicketCriativo) => {
-      // Remover do storage
-      const { error: storageError } = await supabase.storage
-        .from(BUCKET_NAME)
-        .remove([criativo.url]);
+      // Links não têm arquivo no storage
+      if (criativo.tipo !== 'link') {
+        const { error: storageError } = await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([criativo.url]);
 
-      if (storageError) {
-        console.warn('Erro ao remover arquivo do storage:', storageError);
+        if (storageError) {
+          console.warn('Erro ao remover arquivo do storage:', storageError);
+        }
       }
 
       // Remover registro do banco
@@ -92,11 +121,11 @@ export function useTicketCriativos(projetoId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket-criativos', projetoId] });
-      toast.success('Arquivo removido');
+      toast.success('Item removido');
     },
     onError: (error: Error) => {
-      console.error('Erro ao remover arquivo:', error);
-      toast.error('Erro ao remover arquivo');
+      console.error('Erro ao remover item:', error);
+      toast.error('Erro ao remover item');
     },
   });
 
@@ -137,6 +166,7 @@ export function useTicketCriativos(projetoId: string) {
     criativos,
     isLoading,
     uploadCriativo,
+    addLink,
     deleteCriativo,
     toggleFinal,
     getSignedUrl,
