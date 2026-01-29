@@ -1,50 +1,58 @@
 
 
-# Plano: Simplificar Layout do Portal do Incorporador
+# Plano: Reorganizar Layout do Portal do Incorporador
 
-## Objetivo
+## Problema Atual
 
-Remover as abas de navegação do header e utilizar os cards clicáveis como única forma de navegação entre as seções do portal. Isso elimina a redundância visual e deixa o layout mais limpo.
+Os cards de navegação (Executivo, Forecast, Marketing) estão posicionados **entre os KPIs e a lista de empreendimentos**, o que não é intuitivo. O usuário quer que eles fiquem logo abaixo do título "Portal do Incorporador".
 
 ## Alterações Propostas
 
-### 1. Simplificar o Header (PortalIncorporadorLayout.tsx)
+### 1. Alterar o Título da Página Principal
 
-**Antes:** Header com logo + 4 abas (Dashboard, Executivo, Forecast, Marketing) + info usuário
+**Arquivo:** `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
 
-**Depois:** Header com logo + info usuário + botão Sair (apenas)
+- Mudar o título de "Dashboard" para "Portal do Incorporador"
+- Ajustar o subtítulo conforme apropriado
 
-O header fica minimalista e elegante:
+### 2. Mover Cards de Navegação para o Layout
+
+**Arquivo:** `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
+
+Os cards de navegação serão renderizados **diretamente no Layout**, logo abaixo do título, apenas quando estiver na rota principal (`/portal-incorporador`).
+
+### 3. Remover Cards de Navegação do Dashboard
+
+**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
+
+Remover a seção "Links Rápidos" (linhas 109-155), pois ela será movida para o Layout.
+
+---
+
+## Resultado Visual Esperado
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  [Logo]                                      Incorp    [Sair]  │
-│                                            Contratante          │
 └─────────────────────────────────────────────────────────────────┘
-```
 
-### 2. Adicionar Navegação de Volta nas Páginas Internas
+  Portal do Incorporador
+  Visão geral dos seus empreendimentos
 
-Nas páginas Executivo, Forecast e Marketing, adicionar um botão/link de retorno ao Dashboard no título da página:
+  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+  │ Dashboard        │ │ Forecast         │ │ Marketing        │
+  │ Executivo      → │ │                → │ │                → │
+  └──────────────────┘ └──────────────────┘ └──────────────────┘
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  ← Voltar    Dashboard Executivo                                │
-│              KPIs e métricas consolidadas                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+  │Empreendim.  │ │ Unidades    │ │ VGV Vendido │ │ Vendas Mês  │
+  │     2       │ │     0       │ │   R$ 0      │ │   R$ 0      │
+  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 
-Isso será feito via props no Layout, similar ao padrão `backTo` já usado no `PageHeader` do sistema principal.
-
-### 3. Manter Cards de Navegação no Dashboard
-
-Os cards de navegação rápida já existem e funcionam bem - serão mantidos exatamente como estão:
-
-```
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│ 📊 Dashboard     │  │ 📈 Forecast      │  │ 🎨 Marketing     │
-│    Executivo     │  │    Previsões     │  │    Tickets       │
-│              →   │  │              →   │  │              →   │
-└──────────────────┘  └──────────────────┘  └──────────────────┘
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Seus Empreendimentos                                        │
+  │ ...                                                         │
+  └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -53,66 +61,45 @@ Os cards de navegação rápida já existem e funcionam bem - serão mantidos ex
 
 ### Arquivo: `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
 
-**Modificações:**
-1. Remover a `nav` do header desktop (linhas 60-79)
-2. Remover a navegação mobile (linhas 99-120)
-3. Adicionar lógica para exibir link "Voltar" quando não estiver no Dashboard
-4. Simplificar o `menuItems` para apenas referência de títulos
-
-```typescript
-// Antes: Header com navegação
-<nav className="hidden md:flex items-center gap-1">
-  {menuItems.map((item) => ...)}
-</nav>
-
-// Depois: Header limpo (sem navegação)
-// Apenas logo + info usuário + sair
-```
-
-**Novo Header:**
 ```tsx
-<header className="sticky top-0 z-50 w-full border-b bg-background/95 ...">
-  <div className="container flex h-16 items-center justify-between">
-    {/* Logo */}
-    <Link to="/portal-incorporador" className="flex items-center gap-2">
-      <img src={logo} alt="Logo" className="h-8" />
+// Atualizar routeTitles
+'/portal-incorporador': { 
+  title: 'Portal do Incorporador', 
+  subtitle: 'Visão geral dos seus empreendimentos' 
+},
+
+// Adicionar imports
+import { BarChart3, TrendingUp, Palette, ArrowRight } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+// Adicionar cards de navegação após título (apenas na página principal)
+{!isInternalPage && (
+  <div className="grid gap-4 md:grid-cols-3 mb-6">
+    <Link to="/portal-incorporador/executivo">
+      <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+        <CardContent className="p-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+            <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold">Dashboard Executivo</h3>
+            <p className="text-sm text-muted-foreground">KPIs e métricas detalhadas</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        </CardContent>
+      </Card>
     </Link>
-    
-    {/* Usuário + Sair */}
-    <div className="flex items-center gap-4">
-      <div className="text-right hidden sm:block">
-        <p className="text-sm font-medium">{profile?.full_name}</p>
-        <p className="text-xs text-muted-foreground">Contratante</p>
-      </div>
-      <button onClick={handleLogout} ...>
-        <LogOut className="h-4 w-4" />
-        <span>Sair</span>
-      </button>
-    </div>
+    {/* ... Forecast e Marketing ... */}
   </div>
-</header>
+)}
+<Outlet />
 ```
 
-**Novo Título com Voltar:**
-```tsx
-<main className="container py-6">
-  <div className="mb-6">
-    {/* Mostrar "Voltar" apenas em páginas internas */}
-    {location.pathname !== '/portal-incorporador' && (
-      <Link 
-        to="/portal-incorporador" 
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Voltar
-      </Link>
-    )}
-    <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-    {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
-  </div>
-  <Outlet />
-</main>
-```
+### Arquivo: `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
+
+Remover toda a seção de "Links Rápidos" (linhas 109-155), mantendo apenas:
+- KPIs Principais
+- Lista de Empreendimentos
 
 ---
 
@@ -120,61 +107,6 @@ Os cards de navegação rápida já existem e funcionam bem - serão mantidos ex
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `src/components/portal-incorporador/PortalIncorporadorLayout.tsx` | Remover navegação por abas do header e da navegação mobile; adicionar link "Voltar" no título para páginas internas |
-
----
-
-## Resultado Visual Esperado
-
-**Dashboard (/portal-incorporador):**
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  [Logo]                                      Incorp    [Sair]  │
-└─────────────────────────────────────────────────────────────────┘
-
-  Dashboard
-  Visão geral dos seus empreendimentos
-
-  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-  │Empreendim.  │ │ Unidades    │ │ VGV Vendido │ │ Vendas Mês  │
-  │     2       │ │     0       │ │   R$ 0      │ │   R$ 0      │
-  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
-
-  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-  │ Dashboard        │ │ Forecast         │ │ Marketing        │
-  │ Executivo      → │ │                → │ │                → │
-  └──────────────────┘ └──────────────────┘ └──────────────────┘
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │ Seus Empreendimentos                                        │
-  │ ┌─────────────────────┐ ┌─────────────────────┐             │
-  │ │ VITHORIA DO SOL     │ │ DON INÁCIO          │             │
-  │ │ Gestor: Michel      │ │ Gestor: Michel      │             │
-  │ └─────────────────────┘ └─────────────────────┘             │
-  └─────────────────────────────────────────────────────────────┘
-```
-
-**Página Interna (/portal-incorporador/executivo):**
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  [Logo]                                      Incorp    [Sair]  │
-└─────────────────────────────────────────────────────────────────┘
-
-  ← Voltar
-
-  Dashboard Executivo
-  KPIs e métricas consolidadas
-
-  [... conteúdo da página ...]
-```
-
----
-
-## Critérios de Aceite
-
-1. O header mostra apenas logo + info do usuário + botão Sair
-2. Não há mais abas de navegação no header (desktop e mobile)
-3. Os cards de navegação no Dashboard funcionam como links para as seções
-4. Nas páginas internas (Executivo, Forecast, Marketing) aparece link "← Voltar"
-5. O clique no logo também retorna ao Dashboard
+| `PortalIncorporadorLayout.tsx` | Alterar título para "Portal do Incorporador"; adicionar cards de navegação logo após o título/subtítulo (apenas na rota principal) |
+| `PortalIncorporadorDashboard.tsx` | Remover seção "Links Rápidos" (será renderizada pelo Layout) |
 
