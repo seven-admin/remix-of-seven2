@@ -72,12 +72,17 @@ export default function PortalIncorporadorMarketing() {
       const hoje = new Date();
       const hojeStr = format(hoje, 'yyyy-MM-dd');
       
-      // Buscar etapas
+      // Buscar etapas (incluindo is_final para filtrar tickets concluídos)
       const { data: etapas } = await supabase
         .from('ticket_etapas')
-        .select('id, nome, cor, ordem')
+        .select('id, nome, cor, ordem, is_final')
         .eq('is_active', true)
         .order('ordem');
+      
+      // Criar conjunto de IDs de etapas finais
+      const etapasFinaisIds = new Set(
+        (etapas || []).filter(e => e.is_final).map(e => e.id)
+      );
       
       // Buscar tickets dos empreendimentos do incorporador
       const { data: tickets, error } = await supabase
@@ -90,19 +95,22 @@ export default function PortalIncorporadorMarketing() {
       
       const allTickets = tickets || [];
       
-      // KPIs
-      const ticketsAtivos = allTickets.filter(t => 
-        !['concluido', 'arquivado'].includes(t.status)
-      ).length;
+      // KPIs - considera etapas finais como concluídos
+      const ticketsAtivos = allTickets.filter(t => {
+        if (['concluido', 'arquivado'].includes(t.status)) return false;
+        if (t.ticket_etapa_id && etapasFinaisIds.has(t.ticket_etapa_id)) return false;
+        return true;
+      }).length;
       
       const emProducao = allTickets.filter(t => t.status === 'em_producao').length;
       const aguardandoAprovacao = allTickets.filter(t => t.status === 'aprovacao_cliente').length;
       const concluidosPeriodo = allTickets.filter(t => t.status === 'concluido').length;
       
-      // Tickets atrasados
+      // Tickets atrasados - exclui etapas finais
       const ticketsAtrasados: TicketResumo[] = allTickets
         .filter(t => {
           if (['concluido', 'arquivado'].includes(t.status)) return false;
+          if (t.ticket_etapa_id && etapasFinaisIds.has(t.ticket_etapa_id)) return false;
           if (!t.data_previsao) return false;
           return t.data_previsao < hojeStr;
         })
@@ -118,11 +126,12 @@ export default function PortalIncorporadorMarketing() {
         }))
         .sort((a, b) => (b.dias_atraso || 0) - (a.dias_atraso || 0));
       
-      // Próximas entregas (7 dias)
+      // Próximas entregas (7 dias) - exclui etapas finais
       const seteDiasFrente = format(new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
       const proximasEntregas: TicketResumo[] = allTickets
         .filter(t => {
           if (['concluido', 'arquivado'].includes(t.status)) return false;
+          if (t.ticket_etapa_id && etapasFinaisIds.has(t.ticket_etapa_id)) return false;
           if (!t.data_previsao) return false;
           return t.data_previsao >= hojeStr && t.data_previsao <= seteDiasFrente;
         })
