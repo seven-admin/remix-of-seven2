@@ -1,76 +1,99 @@
 
-# Plano: Corrigir Referências Restantes de `data_hora`
+# Plano: Melhorias no Portal do Incorporador
 
-## Diagnóstico
+## Diagnóstico do Problema Reportado
 
-A migração do banco de dados foi executada com sucesso, mas ainda existem **2 arquivos** que referenciam o campo antigo `data_hora`:
+Ao investigar o problema do usuário `bk@sevengroup360.com.br`, descobri que:
 
-| Arquivo | Ocorrências | Status |
-|---------|-------------|--------|
-| `src/hooks/useForecast.ts` | 20 referências | Pendente |
-| `src/components/forecast/ProximasAtividades.tsx` | 2 referências | Pendente |
+### O que ESTÁ funcionando corretamente:
+1. O usuário tem role `incorporador` configurada corretamente
+2. Existe vínculo em `user_empreendimentos` com o empreendimento AXIS
+3. O RLS está funcionando - o usuário só vê o empreendimento AXIS
+4. Os 5 projetos de marketing do AXIS aparecem corretamente no dashboard
+
+### A causa raiz do "problema":
+O empreendimento **AXIS não possui dados cadastrados**:
+- 0 unidades no sistema
+- 0 negociações
+- 0 atividades
+- 0 contratos
+
+Por isso todos os KPIs mostram zero - não é problema de permissão, é ausência de dados no empreendimento!
 
 ---
 
-## Alterações Necessárias
+## Melhorias Propostas
 
-### 1. Hook useForecast.ts
+Para evitar confusões futuras e melhorar a experiência, proponho as seguintes melhorias:
 
-Atualizar **todas** as queries para usar `data_inicio` e `data_fim`:
+### 1. Mensagem Informativa no Dashboard
 
-| Função | Mudança |
-|--------|---------|
-| `useFunilTemperatura` | Trocar `.gte('data_hora', ...)` por `.lte('data_inicio', ...).gte('data_fim', ...)` |
-| `useVisitasPorEmpreendimento` | Trocar select e filtros para novos campos |
-| `useResumoAtividades` | Trocar select e filtros, atualizar lógica de vencidas/hoje |
-| `useAtividadesPorTipoPorSemana` | Trocar campos e lógica de agrupamento por semana |
-| `useAtividadesPorCorretor` | Trocar filtros de data |
-| `useCalendarioAtividades` | Trocar select e filtros, ajustar contagem por dia |
-| `useProximasAtividades` | Trocar select, filtros e ordenação |
-| `useResumoAtendimentos` | Trocar filtros de data |
+Quando um empreendimento não tem dados cadastrados, exibir uma mensagem clara informando que os dados estão vazios, em vez de apenas mostrar zeros.
 
-**Padrão de migração:**
-
-```typescript
-// ANTES (data_hora)
-.gte('data_hora', inicioMes.toISOString())
-.lte('data_hora', fimMes.toISOString())
-
-// DEPOIS (data_inicio e data_fim)
-// Buscar atividades que se sobrepõem ao período
-.lte('data_inicio', fimMes.toISOString().split('T')[0])
-.gte('data_fim', inicioMes.toISOString().split('T')[0])
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ ⚠️ Empreendimento AXIS ainda não possui dados cadastrados            │
+│                                                                        │
+│ Os dados de unidades, negociações e atividades serão exibidos aqui    │
+│ assim que forem cadastrados no sistema.                               │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Lógica de calendário (atividades multi-dia):**
+**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
 
-```typescript
-// Para contagem no calendário, considerar todos os dias do intervalo
-eachDayOfInterval({ 
-  start: parseISO(ativ.data_inicio), 
-  end: parseISO(ativ.data_fim) 
-}).forEach(dia => {
-  const diaNum = dia.getDate();
-  contagem.set(diaNum, (contagem.get(diaNum) || 0) + 1);
-});
+### 2. Indicador Visual de Dados Vazios por Empreendimento
+
+Na listagem de empreendimentos, adicionar um indicador quando o empreendimento não tem unidades cadastradas:
+
+```text
+┌─────────────────────────────────────────────────┐
+│ AXIS                                            │
+│ Goiânia - GO                                    │
+│                                                 │
+│ ⚠️ Nenhuma unidade cadastrada                  │
+│                                                 │
+│ Gestor: Maria Silva                             │
+└─────────────────────────────────────────────────┘
 ```
 
-### 2. Componente ProximasAtividades.tsx
+**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
 
-Atualizar exibição para usar `data_inicio`:
+### 3. Validação ao Vincular Empreendimento
 
-```typescript
-// ANTES
-const isToday = format(new Date(atividade.data_hora), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-format(new Date(atividade.data_hora), "dd/MM 'às' HH:mm")
+Na tela de administração de usuários, ao vincular um empreendimento a um incorporador, exibir quantas unidades o empreendimento possui para evitar vincular empreendimentos vazios:
 
-// DEPOIS (sem hora)
-const isToday = atividade.data_inicio === format(new Date(), 'yyyy-MM-dd');
-// Exibir apenas data ou intervalo
-atividade.data_inicio === atividade.data_fim
-  ? format(parseISO(atividade.data_inicio), "dd/MM")
-  : `${format(parseISO(atividade.data_inicio), "dd/MM")} - ${format(parseISO(atividade.data_fim), "dd/MM")}`
+```text
+┌─────────────────────────────────────────────────┐
+│ Vincular Empreendimentos                        │
+├─────────────────────────────────────────────────┤
+│ ☑ AXIS              (0 unidades) ⚠️            │
+│ ☐ BELVEDERE         (111 unidades) ✓           │
+│ ☐ RESERVA DO LAGO   (406 unidades) ✓           │
+└─────────────────────────────────────────────────┘
 ```
+
+**Arquivo:** `src/components/usuarios/UserEmpreendimentosTab.tsx`
+
+### 4. Estado Vazio Melhorado no Forecast
+
+Se não houver atividades ou negociações, exibir mensagem orientativa em vez de widgets vazios:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ 📊 Forecast                                                           │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│ Nenhuma atividade ou negociação encontrada para seus empreendimentos. │
+│                                                                        │
+│ As informações de forecast serão exibidas aqui quando:                │
+│ • Atividades forem agendadas                                          │
+│ • Negociações forem cadastradas                                       │
+│ • Leads forem registrados                                             │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx`
 
 ---
 
@@ -78,41 +101,78 @@ atividade.data_inicio === atividade.data_fim
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/useForecast.ts` | Atualizar todas as queries e lógicas |
-| `src/components/forecast/ProximasAtividades.tsx` | Atualizar exibição de datas |
+| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Adicionar mensagem para dados vazios |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Estado vazio melhorado |
+| `src/components/usuarios/UserEmpreendimentosTab.tsx` | Mostrar contagem de unidades |
+| `src/hooks/useIncorporadorEmpreendimentos.ts` | Incluir contagem de unidades |
 
 ---
 
-## Considerações Especiais
+## Detalhes Técnicos
 
-### Atividades Multi-Dia no Calendário
+### Hook useIncorporadorEmpreendimentos
 
-Uma atividade com `data_inicio: 01/02` e `data_fim: 03/02` deve aparecer na contagem dos dias 1, 2 e 3 do calendário.
-
-### Ordenação de Próximas Atividades
-
-Ordenar por `data_inicio` em vez de `data_hora`:
+Adicionar contagem de unidades na query:
 
 ```typescript
-.order('data_inicio', { ascending: true })
+const { data, error } = await supabase
+  .from('user_empreendimentos')
+  .select(`
+    empreendimento_id,
+    empreendimento:empreendimentos(
+      id, nome, status, endereco_cidade, endereco_uf,
+      unidades:unidades(count)
+    )
+  `)
+  .eq('user_id', user.id);
 ```
 
-### Verificação de "Hoje"
-
-Comparar apenas a parte DATE:
+### Dashboard - Lógica de Dados Vazios
 
 ```typescript
-// Verificar se atividade inclui hoje
-const hoje = format(new Date(), 'yyyy-MM-dd');
-const isToday = atividade.data_inicio <= hoje && atividade.data_fim >= hoje;
+const hasAnyData = (dashData?.unidades.total || 0) > 0 
+  || (dashData?.negociacoes.total || 0) > 0
+  || (dashData?.marketing.ticketsAbertos || 0) > 0;
+
+if (!hasAnyData) {
+  return (
+    <Alert>
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Dados em configuração</AlertTitle>
+      <AlertDescription>
+        Os empreendimentos vinculados ainda não possuem dados cadastrados.
+      </AlertDescription>
+    </Alert>
+  );
+}
 ```
+
+### UserEmpreendimentosTab - Contagem de Unidades
+
+```typescript
+const { data: empreendimentos } = await supabase
+  .from('empreendimentos')
+  .select(`
+    id, nome, status,
+    unidades:unidades(count)
+  `)
+  .eq('is_active', true);
+```
+
+---
+
+## Benefícios
+
+1. **Clareza para o usuário** - Sabe exatamente por que não está vendo dados
+2. **Prevenção de erros** - Admin vê se empreendimento tem dados antes de vincular
+3. **Melhor UX** - Estados vazios orientam o usuário sobre próximos passos
+4. **Menos suporte** - Reduz confusões sobre "dados não aparecem"
 
 ---
 
 ## Critérios de Aceite
 
-1. Nenhuma referência a `data_hora` no código
-2. Queries do Forecast funcionam com novos campos
-3. Calendário mostra atividades multi-dia corretamente
-4. Próximas atividades exibe datas sem hora
-5. Sem erros no console
+1. Dashboard mostra mensagem clara quando empreendimentos não têm dados
+2. Lista de empreendimentos indica quais não têm unidades
+3. Tela de vínculo de empreendimentos mostra contagem de unidades
+4. Forecast mostra estado vazio orientativo quando sem dados
