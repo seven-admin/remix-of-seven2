@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Building2, Users, LayoutGrid, List, AlertTriangle, Check } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Building2, Users, LayoutGrid, List, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTickets } from '@/hooks/useTickets';
 import { useTicketEtapas } from '@/hooks/useTicketEtapas';
 import { MarketingKanban } from '@/components/marketing/MarketingKanban';
@@ -13,7 +14,8 @@ import { TicketsListaTab } from '@/components/marketing/TicketsListaTab';
 import { TicketForm } from '@/components/marketing/TicketForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CATEGORIA_LABELS, type CategoriaTicket } from '@/types/marketing.types';
-import { isBefore, startOfDay } from 'date-fns';
+import { isBefore, startOfDay, isSameMonth, subMonths, addMonths, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type TipoFilter = 'all' | 'interno' | 'externo';
 type ViewMode = 'kanban' | 'lista';
@@ -25,6 +27,10 @@ export default function Marketing() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Estados para filtro de período
+  const [mesSelecionado, setMesSelecionado] = useState<Date>(new Date());
+  const [ocultarConcluidos, setOcultarConcluidos] = useState(false);
   
   const { tickets, isLoading, alterarEtapa, alterarEtapaEmLote } = useTickets(
     categoriaFilter !== 'all' ? { categoria: categoriaFilter } : undefined
@@ -38,7 +44,12 @@ export default function Marketing() {
     [etapas]
   );
 
-  // Filtrar por busca e tipo (interno/externo)
+  // Navegação entre meses
+  const irParaMesAnterior = useCallback(() => setMesSelecionado(prev => subMonths(prev, 1)), []);
+  const irParaProximoMes = useCallback(() => setMesSelecionado(prev => addMonths(prev, 1)), []);
+  const irParaMesAtual = useCallback(() => setMesSelecionado(new Date()), []);
+
+  // Filtrar por busca, tipo, mês e concluídos
   const projetosFiltrados = useMemo(() => {
     return tickets?.filter(p => {
       // Filtro de busca
@@ -52,9 +63,27 @@ export default function Marketing() {
         (tipoFilter === 'interno' && p.is_interno) ||
         (tipoFilter === 'externo' && !p.is_interno);
       
-      return matchSearch && matchTipo;
+      // Filtro por mês (baseado em data_previsao)
+      let matchMes = true;
+      if (p.data_previsao) {
+        const dataPrev = new Date(p.data_previsao);
+        matchMes = isSameMonth(dataPrev, mesSelecionado);
+      } else {
+        // Tickets sem previsão: mostrar apenas no mês atual
+        matchMes = isSameMonth(new Date(), mesSelecionado);
+      }
+      
+      // Filtro de concluídos
+      let matchConcluido = true;
+      if (ocultarConcluidos) {
+        const isFinal = ['concluido', 'arquivado'].includes(p.status) ||
+          (p.ticket_etapa_id && etapasFinaisIds.has(p.ticket_etapa_id));
+        matchConcluido = !isFinal;
+      }
+      
+      return matchSearch && matchTipo && matchMes && matchConcluido;
     });
-  }, [tickets, searchTerm, tipoFilter]);
+  }, [tickets, searchTerm, tipoFilter, mesSelecionado, ocultarConcluidos, etapasFinaisIds]);
 
   // Contar atrasados (tickets não em etapa final, com data_previsao vencida)
   const ticketsAtrasados = useMemo(() => {
@@ -108,6 +137,45 @@ export default function Marketing() {
       title="Tickets de Produção"
       subtitle="Gerencie tickets de criação e marketing"
     >
+      {/* Seletor de Mês e Toggle de Concluídos */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={irParaMesAnterior} className="h-8 w-8">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <span className="font-medium min-w-[130px] text-center capitalize">
+            {format(mesSelecionado, 'MMMM yyyy', { locale: ptBR })}
+          </span>
+          
+          <Button variant="ghost" size="icon" onClick={irParaProximoMes} className="h-8 w-8">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={irParaMesAtual}>
+            Este mês
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setMesSelecionado(subMonths(new Date(), 1))}>
+            Mês anterior
+          </Button>
+        </div>
+        
+        <div className="flex-1" />
+        
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="ocultar-concluidos"
+            checked={ocultarConcluidos}
+            onCheckedChange={(checked) => setOcultarConcluidos(checked === true)}
+          />
+          <label htmlFor="ocultar-concluidos" className="text-sm cursor-pointer select-none">
+            Ocultar concluídos
+          </label>
+        </div>
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
