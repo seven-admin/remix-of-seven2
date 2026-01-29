@@ -124,7 +124,13 @@ export function UserEmpreendimentosTab({ userId, userScope }: UserEmpreendimento
                   />
                   
                   <div>
-                    <p className="font-medium">{emp.nome}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{emp.nome}</p>
+                      <span className={`text-xs ${emp.unidades_count === 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                        ({emp.unidades_count} unidade{emp.unidades_count !== 1 ? 's' : ''})
+                        {emp.unidades_count === 0 && ' ⚠️'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {emp.cidade && (
                         <span className="flex items-center gap-1">

@@ -16,6 +16,7 @@ export interface EmpreendimentoWithLink {
   uf: string | null;
   status: string;
   is_linked: boolean;
+  unidades_count: number;
 }
 
 // Fetch user empreendimentos
@@ -44,10 +45,10 @@ export function useEmpreendimentosWithLinks(userId: string | undefined) {
     queryFn: async (): Promise<EmpreendimentoWithLink[]> => {
       if (!userId) return [];
 
-      // Fetch all active empreendimentos
+      // Fetch all active empreendimentos with unit count
       const { data: empreendimentos, error: empError } = await supabase
         .from('empreendimentos')
-        .select('id, nome, endereco_cidade, endereco_uf, status')
+        .select('id, nome, endereco_cidade, endereco_uf, status, unidades(count)')
         .eq('is_active', true)
         .order('nome');
 
@@ -63,14 +64,20 @@ export function useEmpreendimentosWithLinks(userId: string | undefined) {
 
       const linkedIds = new Set((links || []).map(l => l.empreendimento_id));
 
-      return (empreendimentos || []).map(emp => ({
-        id: emp.id,
-        nome: emp.nome,
-        cidade: emp.endereco_cidade,
-        uf: emp.endereco_uf,
-        status: emp.status,
-        is_linked: linkedIds.has(emp.id)
-      }));
+      return (empreendimentos || []).map(emp => {
+        const unidadesData = emp.unidades as unknown as { count: number }[] | null;
+        const unidadesCount = unidadesData?.[0]?.count || 0;
+        
+        return {
+          id: emp.id,
+          nome: emp.nome,
+          cidade: emp.endereco_cidade,
+          uf: emp.endereco_uf,
+          status: emp.status,
+          is_linked: linkedIds.has(emp.id),
+          unidades_count: unidadesCount
+        };
+      });
     },
     enabled: !!userId
   });

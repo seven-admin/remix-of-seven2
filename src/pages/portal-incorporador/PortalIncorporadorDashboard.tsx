@@ -4,6 +4,7 @@ import { useGestoresMultiplosEmpreendimentos } from '@/hooks/useGestoresMultiplo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -11,6 +12,8 @@ import {
   DollarSign,
   TrendingUp,
   User,
+  AlertTriangle,
+  Package,
 } from 'lucide-react';
 
 export default function PortalIncorporadorDashboard() {
@@ -48,8 +51,25 @@ export default function PortalIncorporadorDashboard() {
     }).format(value);
   };
 
+  // Verificar se há dados cadastrados
+  const hasUnidadesData = (dashData?.unidades.total || 0) > 0;
+  const hasNegociacoesData = (dashData?.negociacoes.total || 0) > 0;
+  const hasAnyData = hasUnidadesData || hasNegociacoesData;
+
   return (
     <div className="space-y-6">
+      {/* Alerta quando não há dados */}
+      {!hasAnyData && empreendimentos.length > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Dados em configuração</AlertTitle>
+          <AlertDescription>
+            Os empreendimentos vinculados à sua conta ainda não possuem unidades ou negociações cadastradas. 
+            As informações serão exibidas aqui assim que os dados forem registrados no sistema.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* KPIs Principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -144,7 +164,7 @@ export default function PortalIncorporadorDashboard() {
                         {emp.status}
                       </Badge>
                     </div>
-                    {unidadesEmp && (
+                    {unidadesEmp ? (
                       <div className="mt-3 flex gap-4 text-sm">
                         <span className="text-green-600 dark:text-green-400">
                           {unidadesEmp.disponiveis} disponíveis
@@ -152,6 +172,11 @@ export default function PortalIncorporadorDashboard() {
                         <span className="text-blue-600 dark:text-blue-400">
                           {unidadesEmp.vendidas} vendidas
                         </span>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                        <Package className="h-3 w-3" />
+                        Nenhuma unidade cadastrada
                       </div>
                     )}
                   </div>
