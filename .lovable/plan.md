@@ -1,139 +1,154 @@
 
 
-# Plano: Corrigir Listagem de Membros da Equipe de Criação
+# Plano: Ordenar Dropdown de Vínculo por Quadra/Andar e Número
 
 ## Problema Identificado
 
-O hook `useEquipeMarketing.ts` busca membros da equipe apenas na tabela `user_module_permissions`, que armazena **permissões customizadas por usuário**. 
+A lista de unidades no dropdown de vínculo de polígonos/marcadores no Editor de Mapa (`MapaEditor.tsx`) não está ordenada de forma organizada. Atualmente:
 
-A maioria dos usuários herda suas permissões através do **role** (via `role_permissions`), e não tem registros em `user_module_permissions`.
-
-### Dados do Banco
-
-| Fonte | Usuários encontrados |
-|-------|---------------------|
-| `user_module_permissions` | 1 (Jéssica) |
-| `role_permissions` via role | 5 (Priscila, Jéssica, Rafael, Jonas, Kalebe) |
-
-### Resultado Atual
-Apenas Jéssica aparece em `/marketing/equipe`
-
----
+1. **Os grupos de blocos/quadras** não estão sendo ordenados (aparecem na ordem que a `Map` inseriu)
+2. **As unidades dentro de cada grupo** são ordenadas apenas por número, mas sem considerar o andar
 
 ## Solução
 
-Atualizar a lógica do hook para buscar membros de **ambas as fontes**:
-1. Usuários com permissões customizadas (`user_module_permissions`)
-2. Usuários com roles que possuem acesso ao módulo (`role_permissions` + `user_roles`)
+Refatorar a função `groupUnidadesByBloco` no arquivo `src/lib/mapaUtils.ts` para:
 
----
+1. **Ordenar os grupos (blocos/quadras)** usando ordenação natural (Quadra 2 antes de Quadra 10)
+2. **Ordenar as unidades dentro de cada grupo** por **andar** primeiro, depois por **número**
 
 ## Alterações Necessárias
 
-### Arquivo: `src/hooks/useEquipeMarketing.ts`
+### Arquivo: `src/lib/mapaUtils.ts`
 
-Modificar a query de busca de membros da equipe:
+Modificar a função `groupUnidadesByBloco`:
 
 ```text
-ANTES (linha 65-77):
-- Busca apenas em user_module_permissions
-- Resultado: 1 usuário
+ANTES (linhas 143-167):
+- Grupos não ordenados (ordem de inserção do Map)
+- Unidades ordenadas apenas por número
 
 DEPOIS:
-- Busca em user_module_permissions (permissões customizadas)
-- Busca em user_roles + role_permissions (permissões via role)
-- Combina resultados removendo duplicatas
-- Exclui admin/super_admin
-- Resultado: 5 usuários
+- Grupos ordenados por nome (ordenação natural: "Quadra 2" < "Quadra 10")
+- Unidades ordenadas por: 1º andar (se existir), 2º número (ordenação natural)
+- Retorna Map com chaves ordenadas
 ```
 
-### Nova Lógica
+### Nova Implementação
 
 ```typescript
-// 1. Buscar usuários COM permissões customizadas no módulo
-const { data: permissoesCustomizadas } = await supabase
-  .from('user_module_permissions')
-  .select('user_id')
-  .eq('module_id', moduloMarketing.id)
-  .eq('can_view', true);
+export function groupUnidadesByBloco(unidades: Unidade[]): Map<string, Unidade[]> {
+  const groups = new Map<string, Unidade[]>();
+  
+  unidades.forEach((unidade) => {
+    const key = unidade.bloco?.nome || 'Sem Bloco';
+    const existing = groups.get(key) || [];
+    existing.push(unidade);
+    groups.set(key, existing);
+  });
 
-// 2. Buscar usuários COM permissões via ROLE
-const { data: permissoesViaRole } = await supabase
-  .from('user_roles')
-  .select('user_id, role_id')
-  .in('role_id', roleIdsComAcessoMarketing);
+  // 1. Ordenar unidades dentro de cada grupo: por andar, depois por número
+  groups.forEach((units) => {
+    units.sort((a, b) => {
+      // Primeiro ordenar por andar (se existir)
+      const andarA = a.andar ?? -Infinity;
+      const andarB = b.andar ?? -Infinity;
+      if (andarA !== andarB) {
+        return andarA - andarB;
+      }
+      // Depois ordenar por número (ordenação natural)
+      return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
+    });
+  });
 
-// 3. Combinar IDs únicos
-const todosUserIds = new Set([
-  ...(permissoesCustomizadas || []).map(p => p.user_id),
-  ...(permissoesViaRole || []).map(p => p.user_id)
-]);
+  // 2. Criar novo Map com chaves ordenadas (blocos/quadras em ordem natural)
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => 
+    a.localeCompare(b, 'pt-BR', { numeric: true })
+  );
+  
+  const sortedGroups = new Map<string, Unidade[]>();
+  
+  // "Sem Bloco" sempre por último
+  const semBlocoKey = 'Sem Bloco';
+  const keysWithoutSemBloco = sortedKeys.filter(k => k !== semBlocoKey);
+  
+  keysWithoutSemBloco.forEach(key => {
+    sortedGroups.set(key, groups.get(key)!);
+  });
+  
+  // Adicionar "Sem Bloco" no final se existir
+  if (groups.has(semBlocoKey)) {
+    sortedGroups.set(semBlocoKey, groups.get(semBlocoKey)!);
+  }
 
-// 4. Buscar profiles e filtrar admins
+  return sortedGroups;
+}
 ```
-
----
-
-## Diagrama do Fluxo Corrigido
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    useEquipeMarketing.ts                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Buscar módulo projetos_marketing                           │
-│                     ↓                                           │
-│  2. Buscar roles com acesso ao módulo                          │
-│     └─→ role_permissions WHERE module_id = X AND can_view      │
-│                     ↓                                           │
-│  3. Buscar usuários com esses roles                            │
-│     └─→ user_roles WHERE role_id IN (roles_com_acesso)         │
-│                     ↓                                           │
-│  4. Buscar usuários com permissões customizadas                │
-│     └─→ user_module_permissions WHERE module_id = X            │
-│                     ↓                                           │
-│  5. Combinar (UNION de user_ids)                               │
-│                     ↓                                           │
-│  6. Excluir admin/super_admin                                  │
-│                     ↓                                           │
-│  7. Buscar profiles e métricas                                 │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
 
 ## Resultado Esperado
 
-| Antes | Depois |
-|-------|--------|
-| 1 membro (Jéssica) | 5 membros (Priscila, Jéssica, Rafael, Jonas, Kalebe) |
+### Antes (ordem atual, ruim):
+```
+Quadra A
+  ├─ 10
+  ├─ 1
+  └─ 2
+Quadra B
+  ├─ 5
+  └─ 3
+Quadra 10
+  └─ 1
+Quadra 2
+  └─ 1
+```
 
----
+### Depois (ordenado):
+```
+Quadra 2
+  └─ 1
+Quadra 10
+  └─ 1
+Quadra A
+  ├─ 1
+  ├─ 2
+  └─ 10
+Quadra B
+  ├─ 3
+  └─ 5
+```
+
+Para prédios com andares:
+```
+Torre 1
+  ├─ 1º andar
+  │   ├─ 101
+  │   └─ 102
+  ├─ 2º andar
+  │   ├─ 201
+  │   └─ 202
+```
+
+## Resumo de Arquivos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/lib/mapaUtils.ts` | Modificar função `groupUnidadesByBloco` |
 
 ## Detalhes Técnicos
 
-### Roles que devem aparecer
+### Ordenação Natural
+Usando `localeCompare` com `{ numeric: true }` para que:
+- "Quadra 2" venha antes de "Quadra 10"
+- "Lote 1" venha antes de "Lote 12"
 
-Os roles de marketing ativos são:
-- `supervisão_de_criação` 
-- `diretor_de_marketing`
-
-### Exclusões
-
-Serão excluídos usuários com roles:
-- `admin`
-- `super_admin`
-
-Isso garante que apenas membros executores apareçam na listagem, não gestores/administradores.
-
----
+### Tratamento de Nulos
+- Unidades sem andar (`andar = null`) ficam antes das que têm andar
+- Unidades sem bloco vão para o grupo "Sem Bloco" no final
 
 ## Critérios de Aceite
 
-1. Todos os usuários com role de marketing aparecem na página
-2. Usuários com permissões customizadas também aparecem
-3. Não há duplicatas na listagem
-4. Admins/super_admins não aparecem
-5. Métricas de tickets são calculadas corretamente para cada membro
+1. Grupos de blocos/quadras aparecem em ordem alfabética/numérica natural
+2. Unidades dentro de cada grupo são ordenadas por andar primeiro
+3. Unidades com mesmo andar são ordenadas por número
+4. "Sem Bloco" aparece por último
+5. A busca no dropdown continua funcionando normalmente
 
