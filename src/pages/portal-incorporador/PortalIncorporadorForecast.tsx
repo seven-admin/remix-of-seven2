@@ -6,6 +6,7 @@ import { VisitasPorEmpreendimento } from '@/components/forecast/VisitasPorEmpree
 import { AtividadesPorTipo } from '@/components/forecast/AtividadesPorTipo';
 import { ProximasAtividades } from '@/components/forecast/ProximasAtividades';
 import { AtendimentosResumo } from '@/components/forecast/AtendimentosResumo';
+import { CalendarioCompacto } from '@/components/forecast/CalendarioCompacto';
 import { useResumoAtividades } from '@/hooks/useForecast';
 import {
   CalendarDays,
@@ -124,8 +125,11 @@ export default function PortalIncorporadorForecast() {
         <ProximasAtividades empreendimentoIds={empreendimentoIds} />
       </div>
 
-      {/* Atendimentos */}
-      <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
+      {/* Calendário e Atendimentos */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CalendarioCompacto empreendimentoIds={empreendimentoIds} />
+        <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
+      </div>
     </div>
   );
 }

@@ -8,11 +8,18 @@ import { useCalendarioAtividades } from '@/hooks/useForecast';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function CalendarioCompacto() {
+interface CalendarioCompactoProps {
+  gestorId?: string;
+  empreendimentoIds?: string[];
+}
+
+export function CalendarioCompacto({ gestorId, empreendimentoIds }: CalendarioCompactoProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const { data: diasComAtividades, isLoading } = useCalendarioAtividades(
     currentMonth.getFullYear(),
-    currentMonth.getMonth() + 1
+    currentMonth.getMonth() + 1,
+    gestorId,
+    empreendimentoIds
   );
 
   const daysOfWeek = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
