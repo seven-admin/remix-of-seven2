@@ -1,178 +1,87 @@
 
-# Plano: Melhorias no Portal do Incorporador
 
-## Diagnóstico do Problema Reportado
+# Plano: Mover Título para o Header
 
-Ao investigar o problema do usuário `bk@sevengroup360.com.br`, descobri que:
+## Objetivo
 
-### O que ESTÁ funcionando corretamente:
-1. O usuário tem role `incorporador` configurada corretamente
-2. Existe vínculo em `user_empreendimentos` com o empreendimento AXIS
-3. O RLS está funcionando - o usuário só vê o empreendimento AXIS
-4. Os 5 projetos de marketing do AXIS aparecem corretamente no dashboard
-
-### A causa raiz do "problema":
-O empreendimento **AXIS não possui dados cadastrados**:
-- 0 unidades no sistema
-- 0 negociações
-- 0 atividades
-- 0 contratos
-
-Por isso todos os KPIs mostram zero - não é problema de permissão, é ausência de dados no empreendimento!
+Posicionar "Portal do Incorporador" ao lado da logo no header e remover o título duplicado da área de conteúdo na página principal.
 
 ---
 
-## Melhorias Propostas
+## Mudança Visual
 
-Para evitar confusões futuras e melhorar a experiência, proponho as seguintes melhorias:
-
-### 1. Mensagem Informativa no Dashboard
-
-Quando um empreendimento não tem dados cadastrados, exibir uma mensagem clara informando que os dados estão vazios, em vez de apenas mostrar zeros.
-
+### Antes (Atual)
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│ ⚠️ Empreendimento AXIS ainda não possui dados cadastrados            │
-│                                                                        │
-│ Os dados de unidades, negociações e atividades serão exibidos aqui    │
-│ assim que forem cadastrados no sistema.                               │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Logo]                                       Nome Usuário   [Sair]  │
+└─────────────────────────────────────────────────────────────────────┘
+
+  Portal do Incorporador          <-- Título abaixo do header
+  Visão geral dos seus empreendimentos
 ```
 
-**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
-
-### 2. Indicador Visual de Dados Vazios por Empreendimento
-
-Na listagem de empreendimentos, adicionar um indicador quando o empreendimento não tem unidades cadastradas:
-
+### Depois (Proposto)
 ```text
-┌─────────────────────────────────────────────────┐
-│ AXIS                                            │
-│ Goiânia - GO                                    │
-│                                                 │
-│ ⚠️ Nenhuma unidade cadastrada                  │
-│                                                 │
-│ Gestor: Maria Silva                             │
-└─────────────────────────────────────────────────┘
-```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Logo]  Portal do Incorporador               Nome Usuário   [Sair]  │
+└─────────────────────────────────────────────────────────────────────┘
 
-**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
-
-### 3. Validação ao Vincular Empreendimento
-
-Na tela de administração de usuários, ao vincular um empreendimento a um incorporador, exibir quantas unidades o empreendimento possui para evitar vincular empreendimentos vazios:
-
-```text
-┌─────────────────────────────────────────────────┐
-│ Vincular Empreendimentos                        │
-├─────────────────────────────────────────────────┤
-│ ☑ AXIS              (0 unidades) ⚠️            │
-│ ☐ BELVEDERE         (111 unidades) ✓           │
-│ ☐ RESERVA DO LAGO   (406 unidades) ✓           │
-└─────────────────────────────────────────────────┘
-```
-
-**Arquivo:** `src/components/usuarios/UserEmpreendimentosTab.tsx`
-
-### 4. Estado Vazio Melhorado no Forecast
-
-Se não houver atividades ou negociações, exibir mensagem orientativa em vez de widgets vazios:
-
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│ 📊 Forecast                                                           │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│ Nenhuma atividade ou negociação encontrada para seus empreendimentos. │
-│                                                                        │
-│ As informações de forecast serão exibidas aqui quando:                │
-│ • Atividades forem agendadas                                          │
-│ • Negociações forem cadastradas                                       │
-│ • Leads forem registrados                                             │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-**Arquivo:** `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx`
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Adicionar mensagem para dados vazios |
-| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Estado vazio melhorado |
-| `src/components/usuarios/UserEmpreendimentosTab.tsx` | Mostrar contagem de unidades |
-| `src/hooks/useIncorporadorEmpreendimentos.ts` | Incluir contagem de unidades |
-
----
-
-## Detalhes Técnicos
-
-### Hook useIncorporadorEmpreendimentos
-
-Adicionar contagem de unidades na query:
-
-```typescript
-const { data, error } = await supabase
-  .from('user_empreendimentos')
-  .select(`
-    empreendimento_id,
-    empreendimento:empreendimentos(
-      id, nome, status, endereco_cidade, endereco_uf,
-      unidades:unidades(count)
-    )
-  `)
-  .eq('user_id', user.id);
-```
-
-### Dashboard - Lógica de Dados Vazios
-
-```typescript
-const hasAnyData = (dashData?.unidades.total || 0) > 0 
-  || (dashData?.negociacoes.total || 0) > 0
-  || (dashData?.marketing.ticketsAbertos || 0) > 0;
-
-if (!hasAnyData) {
-  return (
-    <Alert>
-      <AlertTriangle className="h-4 w-4" />
-      <AlertTitle>Dados em configuração</AlertTitle>
-      <AlertDescription>
-        Os empreendimentos vinculados ainda não possuem dados cadastrados.
-      </AlertDescription>
-    </Alert>
-  );
-}
-```
-
-### UserEmpreendimentosTab - Contagem de Unidades
-
-```typescript
-const { data: empreendimentos } = await supabase
-  .from('empreendimentos')
-  .select(`
-    id, nome, status,
-    unidades:unidades(count)
-  `)
-  .eq('is_active', true);
+  Visão geral dos seus empreendimentos    <-- Apenas subtitle
 ```
 
 ---
 
-## Benefícios
+## Comportamento por Página
 
-1. **Clareza para o usuário** - Sabe exatamente por que não está vendo dados
-2. **Prevenção de erros** - Admin vê se empreendimento tem dados antes de vincular
-3. **Melhor UX** - Estados vazios orientam o usuário sobre próximos passos
-4. **Menos suporte** - Reduz confusões sobre "dados não aparecem"
+| Página | Header | Área de Conteúdo |
+|--------|--------|------------------|
+| `/portal-incorporador` | Logo + "Portal do Incorporador" | Apenas subtitle |
+| `/portal-incorporador/executivo` | Logo + "Portal do Incorporador" | "Voltar" + "Dashboard Executivo" + subtitle |
+| `/portal-incorporador/forecast` | Logo + "Portal do Incorporador" | "Voltar" + "Forecast" + subtitle |
+| `/portal-incorporador/marketing` | Logo + "Portal do Incorporador" | "Voltar" + "Produção de Marketing" + subtitle |
 
 ---
 
-## Critérios de Aceite
+## Alterações Técnicas
 
-1. Dashboard mostra mensagem clara quando empreendimentos não têm dados
-2. Lista de empreendimentos indica quais não têm unidades
-3. Tela de vínculo de empreendimentos mostra contagem de unidades
-4. Forecast mostra estado vazio orientativo quando sem dados
+### Arquivo: `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
+
+**1. Adicionar título ao lado da logo no header:**
+
+```tsx
+<Link to="/portal-incorporador" className="flex items-center gap-3">
+  <img src={logo} alt="Logo" className="h-8" />
+  <span className="font-semibold text-lg hidden sm:inline">
+    Portal do Incorporador
+  </span>
+</Link>
+```
+
+**2. Ajustar área de conteúdo:**
+
+- Na página principal (`/portal-incorporador`): exibir apenas o subtitle
+- Nas páginas internas: manter título específico (Dashboard Executivo, Forecast, etc.)
+
+```tsx
+<div className="mb-6">
+  {isInternalPage && (
+    <>
+      <Link to="/portal-incorporador" className="...">
+        <ArrowLeft /> Voltar
+      </Link>
+      <h1 className="text-2xl font-bold">{title}</h1>
+    </>
+  )}
+  {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
+</div>
+```
+
+---
+
+## Resultado Final
+
+- Header mais informativo com identificação clara do portal
+- Página principal sem título duplicado (apenas subtitle)
+- Páginas internas mantêm seus títulos específicos
+- Título "Portal do Incorporador" oculto em mobile (para não ocupar espaço)
+
