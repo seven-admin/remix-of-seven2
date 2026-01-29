@@ -39,7 +39,12 @@ function applyAtividadesFilters(query: any, filters?: AtividadeFilters) {
   if (filters?.status) q = q.eq('status', filters.status);
   if (filters?.responsavel_id) q = q.eq('gestor_id', filters.responsavel_id);
   if (filters?.created_by) q = q.eq('created_by', filters.created_by);
-  if (filters?.empreendimento_id) q = q.eq('empreendimento_id', filters.empreendimento_id);
+  // Suporte a múltiplos empreendimentos (portal incorporador)
+  if (filters?.empreendimento_ids?.length) {
+    q = q.in('empreendimento_id', filters.empreendimento_ids);
+  } else if (filters?.empreendimento_id) {
+    q = q.eq('empreendimento_id', filters.empreendimento_id);
+  }
   if (filters?.cliente_id) q = q.eq('cliente_id', filters.cliente_id);
   if (filters?.data_inicio) q = q.gte('data_hora', filters.data_inicio);
   if (filters?.data_fim) q = q.lte('data_hora', filters.data_fim);
