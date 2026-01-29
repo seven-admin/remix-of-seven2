@@ -1,129 +1,117 @@
 
-# Plano: Filtro por Mês no Dashboard de Marketing
+# Plano: Adicionar Calendário de Atividades ao Portal do Incorporador
 
 ## Objetivo
 
-Substituir o filtro de período (7d, 30d, 90d, todos) por um **seletor de mês** similar ao usado no Forecast, mantendo consistência visual com os outros dashboards do sistema.
+Adicionar o **Calendário Compacto de Atividades** à página de Forecast do Portal do Incorporador, garantindo que exiba apenas atividades vinculadas aos empreendimentos do incorporador logado.
 
 ---
 
-## Comparação: Antes e Depois
+## Análise do Código Atual
 
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| Tipo de filtro | Período relativo (7d, 30d, 90d, all) | Mês calendário (Janeiro 2025, etc.) |
-| Navegação | Dropdown select | Setas + botões de atalho |
-| Lógica de dados | Data início/fim calculada com `subDays`/`subMonths` | `startOfMonth`/`endOfMonth` do mês selecionado |
-| Comparação | Não tem | Pode adicionar variação vs mês anterior |
-
----
-
-## Interface Proposta
-
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Dashboard Marketing                                                      │
-│ Visão consolidada de tickets, prazos e produtividade                    │
-│                                                                          │
-│                     Atualizado: 14:21:18  [30s]                         │
-│                                                                          │
-│  [🔄] [<] Janeiro de 2025 [>] [Este mês] [Mês anterior]                 │
-│       [Categoria ▼] [Tipo ▼]                        [📺 Modo TV]        │
-│                                                                          │
-│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐     │
-│  │Ativos  │ │Produção│ │Aprovação│ │Concluídos│ │Atrasados│ │Tempo   │  │
-│  │   12   │ │   5    │ │   3     │ │    8    │ │   2    │ │  4.5d  │   │
-│  └────────┘ └────────┘ └────────┘ └────────────┘ └────────┘ └────────┘   │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| Componente/Hook | Status | Problema |
+|-----------------|--------|----------|
+| `CalendarioCompacto` | Existe | Não aceita filtro por `empreendimentoIds` |
+| `useCalendarioAtividades` | Existe | Não filtra por `empreendimentoIds` |
+| `PortalIncorporadorForecast` | Existe | Não inclui o calendário |
 
 ---
 
 ## Alterações Técnicas
 
-### 1. Estado de Competência (src/pages/DashboardMarketing.tsx)
+### 1. Atualizar Hook `useCalendarioAtividades` (src/hooks/useForecast.ts)
+
+Adicionar parâmetros opcionais para `gestorId` e `empreendimentoIds`:
 
 ```typescript
-// REMOVER
-type PeriodoFilter = '7d' | '30d' | '90d' | 'all';
-const [periodo, setPeriodo] = useState<PeriodoFilter>('30d');
+export function useCalendarioAtividades(
+  ano: number, 
+  mes: number,
+  gestorId?: string,           // NOVO
+  empreendimentoIds?: string[] // NOVO
+) {
+  return useQuery({
+    queryKey: ['forecast', 'calendario-atividades', ano, mes, gestorId || 'all', empreendimentoIds?.join(',') || 'all'],
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: true,
+    queryFn: async () => {
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
 
-// ADICIONAR
-const [competencia, setCompetencia] = useState(new Date());
+      let query = supabase
+        .from('atividades' as any)
+        .select('data_hora')
+        .gte('data_hora', inicioMes.toISOString())
+        .lte('data_hora', fimMes.toISOString())
+        .neq('status', 'cancelada');
 
-// Calcular período baseado no mês selecionado
-const filters = useMemo(() => {
-  const periodoInicio = startOfMonth(competencia);
-  const periodoFim = endOfMonth(competencia);
-  
-  return {
-    periodoInicio,
-    periodoFim,
-    categoria: categoria === 'all' ? undefined : categoria,
-    tipo: tipo === 'all' ? undefined : tipo,
-  };
-}, [competencia, categoria, tipo]);
+      // NOVOS FILTROS
+      if (gestorId) {
+        query = query.eq('gestor_id', gestorId);
+      }
+      
+      if (empreendimentoIds?.length) {
+        query = query.in('empreendimento_id', empreendimentoIds);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const contagem = new Map<number, number>();
+      (data || []).forEach((ativ: any) => {
+        const dia = new Date(ativ.data_hora).getDate();
+        contagem.set(dia, (contagem.get(dia) || 0) + 1);
+      });
+
+      return Array.from(contagem.entries())
+        .map(([dia, quantidade]) => ({ dia, quantidade }))
+        .sort((a, b) => a.dia - b.dia);
+    },
+  });
+}
 ```
 
-### 2. Componente de Seletor de Mês (no PageHeader actions)
+### 2. Atualizar Componente `CalendarioCompacto` (src/components/forecast/CalendarioCompacto.tsx)
 
-Reutilizar o mesmo padrão visual do Forecast:
+Adicionar props opcionais:
 
 ```typescript
-<div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-  <Button 
-    variant="ghost" 
-    size="icon" 
-    className="h-8 w-8"
-    onClick={() => setCompetencia(subMonths(competencia, 1))}
-  >
-    <ChevronLeft className="h-4 w-4" />
-  </Button>
-  <div className="min-w-[140px] text-center font-medium text-sm capitalize">
-    {format(competencia, "MMMM 'de' yyyy", { locale: ptBR })}
-  </div>
-  <Button 
-    variant="ghost" 
-    size="icon" 
-    className="h-8 w-8"
-    onClick={() => setCompetencia(addMonths(competencia, 1))}
-  >
-    <ChevronRight className="h-4 w-4" />
-  </Button>
+interface CalendarioCompactoProps {
+  gestorId?: string;
+  empreendimentoIds?: string[];
+}
+
+export function CalendarioCompacto({ gestorId, empreendimentoIds }: CalendarioCompactoProps) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const { data: diasComAtividades, isLoading } = useCalendarioAtividades(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth() + 1,
+    gestorId,           // NOVO
+    empreendimentoIds   // NOVO
+  );
+  // ... restante do código permanece igual
+}
+```
+
+### 3. Adicionar Calendário ao Portal do Incorporador (src/pages/portal-incorporador/PortalIncorporadorForecast.tsx)
+
+Importar e renderizar o calendário passando os IDs dos empreendimentos:
+
+```typescript
+import { CalendarioCompacto } from '@/components/forecast/CalendarioCompacto';
+
+// ... dentro do return
+<div className="grid gap-4 lg:grid-cols-2">
+  <AtividadesPorTipo empreendimentoIds={empreendimentoIds} />
+  <ProximasAtividades empreendimentoIds={empreendimentoIds} />
 </div>
 
-{/* Atalhos rápidos */}
-<div className="flex gap-1">
-  <Button 
-    variant={format(competencia, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'default' : 'outline'} 
-    size="sm"
-    onClick={() => setCompetencia(new Date())}
-  >
-    Este mês
-  </Button>
-  <Button 
-    variant={format(competencia, 'yyyy-MM') === format(subMonths(new Date(), 1), 'yyyy-MM') ? 'default' : 'outline'} 
-    size="sm"
-    onClick={() => setCompetencia(subMonths(new Date(), 1))}
-  >
-    Mês anterior
-  </Button>
+{/* NOVO: Calendário Compacto */}
+<div className="grid gap-4 lg:grid-cols-2">
+  <CalendarioCompacto empreendimentoIds={empreendimentoIds} />
+  <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
 </div>
 ```
-
-### 3. Imports a Adicionar
-
-```typescript
-import { startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-```
-
-### 4. Remover Código Obsoleto
-
-- Remover a constante `PERIODO_OPTIONS`
-- Remover o tipo `PeriodoFilter`
-- Remover o estado `periodo`
-- Remover o `<Select>` de período do PageHeader
 
 ---
 
@@ -131,51 +119,75 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/DashboardMarketing.tsx` | Substituir filtro de período por seletor de mês |
+| `src/hooks/useForecast.ts` | Adicionar parâmetros `gestorId` e `empreendimentoIds` ao hook `useCalendarioAtividades` |
+| `src/components/forecast/CalendarioCompacto.tsx` | Adicionar props e passá-las ao hook |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Importar e renderizar `CalendarioCompacto` com filtro |
 
 ---
 
-## Comportamento do Hook (sem alterações)
+## Fluxo de Dados
 
-O hook `useDashboardMarketing` já recebe `periodoInicio` e `periodoFim` como `Date`, portanto **não precisa de alterações**:
-
-```typescript
-// Hook já funciona assim:
-const periodoInicio = filters?.periodoInicio || subWeeks(hoje, 4);
-const periodoFim = filters?.periodoFim || hoje;
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ useIncorporadorEmpreendimentos()                                │
+│   → Retorna lista de empreendimentoIds vinculados ao usuário   │
+└─────────────────────────────────────┬───────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ CalendarioCompacto({ empreendimentoIds })                       │
+│   → Passa IDs para o hook                                       │
+└─────────────────────────────────────┬───────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ useCalendarioAtividades(ano, mes, undefined, empreendimentoIds) │
+│   → Query filtra: .in('empreendimento_id', empreendimentoIds)   │
+└─────────────────────────────────────┬───────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Resultado: Apenas atividades dos empreendimentos do incorporador│
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-Apenas passaremos as datas do mês selecionado em vez de datas relativas.
 
 ---
 
-## Modo TV
+## Segurança
 
-O modo TV também será atualizado para exibir o mês selecionado no header:
+As políticas RLS existentes na tabela `atividades` já garantem que o incorporador só veja atividades de seus empreendimentos:
 
-```typescript
-<span className="text-sm font-medium text-primary uppercase">
-  {format(competencia, "MMM/yyyy", { locale: ptBR })}
-</span>
+```sql
+-- Política existente para incorporadores
+CREATE POLICY "Incorporadores can view their project activities"
+ON public.atividades FOR SELECT
+USING (
+  public.is_incorporador(auth.uid())
+  AND empreendimento_id IN (
+    SELECT empreendimento_id FROM public.user_empreendimentos
+    WHERE user_id = auth.uid()
+  )
+);
 ```
+
+O filtro adicional no frontend é uma camada extra de segurança e otimização de performance.
 
 ---
 
 ## Resultado Esperado
 
-1. Seletor de mês com navegação por setas (← Janeiro de 2025 →)
-2. Botões de atalho "Este mês" e "Mês anterior" com destaque visual quando ativos
-3. Todos os KPIs e gráficos filtrados pelo mês selecionado
-4. Consistência visual com o Dashboard de Forecast
-5. Modo TV exibe o mês selecionado no header
+1. O calendário aparece na página de Forecast do Portal do Incorporador
+2. Exibe apenas atividades dos empreendimentos vinculados ao usuário
+3. Navegação por mês funciona corretamente
+4. Intensidade visual (cores) reflete a quantidade de atividades por dia
+5. Layout responsivo em grid com outros componentes
 
 ---
 
 ## Critérios de Aceite
 
-1. Navegação por setas funciona corretamente
-2. Botões de atalho destacam quando o período correspondente está selecionado
-3. KPIs refletem apenas dados do mês selecionado
-4. Gráfico "Entregas por Semana" mostra semanas do mês selecionado
-5. Listas de atrasados e próximas entregas respeitam o filtro de mês
-6. Modo TV exibe o mês no header
+1. Calendário visível na página `/portal-incorporador/forecast`
+2. Apenas atividades dos empreendimentos do incorporador são contabilizadas
+3. Navegação entre meses funciona
+4. Dias com atividades exibem indicador visual
+5. Tooltip mostra quantidade de atividades ao passar o mouse
