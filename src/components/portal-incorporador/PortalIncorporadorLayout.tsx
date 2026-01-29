@@ -1,21 +1,7 @@
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  LayoutDashboard,
-  BarChart3,
-  TrendingUp,
-  Palette,
-  LogOut,
-} from 'lucide-react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 import logo from '@/assets/logo.png';
-
-const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/portal-incorporador' },
-  { icon: BarChart3, label: 'Executivo', path: '/portal-incorporador/executivo' },
-  { icon: TrendingUp, label: 'Forecast', path: '/portal-incorporador/forecast' },
-  { icon: Palette, label: 'Marketing', path: '/portal-incorporador/marketing' },
-];
 
 const routeTitles: Record<string, { title: string; subtitle?: string }> = {
   '/portal-incorporador': { 
@@ -42,6 +28,7 @@ export function PortalIncorporadorLayout() {
   const { profile, signOut } = useAuth();
 
   const { title, subtitle } = routeTitles[location.pathname] || { title: 'Portal' };
+  const isInternalPage = location.pathname !== '/portal-incorporador';
 
   const handleLogout = async () => {
     await signOut();
@@ -50,35 +37,15 @@ export function PortalIncorporadorLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header - Simplified */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/portal-incorporador" className="flex items-center gap-2">
-              <img src={logo} alt="Logo" className="h-8" />
-            </Link>
-            <nav className="hidden md:flex items-center gap-1">
-              {menuItems.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
+          {/* Logo */}
+          <Link to="/portal-incorporador" className="flex items-center gap-2">
+            <img src={logo} alt="Logo" className="h-8" />
+          </Link>
           
+          {/* User Info + Logout */}
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium">{profile?.full_name}</p>
@@ -95,33 +62,19 @@ export function PortalIncorporadorLayout() {
         </div>
       </header>
 
-      {/* Mobile Navigation */}
-      <nav className="md:hidden border-b bg-background overflow-x-auto">
-        <div className="container flex gap-1 py-2">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors',
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
       {/* Main Content */}
       <main className="container py-6">
         <div className="mb-6">
+          {/* Back link for internal pages */}
+          {isInternalPage && (
+            <Link 
+              to="/portal-incorporador" 
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Link>
+          )}
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
         </div>
