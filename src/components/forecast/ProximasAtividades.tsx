@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Clock, User, MapPin, Phone, Headphones } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,8 @@ export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtiv
     );
   }
 
+  const hojeStr = format(new Date(), 'yyyy-MM-dd');
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-3">
@@ -58,9 +60,15 @@ export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtiv
         ) : (
         <ScrollArea className="h-[300px]">
             <div className="px-6 pb-4 space-y-2">
-              {atividades.map((atividade: any, index: number) => {
+              {atividades.map((atividade: any) => {
                 const Icon = TIPO_ICON[atividade.tipo] || Calendar;
-                const isToday = format(new Date(atividade.data_hora), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                // Atividade inclui hoje se data_inicio <= hoje <= data_fim
+                const isToday = atividade.data_inicio <= hojeStr && atividade.data_fim >= hojeStr;
+
+                // Formatar exibição de data
+                const dataExibicao = atividade.data_inicio === atividade.data_fim
+                  ? format(parseISO(atividade.data_inicio), "dd/MM", { locale: ptBR })
+                  : `${format(parseISO(atividade.data_inicio), "dd/MM")} - ${format(parseISO(atividade.data_fim), "dd/MM")}`;
 
                 return (
                   <div
@@ -81,9 +89,7 @@ export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtiv
                       <p className="text-sm font-medium truncate">{atividade.titulo}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <Clock className="h-3 w-3" />
-                        <span>
-                          {format(new Date(atividade.data_hora), "dd/MM 'às' HH:mm", { locale: ptBR })}
-                        </span>
+                        <span>{dataExibicao}</span>
                         {atividade.cliente && (
                           <>
                             <span className="text-muted-foreground/50">•</span>
