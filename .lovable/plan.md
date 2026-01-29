@@ -1,152 +1,267 @@
 
-# Plano: Corrigir Acesso dos Perfis de Marketing/Criação
 
-## Problema Identificado
+# Plano: Implementar Aba "Criativo" com Upload de Imagens nos Tickets de Marketing
 
-O usuário `criacao1@sevengroup360.com.br` com perfil "Supervisão de Criação" está vendo "Acesso Pendente" porque:
+## Objetivo
 
-### Causa Raiz 1: Zero Permissões Configuradas
-Os roles abaixo não possuem **nenhuma** permissão na tabela `role_permissions`:
-- `supervisão_de_criação` (0 permissões)
-- `diretor_de_marketing` (0 permissões)
-
-### Causa Raiz 2: Função `is_marketing_supervisor()` Desatualizada
-A função verifica roles com nomes **antigos em inglês** que foram deletados:
-```sql
--- Atual (incorreto)
-r.name IN (
-  'supervisor_relacionamento', 
-  'supervisor_render', 
-  'supervisor_criacao',  -- NÃO EXISTE MAIS
-  'supervisor_video', 
-  'equipe_marketing',    -- NÃO EXISTE MAIS  
-  'diretor_de_marketing'
-)
-```
-
-Os roles atuais no sistema são:
-| name | display_name | tem permissões? |
-|------|-------------|-----------------|
-| supervisão_de_criação | Supervisão de Criação | NÃO |
-| diretor_de_marketing | Diretor de Marketing | NÃO |
+Criar uma nova aba "Criativo" na página de detalhes do ticket de marketing (`MarketingDetalhe.tsx`) onde os usuários poderão fazer upload de imagens relacionadas ao ticket (renders, artes, vídeos, etc.).
 
 ---
 
-## Solução
+## Arquitetura da Solução
 
-### Etapa 1: Atualizar função `is_marketing_supervisor()`
-
-Incluir o novo nome do role criado dinamicamente:
-
-```sql
-CREATE OR REPLACE FUNCTION public.is_marketing_supervisor(_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1 
-    FROM public.user_roles ur
-    JOIN public.roles r ON r.id = ur.role_id
-    WHERE ur.user_id = _user_id
-    AND r.name IN (
-      'supervisor_relacionamento', 
-      'supervisor_render', 
-      'supervisor_criacao', 
-      'supervisor_video', 
-      'equipe_marketing',
-      'diretor_de_marketing',
-      -- NOVOS nomes dinâmicos
-      'supervisão_de_criação'
-    )
-    AND r.is_active = true
-  )
-$$;
-```
-
-### Etapa 2: Inserir Permissões para os Roles
-
-Configurar as permissões dos módulos para os perfis afetados:
-
-```sql
--- IDs dos módulos necessários
--- projetos_marketing: e8d4fe27-a4fe-4033-8b9e-c3795fdb9159
--- relatorios: 713a265f-7007-48bc-b324-2d9eae3faeef
--- eventos: (buscar)
--- briefings: (buscar)
-
-INSERT INTO public.role_permissions (role_id, module_id, can_view, can_create, can_edit, can_delete, scope)
-SELECT 
-  r.id as role_id,
-  m.id as module_id,
-  true as can_view,
-  true as can_create,
-  true as can_edit,
-  true as can_delete,
-  'global' as scope
-FROM public.roles r
-CROSS JOIN public.modules m
-WHERE r.name IN ('supervisão_de_criação', 'diretor_de_marketing')
-  AND m.name IN ('projetos_marketing', 'eventos', 'briefings', 'relatorios')
-  AND m.is_active = true
-ON CONFLICT DO NOTHING;
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    MarketingDetalhe.tsx                        │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ Tabs: Tarefas | Comentários | Histórico | [CRIATIVO]     │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                              ↓                                  │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │              ProjetoCriativos.tsx (novo)                  │ │
+│  │  - Grid de imagens/vídeos                                 │ │
+│  │  - Upload múltiplo                                        │ │
+│  │  - Preview e exclusão                                     │ │
+│  │  - Marcar imagem como "final"                             │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                  useTicketCriativos.ts (novo)                  │
+│  - Buscar criativos do ticket                                  │
+│  - Upload para Supabase Storage                                │
+│  - Criar/atualizar/deletar registros                           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                   Supabase Storage                             │
+│  Bucket: projetos-arquivos (já existe, privado)                │
+│  Path: {projeto_id}/{timestamp}.{ext}                          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│               Tabela: ticket_criativos (novo)                  │
+│  - id, projeto_id, tipo, nome, url, is_final, created_at       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Resumo das Alterações
+## Etapa 1: Criar Tabela no Banco de Dados
 
-| Local | Alteração |
-|-------|-----------|
-| Função SQL `is_marketing_supervisor()` | Adicionar `'supervisão_de_criação'` à lista de roles verificados |
-| Tabela `role_permissions` | Inserir permissões para `supervisão_de_criação` e `diretor_de_marketing` nos módulos de marketing, eventos, briefings e relatórios |
+**Arquivo**: Migration SQL
+
+```sql
+CREATE TABLE public.ticket_criativos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  projeto_id UUID NOT NULL REFERENCES public.projetos_marketing(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'imagem', -- 'imagem' ou 'video'
+  nome TEXT,
+  url TEXT NOT NULL,
+  is_final BOOLEAN DEFAULT false,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Índice para busca rápida
+CREATE INDEX idx_ticket_criativos_projeto ON public.ticket_criativos(projeto_id);
+
+-- RLS
+ALTER TABLE public.ticket_criativos ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de acesso
+CREATE POLICY "Admins podem tudo em criativos"
+  ON public.ticket_criativos FOR ALL
+  USING (public.is_admin(auth.uid()));
+
+CREATE POLICY "Marketing supervisors podem gerenciar criativos"
+  ON public.ticket_criativos FOR ALL
+  USING (public.is_marketing_supervisor(auth.uid()));
+
+CREATE POLICY "Usuários autenticados podem visualizar criativos"
+  ON public.ticket_criativos FOR SELECT
+  TO authenticated
+  USING (true);
+```
+
+---
+
+## Etapa 2: Configurar Políticas do Bucket Storage
+
+**Arquivo**: Migration SQL
+
+```sql
+-- Permitir upload para usuários de marketing
+CREATE POLICY "Marketing team can upload"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'projetos-arquivos' 
+    AND (public.is_admin(auth.uid()) OR public.is_marketing_supervisor(auth.uid()))
+  );
+
+-- Permitir leitura para usuários autenticados
+CREATE POLICY "Authenticated users can view"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (bucket_id = 'projetos-arquivos');
+
+-- Permitir exclusão para marketing
+CREATE POLICY "Marketing team can delete"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'projetos-arquivos' 
+    AND (public.is_admin(auth.uid()) OR public.is_marketing_supervisor(auth.uid()))
+  );
+```
+
+---
+
+## Etapa 3: Criar Type para Criativo
+
+**Arquivo**: `src/types/marketing.types.ts`
+
+Adicionar novo type:
+
+```typescript
+export interface TicketCriativo {
+  id: string;
+  projeto_id: string;
+  tipo: 'imagem' | 'video';
+  nome: string | null;
+  url: string;
+  is_final: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+---
+
+## Etapa 4: Criar Hook `useTicketCriativos`
+
+**Arquivo**: `src/hooks/useTicketCriativos.ts`
+
+Funcionalidades:
+- `useTicketCriativos(projetoId)` - Buscar criativos
+- `uploadCriativo` - Upload de arquivo para storage + insert na tabela
+- `deleteCriativo` - Remover do storage + delete na tabela
+- `setAsFinal` - Marcar/desmarcar criativo como versão final
+
+Padrão baseado no `useEmpreendimentoMidias.ts` existente.
+
+---
+
+## Etapa 5: Criar Componente `ProjetoCriativos`
+
+**Arquivo**: `src/components/marketing/ProjetoCriativos.tsx`
+
+Layout:
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Criativos                            [+ Enviar Arquivo]     │
+│ 3 arquivos                                                  │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐         │
+│ │         │  │         │  │         │  │         │         │
+│ │  IMG 1  │  │  IMG 2  │  │  VIDEO  │  │  IMG 3  │         │
+│ │ [FINAL] │  │         │  │         │  │         │         │
+│ └─────────┘  └─────────┘  └─────────┘  └─────────┘         │
+│                                                             │
+│ Hover: [⭐ Definir Final] [🗑️ Excluir] [↗️ Abrir]          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Funcionalidades:
+- Grid responsivo de thumbnails
+- Upload múltiplo (arrastar e soltar ou clique)
+- Preview ao clicar (lightbox simples)
+- Badge "FINAL" para versão aprovada
+- Botões de ação no hover
+
+---
+
+## Etapa 6: Integrar na Página de Detalhes
+
+**Arquivo**: `src/pages/MarketingDetalhe.tsx`
+
+Alterações:
+1. Importar `ProjetoCriativos`
+2. Adicionar aba "Criativo" ao `TabsList`
+3. Adicionar `TabsContent` para a nova aba
+
+```tsx
+import { Image } from 'lucide-react';
+import { ProjetoCriativos } from '@/components/marketing/ProjetoCriativos';
+
+// Na TabsList:
+<TabsTrigger value="criativo" className="gap-2">
+  <Image className="h-4 w-4" />
+  Criativo
+</TabsTrigger>
+
+// No TabsContent:
+<TabsContent value="criativo" className="mt-4">
+  <ProjetoCriativos projetoId={projeto.id} />
+</TabsContent>
+```
+
+---
+
+## Resumo de Arquivos a Criar/Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| Migration SQL | Criar tabela `ticket_criativos` + RLS + políticas storage |
+| `src/types/marketing.types.ts` | Adicionar interface `TicketCriativo` |
+| `src/hooks/useTicketCriativos.ts` | Criar hook completo |
+| `src/components/marketing/ProjetoCriativos.tsx` | Criar componente de galeria |
+| `src/pages/MarketingDetalhe.tsx` | Adicionar aba "Criativo" |
 
 ---
 
 ## Detalhes Técnicos
 
-### Por que o usuário vê "Acesso Pendente"?
+### Upload de Arquivos
 
-O fluxo no frontend:
+O bucket `projetos-arquivos` já existe e é privado. Os arquivos serão organizados por projeto:
 
 ```
-1. AuthContext carrega role = 'supervisão_de_criação'
-                    ↓
-2. usePermissions busca permissões do role
-                    ↓
-3. SELECT * FROM role_permissions WHERE role_id = 'e4c5edac...'
-                    ↓
-4. Retorna: 0 registros (role não tem permissões!)
-                    ↓
-5. permissions = [] (array vazio)
-                    ↓
-6. hasAnyViewPermission([]) = false
-                    ↓
-7. ProtectedRoute redireciona para /sem-acesso
+projetos-arquivos/
+  └── {projeto_id}/
+      ├── 1706540000000.jpg
+      ├── 1706540001000.png
+      └── 1706540002000.mp4
 ```
 
-### Por que a RLS funciona para alguns casos?
+### URLs de Acesso
 
-A função `is_marketing_supervisor()` é usada nas políticas RLS das tabelas de marketing (projetos, tarefas, etc.). Ela **já inclui** `diretor_de_marketing`, mas **não inclui** `supervisão_de_criação`.
+Como o bucket é privado, usaremos `createSignedUrl` para gerar URLs temporárias:
 
-Mesmo se a RLS permitisse acesso às tabelas, o frontend bloqueia antes porque não encontra permissões na tabela `role_permissions`.
+```typescript
+const { data } = await supabase.storage
+  .from('projetos-arquivos')
+  .createSignedUrl(filePath, 3600); // 1 hora de validade
+```
+
+### Formatos Aceitos
+
+- Imagens: JPG, PNG, WEBP, GIF
+- Vídeos: MP4, MOV, WEBM
 
 ---
 
 ## Critérios de Aceite
 
-1. Usuários com role `supervisão_de_criação` podem acessar `/marketing`
-2. Usuários com role `supervisão_de_criação` podem acessar `/eventos`
-3. Usuários com role `supervisão_de_criação` podem acessar `/marketing/briefings`
-4. Usuários com role `supervisão_de_criação` podem acessar `/relatorios`
-5. Usuários com role `diretor_de_marketing` têm os mesmos acessos
-6. A função `is_marketing_supervisor()` reconhece o novo nome do role
-7. Políticas RLS das tabelas de marketing permitem acesso aos dados
+1. Usuários podem acessar a aba "Criativo" no detalhe do ticket
+2. Usuários podem fazer upload de imagens e vídeos
+3. Thumbnails são exibidos em um grid responsivo
+4. Usuários podem marcar uma imagem como "versão final"
+5. Usuários podem excluir arquivos
+6. Usuários podem visualizar arquivos em tamanho maior
+7. Apenas usuários de marketing podem fazer upload/exclusão
+8. Políticas RLS protegem os dados adequadamente
 
----
-
-## Considerações Adicionais
-
-O sistema possui roles dinâmicos (criados via interface) mas algumas partes ainda dependem de nomes hardcoded. Seria recomendado criar uma flag na tabela `roles` como `is_marketing_team` para evitar hardcoding de nomes, mas isso é uma melhoria futura.
