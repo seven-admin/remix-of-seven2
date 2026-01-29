@@ -80,8 +80,8 @@ export interface Atividade {
     full_name: string;
   } | null;
   deadline_date?: string | null;
-  data_hora: string;
-  duracao_minutos?: number | null;
+  data_inicio: string;  // formato: 'YYYY-MM-DD'
+  data_fim: string;     // formato: 'YYYY-MM-DD'
   observacoes?: string | null;
   temperatura_cliente?: ClienteTemperatura | null;
   resultado?: string | null;
@@ -101,8 +101,8 @@ export interface AtividadeFormData {
   imobiliaria_id?: string;
   empreendimento_id?: string;
   gestor_id?: string;
-  data_hora: string;
-  duracao_minutos?: number;
+  data_inicio: string;  // formato: 'YYYY-MM-DD'
+  data_fim: string;     // formato: 'YYYY-MM-DD'
   observacoes?: string;
   temperatura_cliente?: ClienteTemperatura;
   requer_followup?: boolean;

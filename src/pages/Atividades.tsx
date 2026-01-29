@@ -453,7 +453,7 @@ export default function Atividades() {
               ) : (
                 atividades?.map((atividade) => {
                   const TipoIcon = TIPO_ICONS[atividade.tipo];
-                  const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
+                  const isVencida = atividade.status === 'pendente' && new Date(atividade.data_fim) < new Date();
                   const atrasada = isAtrasada(atividade);
                   const isSelected = selectedIds.has(atividade.id);
                   return (
@@ -500,7 +500,10 @@ export default function Atividades() {
                             {atividade.cliente?.nome || 'Sem cliente'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(atividade.data_hora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            {atividade.data_inicio === atividade.data_fim 
+                              ? format(new Date(`${atividade.data_inicio}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })
+                              : `${format(new Date(`${atividade.data_inicio}T00:00:00`), "dd/MM", { locale: ptBR })} - ${format(new Date(`${atividade.data_fim}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}`
+                            }
                           </p>
                           {atividade.deadline_date && (
                             <p className="text-xs text-muted-foreground mt-1">
@@ -619,7 +622,7 @@ export default function Atividades() {
                       ) : (
                         atividades?.map((atividade) => {
                           const TipoIcon = TIPO_ICONS[atividade.tipo];
-                          const isVencida = atividade.status === 'pendente' && new Date(atividade.data_hora) < new Date();
+                          const isVencida = atividade.status === 'pendente' && new Date(atividade.data_fim) < new Date();
                           const atrasada = isAtrasada(atividade);
                           const isSelected = selectedIds.has(atividade.id);
                           return (
@@ -657,7 +660,10 @@ export default function Atividades() {
                               <TableCell className="hidden lg:table-cell">{atividade.corretor?.nome_completo || '-'}</TableCell>
                               <TableCell className="hidden lg:table-cell">{atividade.gestor?.full_name || '-'}</TableCell>
                               <TableCell>
-                                {format(new Date(atividade.data_hora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                {atividade.data_inicio === atividade.data_fim 
+                                  ? format(new Date(`${atividade.data_inicio}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })
+                                  : `${format(new Date(`${atividade.data_inicio}T00:00:00`), "dd/MM", { locale: ptBR })} - ${format(new Date(`${atividade.data_fim}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}`
+                                }
                               </TableCell>
                               <TableCell>
                                 {atividade.deadline_date ? (

@@ -65,7 +65,7 @@ export function ClienteHistoricoAtividadesDialog({
 
   const atividadesOrdenadas = useMemo(() => {
     return [...atividades].sort(
-      (a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime()
+      (a, b) => new Date(b.data_fim).getTime() - new Date(a.data_fim).getTime()
     );
   }, [atividades]);
 
@@ -124,7 +124,10 @@ export function ClienteHistoricoAtividadesDialog({
                             {ATIVIDADE_TIPO_LABELS[a.tipo]}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(a.data_hora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            {a.data_inicio === a.data_fim 
+                              ? format(new Date(`${a.data_inicio}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })
+                              : `${format(new Date(`${a.data_inicio}T00:00:00`), "dd/MM", { locale: ptBR })} - ${format(new Date(`${a.data_fim}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}`
+                            }
                           </span>
                         </div>
 

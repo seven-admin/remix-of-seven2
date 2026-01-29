@@ -39,8 +39,8 @@ export function PendenciasTab({
 }: PendenciasTabProps) {
   const atividadesOrdenadas = useMemo(() => {
     return [...atividades].sort((a, b) => {
-      const dateA = new Date(a.data_hora).getTime();
-      const dateB = new Date(b.data_hora).getTime();
+      const dateA = new Date(a.data_fim).getTime();
+      const dateB = new Date(b.data_fim).getTime();
       return dateA - dateB;
     });
   }, [atividades]);
@@ -93,9 +93,9 @@ export function PendenciasTab({
       <div className="md:hidden space-y-2">
         {atividadesOrdenadas.map((atividade) => {
           const TipoIcon = TIPO_ICONS[atividade.tipo];
-          const dataHora = new Date(atividade.data_hora);
-          const diasVencida = differenceInDays(new Date(), dataHora);
-          const tempoVencida = formatDistanceToNow(dataHora, { addSuffix: true, locale: ptBR });
+          const dataFim = new Date(`${atividade.data_fim}T00:00:00`);
+          const diasVencida = differenceInDays(new Date(), dataFim);
+          const tempoVencida = formatDistanceToNow(dataFim, { addSuffix: true, locale: ptBR });
 
           return (
             <div
@@ -131,7 +131,7 @@ export function PendenciasTab({
                     <p className="text-xs text-muted-foreground truncate">{atividade.cliente.nome}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    {format(dataHora, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    {format(dataFim, "dd/MM/yyyy", { locale: ptBR })}
                   </p>
                 </div>
                 <Button
@@ -173,9 +173,9 @@ export function PendenciasTab({
           <TableBody>
             {atividadesOrdenadas.map((atividade) => {
               const TipoIcon = TIPO_ICONS[atividade.tipo];
-              const dataHora = new Date(atividade.data_hora);
-              const diasVencida = differenceInDays(new Date(), dataHora);
-              const tempoVencida = formatDistanceToNow(dataHora, { addSuffix: true, locale: ptBR });
+              const dataFim = new Date(`${atividade.data_fim}T00:00:00`);
+              const diasVencida = differenceInDays(new Date(), dataFim);
+              const tempoVencida = formatDistanceToNow(dataFim, { addSuffix: true, locale: ptBR });
 
               return (
                 <TableRow
@@ -215,7 +215,7 @@ export function PendenciasTab({
                     {atividade.gestor?.full_name || '-'}
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {format(dataHora, "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    {format(dataFim, "dd/MM/yyyy", { locale: ptBR })}
                   </TableCell>
                   <TableCell>
                     <Badge variant="destructive" className="text-xs">

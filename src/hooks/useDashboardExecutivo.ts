@@ -370,7 +370,7 @@ export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoI
 
       const { data: atividades } = await supabase
         .from('atividades')
-        .select('id, status, data_hora, requer_followup, data_followup');
+        .select('id, status, data_inicio, data_fim, requer_followup, data_followup');
 
       const leadsQuentes = clientes?.filter(c => c.temperatura === 'quente').length || 0;
       const leadsMornos = clientes?.filter(c => c.temperatura === 'morno').length || 0;
@@ -379,7 +379,7 @@ export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoI
 
       const atividadesVencidas = atividades?.filter(a => {
         if (a.status === 'concluida') return false;
-        return new Date(a.data_hora) < hoje;
+        return new Date(a.data_fim) < hoje;
       }).length || 0;
 
       const followupsPendentes = atividades?.filter(a => {
