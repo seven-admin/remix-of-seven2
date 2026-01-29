@@ -139,6 +139,8 @@ export function calculateLabelFontSize(label: string, radius?: number): number {
 
 /**
  * Groups units by their bloco/quadra for organized selection
+ * Groups are sorted naturally (Quadra 2 before Quadra 10)
+ * Units within groups are sorted by floor first, then by number
  */
 export function groupUnidadesByBloco(unidades: Unidade[]): Map<string, Unidade[]> {
   const groups = new Map<string, Unidade[]>();
@@ -150,18 +152,39 @@ export function groupUnidadesByBloco(unidades: Unidade[]): Map<string, Unidade[]
     groups.set(key, existing);
   });
 
-  // Sort units within each group
-  groups.forEach((units, key) => {
+  // 1. Sort units within each group: by floor first, then by number (natural sort)
+  groups.forEach((units) => {
     units.sort((a, b) => {
-      // Try numeric sorting first
-      const numA = parseInt(a.numero);
-      const numB = parseInt(b.numero);
-      if (!isNaN(numA) && !isNaN(numB)) {
-        return numA - numB;
+      // First sort by floor (units without floor come first)
+      const andarA = a.andar ?? -Infinity;
+      const andarB = b.andar ?? -Infinity;
+      if (andarA !== andarB) {
+        return andarA - andarB;
       }
-      return a.numero.localeCompare(b.numero);
+      // Then sort by number using natural sorting
+      return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
     });
   });
 
-  return groups;
+  // 2. Create new Map with sorted keys (blocks/quadras in natural order)
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => 
+    a.localeCompare(b, 'pt-BR', { numeric: true })
+  );
+  
+  const sortedGroups = new Map<string, Unidade[]>();
+  
+  // "Sem Bloco" always at the end
+  const semBlocoKey = 'Sem Bloco';
+  const keysWithoutSemBloco = sortedKeys.filter(k => k !== semBlocoKey);
+  
+  keysWithoutSemBloco.forEach(key => {
+    sortedGroups.set(key, groups.get(key)!);
+  });
+  
+  // Add "Sem Bloco" at the end if it exists
+  if (groups.has(semBlocoKey)) {
+    sortedGroups.set(semBlocoKey, groups.get(semBlocoKey)!);
+  }
+
+  return sortedGroups;
 }
