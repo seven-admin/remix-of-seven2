@@ -127,6 +127,7 @@ export interface AtividadeFilters {
   responsavel_id?: string;
   created_by?: string;
   empreendimento_id?: string;
+  empreendimento_ids?: string[]; // Suporte a múltiplos empreendimentos (portal incorporador)
   cliente_id?: string;
   data_inicio?: string;
   data_fim?: string;
