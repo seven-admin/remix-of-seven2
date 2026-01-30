@@ -165,6 +165,33 @@ export function usePlanejamentoItens(filters?: PlanejamentoFilters) {
     }
   });
 
+  const createItemsBulk = useMutation({
+    mutationFn: async (items: PlanejamentoItemCreate[]) => {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const itemsWithUser = items.map((item, index) => ({
+        ...item,
+        created_by: userData.user?.id,
+        ordem: item.ordem ?? index + 1
+      }));
+      
+      const { data, error } = await supabase
+        .from('planejamento_itens')
+        .insert(itemsWithUser)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
+      toast.success(`${data.length} itens importados com sucesso`);
+    },
+    onError: (error) => {
+      toast.error('Erro ao importar itens: ' + error.message);
+    }
+  });
+
   const reorderItems = useMutation({
     mutationFn: async (items: { id: string; ordem: number }[]) => {
       const promises = items.map(({ id, ordem }) =>
@@ -189,6 +216,7 @@ export function usePlanejamentoItens(filters?: PlanejamentoFilters) {
     updateItem,
     deleteItem,
     duplicateItem,
-    reorderItems
+    reorderItems,
+    createItemsBulk
   };
 }
