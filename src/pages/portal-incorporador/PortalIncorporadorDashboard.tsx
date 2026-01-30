@@ -1,27 +1,19 @@
 import { useIncorporadorEmpreendimentos } from '@/hooks/useIncorporadorEmpreendimentos';
 import { useDashboardExecutivo } from '@/hooks/useDashboardExecutivo';
-import { useGestoresMultiplosEmpreendimentos } from '@/hooks/useGestoresMultiplosEmpreendimentos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Link } from 'react-router-dom';
 import {
   Building2,
   Home,
   DollarSign,
   TrendingUp,
-  User,
-  AlertTriangle,
-  Package,
 } from 'lucide-react';
 
 export default function PortalIncorporadorDashboard() {
   const { empreendimentoIds, empreendimentos, isLoading: loadingEmps } = useIncorporadorEmpreendimentos();
   const { data: dashData, isLoading: loadingDash } = useDashboardExecutivo(undefined, empreendimentoIds);
-  const { data: gestorMap, isLoading: loadingGestores } = useGestoresMultiplosEmpreendimentos(empreendimentoIds);
 
-  const isLoading = loadingEmps || loadingDash || loadingGestores;
+  const isLoading = loadingEmps || loadingDash;
 
   if (isLoading) {
     return (
@@ -51,25 +43,8 @@ export default function PortalIncorporadorDashboard() {
     }).format(value);
   };
 
-  // Verificar se há dados cadastrados
-  const hasUnidadesData = (dashData?.unidades.total || 0) > 0;
-  const hasNegociacoesData = (dashData?.negociacoes.total || 0) > 0;
-  const hasAnyData = hasUnidadesData || hasNegociacoesData;
-
   return (
     <div className="space-y-6">
-      {/* Alerta quando não há dados */}
-      {!hasAnyData && empreendimentos.length > 0 && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Dados em configuração</AlertTitle>
-          <AlertDescription>
-            Os empreendimentos vinculados à sua conta ainda não possuem unidades ou negociações cadastradas. 
-            As informações serão exibidas aqui assim que os dados forem registrados no sistema.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* KPIs Principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -122,70 +97,6 @@ export default function PortalIncorporadorDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Lista de Empreendimentos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Seus Empreendimentos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {empreendimentos.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              Nenhum empreendimento vinculado à sua conta.
-            </p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {empreendimentos.map((emp) => {
-                const unidadesEmp = dashData?.unidades.porEmpreendimento.find(
-                  (u) => u.nome === emp.nome
-                );
-                
-                return (
-                  <div
-                    key={emp.id}
-                    className="p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{emp.nome}</h4>
-                        {(emp.endereco_cidade || emp.endereco_uf) && (
-                          <p className="text-sm text-muted-foreground">
-                            {[emp.endereco_cidade, emp.endereco_uf].filter(Boolean).join(' - ')}
-                          </p>
-                        )}
-                        {gestorMap?.[emp.id] && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <User className="h-3 w-3" />
-                            Gestor: {gestorMap[emp.id].nome}
-                          </p>
-                        )}
-                      </div>
-                      <Badge variant={emp.status === 'ativo' ? 'default' : 'secondary'}>
-                        {emp.status}
-                      </Badge>
-                    </div>
-                    {unidadesEmp ? (
-                      <div className="mt-3 flex gap-4 text-sm">
-                        <span className="text-green-600 dark:text-green-400">
-                          {unidadesEmp.disponiveis} disponíveis
-                        </span>
-                        <span className="text-blue-600 dark:text-blue-400">
-                          {unidadesEmp.vendidas} vendidas
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                        <Package className="h-3 w-3" />
-                        Nenhuma unidade cadastrada
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

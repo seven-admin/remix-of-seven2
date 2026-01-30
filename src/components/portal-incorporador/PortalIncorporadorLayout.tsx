@@ -90,62 +90,62 @@ export function PortalIncorporadorLayout() {
       {/* Cards de navegação - apenas na página principal */}
       {!isInternalPage && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Link to="/portal-incorporador/executivo">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+          <Link to="/portal-incorporador/executivo" className="h-full">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="p-6 flex items-center gap-4 h-full">
+                <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex-shrink-0">
                   <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Dashboard Executivo</h3>
-                  <p className="text-sm text-muted-foreground">KPIs e métricas detalhadas</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">Dashboard Executivo</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">KPIs e métricas detalhadas</p>
                 </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               </CardContent>
             </Card>
           </Link>
 
-          <Link to="/portal-incorporador/forecast">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
+          <Link to="/portal-incorporador/forecast" className="h-full">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="p-6 flex items-center gap-4 h-full">
+                <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30 flex-shrink-0">
                   <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Forecast</h3>
-                  <p className="text-sm text-muted-foreground">Previsões e atividades</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">Forecast</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">Previsões e atividades</p>
                 </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               </CardContent>
             </Card>
           </Link>
 
-          <Link to="/portal-incorporador/marketing">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+          <Link to="/portal-incorporador/marketing" className="h-full">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="p-6 flex items-center gap-4 h-full">
+                <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex-shrink-0">
                   <Palette className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Marketing</h3>
-                  <p className="text-sm text-muted-foreground">Tickets de criação</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">Marketing</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">Tickets de criação</p>
                 </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               </CardContent>
             </Card>
           </Link>
 
-          <Link to="/portal-incorporador/planejamento">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+          <Link to="/portal-incorporador/planejamento" className="h-full">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="p-6 flex items-center gap-4 h-full">
+                <div className="p-3 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex-shrink-0">
                   <ClipboardList className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Planejamento</h3>
-                  <p className="text-sm text-muted-foreground">Cronograma de tarefas</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">Planejamento</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">Cronograma de tarefas</p>
                 </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               </CardContent>
             </Card>
           </Link>
