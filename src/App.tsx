@@ -12,6 +12,7 @@ import {
   PortalIncorporadorExecutivo,
   PortalIncorporadorForecast,
   PortalIncorporadorMarketing,
+  PortalIncorporadorPlanejamento,
 } from "@/pages/portal-incorporador";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
@@ -319,6 +320,7 @@ const App = () => (
               <Route path="executivo" element={<PortalIncorporadorExecutivo />} />
               <Route path="forecast" element={<PortalIncorporadorForecast />} />
               <Route path="marketing" element={<PortalIncorporadorMarketing />} />
+              <Route path="planejamento" element={<PortalIncorporadorPlanejamento />} />
             </Route>
             
             {/* Utilidades */}

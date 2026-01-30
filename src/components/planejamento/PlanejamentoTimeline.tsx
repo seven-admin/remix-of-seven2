@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   empreendimentoId: string;
+  readOnly?: boolean;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month';
@@ -29,7 +30,7 @@ const ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 60;
 const FASE_ROW_HEIGHT = 32;
 
-export function PlanejamentoTimeline({ empreendimentoId }: Props) {
+export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Props) {
   const { itens, isLoading } = usePlanejamentoItens({ empreendimento_id: empreendimentoId });
   const { fases, isLoading: loadingFases } = usePlanejamentoFases();
 

@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, LogOut, BarChart3, TrendingUp, Palette, ArrowRight } from 'lucide-react';
+import { ArrowLeft, LogOut, BarChart3, TrendingUp, Palette, ArrowRight, ClipboardList } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import logo from '@/assets/logo.png';
 
@@ -20,6 +20,10 @@ const routeTitles: Record<string, { title: string; subtitle?: string }> = {
   '/portal-incorporador/marketing': { 
     title: 'Produção de Marketing', 
     subtitle: 'Acompanhe os tickets de criação' 
+  },
+  '/portal-incorporador/planejamento': { 
+    title: 'Planejamento', 
+    subtitle: 'Cronograma de tarefas dos empreendimentos' 
   },
 };
 
@@ -85,7 +89,7 @@ export function PortalIncorporadorLayout() {
       
       {/* Cards de navegação - apenas na página principal */}
       {!isInternalPage && (
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Link to="/portal-incorporador/executivo">
             <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
               <CardContent className="p-6 flex items-center gap-4">
@@ -125,6 +129,21 @@ export function PortalIncorporadorLayout() {
                 <div className="flex-1">
                   <h3 className="font-semibold">Marketing</h3>
                   <p className="text-sm text-muted-foreground">Tickets de criação</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/portal-incorporador/planejamento">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                  <ClipboardList className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">Planejamento</h3>
+                  <p className="text-sm text-muted-foreground">Cronograma de tarefas</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </CardContent>

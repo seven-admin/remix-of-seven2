@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { ClipboardList, CalendarDays, BarChart3, Settings, Download, Upload } from 'lucide-react';
 import { useEmpreendimentosSelect } from '@/hooks/useEmpreendimentosSelect';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PlanejamentoPlanilha } from '@/components/planejamento/PlanejamentoPlanilha';
 import { PlanejamentoDashboard } from '@/components/planejamento/PlanejamentoDashboard';
 import { PlanejamentoTimeline } from '@/components/planejamento/PlanejamentoTimeline';
@@ -14,6 +15,8 @@ export default function Planejamento() {
   const [empreendimentoId, setEmpreendimentoId] = useState<string>('');
   const [activeTab, setActiveTab] = useState('planilha');
   const { data: empreendimentos } = useEmpreendimentosSelect();
+  const { isAdmin } = usePermissions();
+  const canEdit = isAdmin();
 
   return (
     <MainLayout
@@ -40,22 +43,24 @@ export default function Planejamento() {
                 </Select>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={!empreendimentoId}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar
-                </Button>
-                <Button variant="outline" size="sm" disabled={!empreendimentoId}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/planejamento/configuracoes">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Config
-                  </a>
-                </Button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={!empreendimentoId}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={!empreendimentoId}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href="/planejamento/configuracoes">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Config
+                    </a>
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -79,11 +84,11 @@ export default function Planejamento() {
             </TabsList>
 
             <TabsContent value="planilha" className="mt-4">
-              <PlanejamentoPlanilha empreendimentoId={empreendimentoId} />
+              <PlanejamentoPlanilha empreendimentoId={empreendimentoId} readOnly={!canEdit} />
             </TabsContent>
 
             <TabsContent value="timeline" className="mt-4">
-              <PlanejamentoTimeline empreendimentoId={empreendimentoId} />
+              <PlanejamentoTimeline empreendimentoId={empreendimentoId} readOnly={!canEdit} />
             </TabsContent>
 
             <TabsContent value="dashboard" className="mt-4">
