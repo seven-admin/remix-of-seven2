@@ -10,6 +10,19 @@ export interface PlanejamentoFase {
   updated_at: string;
 }
 
+export interface PlanejamentoItemResponsavel {
+  id: string;
+  item_id: string;
+  user_id: string;
+  papel: string;
+  created_at: string;
+  user?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+}
+
 export interface PlanejamentoStatus {
   id: string;
   nome: string;
@@ -46,6 +59,7 @@ export interface PlanejamentoItemWithRelations extends PlanejamentoItem {
     full_name: string;
     email: string;
   };
+  responsaveis?: PlanejamentoItemResponsavel[];
   empreendimento?: {
     id: string;
     nome: string;

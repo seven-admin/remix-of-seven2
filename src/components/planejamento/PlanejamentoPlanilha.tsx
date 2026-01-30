@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, Plus, Trash2, Copy, MessageSquare, CalendarIcon, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronDown, ChevronRight, Plus, Trash2, Copy, MessageSquare, CalendarIcon, Loader2, Edit2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,8 @@ import { useFuncionariosSeven } from '@/hooks/useFuncionariosSeven';
 import type { PlanejamentoItemWithRelations, PlanejamentoFase } from '@/types/planejamento.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { ResponsaveisEditor } from './ResponsaveisEditor';
+import { EditarEmLoteDialog } from './EditarEmLoteDialog';
 
 interface Props {
   empreendimentoId: string;
@@ -25,7 +28,7 @@ interface Props {
 }
 
 export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Props) {
-  const { itens, isLoading, createItem, updateItem, deleteItem, duplicateItem } = usePlanejamentoItens({ empreendimento_id: empreendimentoId });
+  const { itens, isLoading, createItem, updateItem, deleteItem, duplicateItem, refetch } = usePlanejamentoItens({ empreendimento_id: empreendimentoId });
   const { fases, isLoading: loadingFases } = usePlanejamentoFases();
   const { statusList, isLoading: loadingStatus } = usePlanejamentoStatus();
   const { data: funcionarios } = useFuncionariosSeven();
@@ -35,6 +38,8 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
   const [editValue, setEditValue] = useState<string>('');
   const [newItemFaseId, setNewItemFaseId] = useState<string | null>(null);
   const [newItemValue, setNewItemValue] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editEmLoteOpen, setEditEmLoteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Agrupar itens por fase
@@ -61,6 +66,42 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
         next.delete(faseId);
       } else {
         next.add(faseId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!itens) return;
+    if (selectedIds.size === itens.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(itens.map(i => i.id)));
+    }
+  };
+
+  const toggleSelectFase = (faseId: string) => {
+    const faseItems = itensByFase[faseId] || [];
+    const allSelected = faseItems.every(i => selectedIds.has(i.id));
+    
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        faseItems.forEach(i => next.delete(i.id));
+      } else {
+        faseItems.forEach(i => next.add(i.id));
       }
       return next;
     });
@@ -149,8 +190,16 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              {!readOnly && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={itens && itens.length > 0 && selectedIds.size === itens.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+              )}
               <TableHead className="w-[280px]">Item/Tarefa</TableHead>
-              <TableHead className="w-[180px]">Responsável</TableHead>
+              <TableHead className="w-[180px]">Responsáveis</TableHead>
               <TableHead className="w-[160px]">Status</TableHead>
               <TableHead className="w-[120px]">Início</TableHead>
               <TableHead className="w-[120px]">Fim</TableHead>
@@ -164,9 +213,16 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                 {/* Linha da Fase */}
                 <TableRow 
                   className="bg-muted/30 hover:bg-muted/40 cursor-pointer"
-                  onClick={() => toggleFase(fase.id)}
                 >
-                  <TableCell colSpan={readOnly ? 6 : 7} className="py-2">
+                  {!readOnly && (
+                    <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={itensByFase[fase.id]?.length > 0 && itensByFase[fase.id]?.every(i => selectedIds.has(i.id))}
+                        onCheckedChange={() => toggleSelectFase(fase.id)}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell colSpan={readOnly ? 7 : 7} className="py-2" onClick={() => toggleFase(fase.id)}>
                     <div className="flex items-center gap-2 font-medium">
                       {collapsedFases.has(fase.id) ? (
                         <ChevronRight className="h-4 w-4" />
@@ -198,6 +254,8 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                         editValue={editValue}
                         inputRef={inputRef}
                         readOnly={readOnly}
+                        isSelected={selectedIds.has(item.id)}
+                        onToggleSelect={() => toggleSelectItem(item.id)}
                         onCellClick={handleCellClick}
                         onEditValueChange={setEditValue}
                         onKeyDown={handleKeyDown}
@@ -284,6 +342,34 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
           </CollapsibleContent>
         </Collapsible>
       )}
+
+      {/* Barra flutuante de seleção */}
+      {!readOnly && selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4 z-50">
+          <span className="text-sm font-medium">
+            {selectedIds.size} item(ns) selecionado(s)
+          </span>
+          <Button size="sm" onClick={() => setEditEmLoteOpen(true)}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            Editar em Lote
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+
+      {/* Dialog de edição em lote */}
+      <EditarEmLoteDialog
+        open={editEmLoteOpen}
+        onOpenChange={setEditEmLoteOpen}
+        selectedIds={selectedIds}
+        empreendimentoId={empreendimentoId}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          refetch();
+        }}
+      />
     </div>
   );
 }
@@ -297,6 +383,8 @@ interface ItemRowProps {
   editValue: string;
   inputRef: React.RefObject<HTMLInputElement>;
   readOnly: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onCellClick: (id: string, field: string, value: string | null) => void;
   onEditValueChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
@@ -315,6 +403,8 @@ function ItemRow({
   editValue,
   inputRef,
   readOnly,
+  isSelected,
+  onToggleSelect,
   onCellClick,
   onEditValueChange,
   onKeyDown,
@@ -328,7 +418,17 @@ function ItemRow({
   const [obsOpen, setObsOpen] = useState(false);
 
   return (
-    <TableRow className="hover:bg-muted/20">
+    <TableRow className={cn("hover:bg-muted/20", isSelected && "bg-primary/5")}>
+      {/* Checkbox de seleção */}
+      {!readOnly && (
+        <TableCell className="py-1">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onToggleSelect}
+          />
+        </TableCell>
+      )}
+
       {/* Item/Tarefa */}
       <TableCell className="py-1">
         {isEditingItem ? (
@@ -353,29 +453,14 @@ function ItemRow({
         )}
       </TableCell>
 
-      {/* Responsável */}
+      {/* Responsáveis */}
       <TableCell className="py-1">
-        {readOnly ? (
-          <span className="text-sm">{item.responsavel?.full_name || '-'}</span>
-        ) : (
-          <Select
-            value={item.responsavel_tecnico_id || ''}
-            onValueChange={(v) => onSelectChange(item.id, 'responsavel_tecnico_id', v)}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Selecionar..." />
-            </SelectTrigger>
-            <SelectContent>
-              {funcionarios.map(func => (
-                <SelectItem key={func.id} value={func.id}>
-                  {func.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <ResponsaveisEditor
+          itemId={item.id}
+          funcionarios={funcionarios}
+          readOnly={readOnly}
+        />
       </TableCell>
-
       {/* Status */}
       <TableCell className="py-1">
         {readOnly ? (
