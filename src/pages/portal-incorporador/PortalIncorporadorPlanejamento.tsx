@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ClipboardList, CalendarDays, BarChart3 } from 'lucide-react';
+import { CalendarDays, BarChart3 } from 'lucide-react';
 import { useIncorporadorEmpreendimentos } from '@/hooks/useIncorporadorEmpreendimentos';
-import { PlanejamentoPlanilha } from '@/components/planejamento/PlanejamentoPlanilha';
 import { PlanejamentoDashboard } from '@/components/planejamento/PlanejamentoDashboard';
 import { PlanejamentoTimeline } from '@/components/planejamento/PlanejamentoTimeline';
 
 export default function PortalIncorporadorPlanejamento() {
   const [empreendimentoId, setEmpreendimentoId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState('planilha');
+  const [activeTab, setActiveTab] = useState('timeline');
   const { empreendimentos, isLoading } = useIncorporadorEmpreendimentos();
 
   // Auto-select first empreendimento if only one
@@ -44,10 +43,6 @@ export default function PortalIncorporadorPlanejamento() {
       {empreendimentoId ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="planilha" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Planilha
-            </TabsTrigger>
             <TabsTrigger value="timeline" className="gap-2">
               <CalendarDays className="h-4 w-4" />
               Timeline
@@ -57,10 +52,6 @@ export default function PortalIncorporadorPlanejamento() {
               Dashboard
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="planilha" className="mt-4">
-            <PlanejamentoPlanilha empreendimentoId={empreendimentoId} readOnly />
-          </TabsContent>
 
           <TabsContent value="timeline" className="mt-4">
             <PlanejamentoTimeline empreendimentoId={empreendimentoId} readOnly />
@@ -73,7 +64,7 @@ export default function PortalIncorporadorPlanejamento() {
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <CalendarDays className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Selecione um empreendimento para visualizar o planejamento</p>
           </CardContent>
         </Card>
