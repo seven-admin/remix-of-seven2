@@ -3824,6 +3824,45 @@ export type Database = {
           },
         ]
       }
+      planejamento_item_responsaveis: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_id: string
+          papel: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_id: string
+          papel?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          papel?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planejamento_item_responsaveis_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "planejamento_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_item_responsaveis_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planejamento_itens: {
         Row: {
           created_at: string | null

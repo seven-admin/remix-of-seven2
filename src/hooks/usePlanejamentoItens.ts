@@ -22,6 +22,13 @@ export function usePlanejamentoItens(filters?: PlanejamentoFilters) {
           fase:planejamento_fases(id, nome, cor, ordem),
           status:planejamento_status(id, nome, cor, is_final),
           responsavel:profiles!responsavel_tecnico_id(id, full_name, email),
+          responsaveis:planejamento_item_responsaveis(
+            id,
+            user_id,
+            papel,
+            created_at,
+            user:profiles!user_id(id, full_name, email)
+          ),
           empreendimento:empreendimentos(id, nome)
         `)
         .eq('is_active', true)
