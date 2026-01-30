@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, CalendarDays, BarChart3, Settings, Download, Upload } from 'lucide-react';
+import { ClipboardList, CalendarDays, BarChart3, Download, Upload } from 'lucide-react';
 import { useEmpreendimentosSelect } from '@/hooks/useEmpreendimentosSelect';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PlanejamentoPlanilha } from '@/components/planejamento/PlanejamentoPlanilha';
@@ -59,12 +59,6 @@ export default function Planejamento() {
                   <Button variant="outline" size="sm" disabled={!empreendimentoId}>
                     <Download className="h-4 w-4 mr-2" />
                     Exportar
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href="/planejamento/configuracoes">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Config
-                    </a>
                   </Button>
                 </div>
               )}

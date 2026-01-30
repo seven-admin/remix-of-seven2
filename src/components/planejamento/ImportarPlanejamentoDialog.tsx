@@ -495,16 +495,16 @@ export function ImportarPlanejamentoDialog({
                     <div key={key} className="space-y-2">
                       <label className="text-sm font-medium">{label}</label>
                       <Select
-                        value={columnMapping[key as keyof ColumnMapping]}
+                        value={columnMapping[key as keyof ColumnMapping] || '__none__'}
                         onValueChange={(value) =>
-                          setColumnMapping((prev) => ({ ...prev, [key]: value }))
+                          setColumnMapping((prev) => ({ ...prev, [key]: value === '__none__' ? '' : value }))
                         }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione uma coluna" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Não mapear</SelectItem>
+                          <SelectItem value="__none__">Não mapear</SelectItem>
                           {fileColumns.map((col) => (
                             <SelectItem key={col} value={col}>
                               {col}
@@ -612,11 +612,11 @@ export function ImportarPlanejamentoDialog({
                         <div key={value} className="flex items-center gap-4">
                           <span className="w-48 text-sm truncate">{value}</span>
                           <Select
-                            value={valueMapping.responsaveis[value] || ''}
+                            value={valueMapping.responsaveis[value] || '__none__'}
                             onValueChange={(id) =>
                               setValueMapping((prev) => ({
                                 ...prev,
-                                responsaveis: { ...prev.responsaveis, [value]: id },
+                                responsaveis: { ...prev.responsaveis, [value]: id === '__none__' ? '' : id },
                               }))
                             }
                           >
@@ -624,7 +624,7 @@ export function ImportarPlanejamentoDialog({
                               <SelectValue placeholder="Selecione o responsável" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Não atribuir</SelectItem>
+                              <SelectItem value="__none__">Não atribuir</SelectItem>
                               {funcionarios?.map((f) => (
                                 <SelectItem key={f.id} value={f.id}>
                                   {f.full_name}
