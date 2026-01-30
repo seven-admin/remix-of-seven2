@@ -10,10 +10,12 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { PlanejamentoPlanilha } from '@/components/planejamento/PlanejamentoPlanilha';
 import { PlanejamentoDashboard } from '@/components/planejamento/PlanejamentoDashboard';
 import { PlanejamentoTimeline } from '@/components/planejamento/PlanejamentoTimeline';
+import { ImportarPlanejamentoDialog } from '@/components/planejamento/ImportarPlanejamentoDialog';
 
 export default function Planejamento() {
   const [empreendimentoId, setEmpreendimentoId] = useState<string>('');
   const [activeTab, setActiveTab] = useState('planilha');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const { data: empreendimentos } = useEmpreendimentosSelect();
   const { isAdmin } = usePermissions();
   const canEdit = isAdmin();
@@ -45,7 +47,12 @@ export default function Planejamento() {
 
               {canEdit && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={!empreendimentoId}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={!empreendimentoId}
+                    onClick={() => setImportDialogOpen(true)}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
                     Importar
                   </Button>
@@ -102,6 +109,14 @@ export default function Planejamento() {
               <p>Selecione um empreendimento para visualizar o planejamento</p>
             </CardContent>
           </Card>
+        )}
+
+        {empreendimentoId && (
+          <ImportarPlanejamentoDialog
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+            empreendimentoId={empreendimentoId}
+          />
         )}
       </div>
     </MainLayout>
