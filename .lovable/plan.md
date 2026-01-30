@@ -1,218 +1,103 @@
 
 
-# Plano: Melhorias no Timeline de Planejamento
+# Plano: Correções de Layout no Portal do Incorporador
 
-## Resumo das Alterações Solicitadas
+## Alterações Solicitadas
 
-1. **Remover aba "Planilha"** do Portal do Incorporador (somente Timeline e Dashboard)
-2. **Coluna "Tarefas" adaptável** ao tamanho do texto
-3. **Modal de detalhamento** ao clicar em uma tarefa na Timeline (para ambos os portais)
-
----
-
-## 1. Remover Aba "Planilha" do Portal Incorporador
-
-### Arquivo: `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx`
-
-**Alterações:**
-- Mudar `activeTab` inicial de `'planilha'` para `'timeline'`
-- Remover o `TabsTrigger` da aba "Planilha"
-- Remover o `TabsContent` da aba "Planilha"
-- Remover import do componente `PlanejamentoPlanilha`
-- Remover import do ícone `ClipboardList` (se não for mais usado)
-
-**Resultado:**
-O incorporador verá apenas duas abas: Timeline e Dashboard.
+1. Remover o card "Seus Empreendimentos" (não tem função)
+2. Remover o alerta "Dados em configuração"
+3. Corrigir layout dos cards de navegação para terem tamanho uniforme
 
 ---
 
-## 2. Coluna "Tarefas" Adaptável
-
-### Arquivo: `src/components/planejamento/PlanejamentoTimeline.tsx`
-
-**Situação Atual:**
-A coluna de tarefas tem largura fixa de 200px (linha 297: `w-[200px]`).
-
-**Solução:**
-- Mudar de `w-[200px]` para `min-w-[200px] w-auto max-w-[350px]`
-- Remover `truncate` dos nomes das tarefas para permitir quebra de linha
-- Adicionar `whitespace-nowrap` nos itens curtos ou `break-words` para longos
-
-**Implementação:**
-```tsx
-// Antes (linha 297)
-<div className="w-[200px] flex-shrink-0 border-r bg-card z-10">
-
-// Depois
-<div className="min-w-[200px] w-fit max-w-[350px] flex-shrink-0 border-r bg-card z-10">
-```
-
-Para os nomes das tarefas, usar `text-ellipsis overflow-hidden` apenas quando muito longos, ou permitir quebra de linha:
-```tsx
-// Antes (linha 326-327)
-className="border-b flex items-center px-3 text-sm truncate hover:bg-muted/20"
-title={item.item}
-
-// Depois
-className="border-b flex items-center px-3 text-sm hover:bg-muted/20"
-title={item.item}
-// Texto se ajusta naturalmente
-```
-
----
-
-## 3. Modal de Detalhamento ao Clicar na Tarefa
-
-### Novo Componente: `src/components/planejamento/TarefaDetalheDialog.tsx`
-
-Modal que exibe informações completas da tarefa quando clicada na Timeline.
-
-**Campos exibidos:**
-- Nome da tarefa (item)
-- Fase
-- Status (com badge colorido)
-- Data início e Data fim
-- Responsáveis (lista com avatares)
-- Observações
-- Histórico de alterações (usando `usePlanejamentoHistorico`)
-
-**Estrutura do componente:**
-```tsx
-interface TarefaDetalheDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  item: PlanejamentoItemWithRelations | null;
-}
-
-export function TarefaDetalheDialog({ open, onOpenChange, item }: TarefaDetalheDialogProps) {
-  const { historico, isLoading: loadingHistorico } = usePlanejamentoHistorico(item?.id);
-  
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Detalhes da Tarefa</DialogTitle>
-        </DialogHeader>
-        
-        {/* Conteúdo com informações da tarefa */}
-        {/* Tabs: Detalhes | Histórico */}
-      </DialogContent>
-    </Dialog>
-  );
-}
-```
-
-### Modificação: `src/components/planejamento/PlanejamentoTimeline.tsx`
-
-**Adicionar estado e handler:**
-```tsx
-const [selectedItem, setSelectedItem] = useState<PlanejamentoItemWithRelations | null>(null);
-const [detalheOpen, setDetalheOpen] = useState(false);
-
-const handleItemClick = (item: PlanejamentoItemWithRelations) => {
-  setSelectedItem(item);
-  setDetalheOpen(true);
-};
-```
-
-**Modificar as barras clicáveis (linha 411-430):**
-```tsx
-<div
-  className={cn(
-    "absolute top-1 h-[calc(100%-8px)] rounded-md cursor-pointer transition-all hover:brightness-110",
-    pos.isOverdue ? "bg-destructive/80" : ""
-  )}
-  style={{...}}
-  onClick={() => handleItemClick(item)}  // NOVO
->
-```
-
-**Modificar os nomes na coluna (linha 323-331):**
-```tsx
-<div 
-  key={item.id}
-  className="border-b flex items-center px-3 text-sm hover:bg-muted/20 cursor-pointer"
-  style={{ height: ROW_HEIGHT }}
-  title={item.item}
-  onClick={() => handleItemClick(item)}  // NOVO
->
-```
-
-**Renderizar o dialog no final:**
-```tsx
-<TarefaDetalheDialog
-  open={detalheOpen}
-  onOpenChange={setDetalheOpen}
-  item={selectedItem}
-/>
-```
-
----
-
-## Arquivos a Criar/Modificar
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx` | Remover aba Planilha |
-| `src/components/planejamento/PlanejamentoTimeline.tsx` | Coluna adaptável + onClick para modal |
-| `src/components/planejamento/TarefaDetalheDialog.tsx` | **Criar** - Modal de detalhamento |
+| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Remover card e alerta |
+| `src/components/portal-incorporador/PortalIncorporadorLayout.tsx` | Corrigir altura uniforme dos cards |
 
 ---
 
-## Layout do Modal de Detalhamento
+## 1. Remover Card "Seus Empreendimentos" e Alerta
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  Detalhes da Tarefa                              ✕  │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  [Nome da Tarefa]                                   │
-│                                                     │
-│  [Badge: Fase]  [Badge: Status]  [Badge: Atrasado?] │
-│                                                     │
-│  ─────────────────────────────────────────────────  │
-│                                                     │
-│  📅 Data Início: 15/01/2026                         │
-│  📅 Data Fim: 30/01/2026                            │
-│                                                     │
-│  👤 Responsáveis:                                   │
-│     • João Silva (Principal)                        │
-│     • Maria Santos (Apoio)                          │
-│                                                     │
-│  📝 Observações:                                    │
-│     Lorem ipsum dolor sit amet...                   │
-│                                                     │
-│  ─────────────────────────────────────────────────  │
-│                                                     │
-│  📜 Histórico de Alterações:                        │
-│     • 28/01 - Status alterado: Pendente → Em And... │
-│     • 25/01 - Data fim alterada: 28/01 → 30/01      │
-│     • 15/01 - Tarefa criada por Admin               │
-│                                                     │
-└─────────────────────────────────────────────────────┘
+### `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
+
+**Remover:**
+- O bloco do Alert "Dados em configuração" (linhas 62-71)
+- O card "Seus Empreendimentos" completo (linhas 127-188)
+- Imports não utilizados: `Alert`, `AlertDescription`, `AlertTitle`, `AlertTriangle`, `Badge`, `User`, `Package`
+- Variáveis não utilizadas: `hasUnidadesData`, `hasNegociacoesData`, `hasAnyData`, `gestorMap`, `loadingGestores`
+- Hook não utilizado: `useGestoresMultiplosEmpreendimentos`
+
+**Manter:**
+- Os 4 KPIs principais (Empreendimentos, Unidades Disponíveis, VGV Vendido, Vendas do Mês)
+
+---
+
+## 2. Corrigir Layout Uniforme dos Cards de Navegação
+
+### `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
+
+**Problema atual:**
+Os cards têm alturas diferentes porque o conteúdo interno varia (textos de descrição com 1 ou 2 linhas).
+
+**Solução:**
+Adicionar altura fixa ao conteúdo e garantir que o texto seja truncado:
+
+```tsx
+// Antes
+<CardContent className="p-6 flex items-center gap-4">
+  <div className="flex-1">
+    <h3 className="font-semibold">Dashboard Executivo</h3>
+    <p className="text-sm text-muted-foreground">KPIs e métricas detalhadas</p>
+  </div>
+</CardContent>
+
+// Depois
+<CardContent className="p-6 flex items-center gap-4 h-full">
+  <div className="flex-1 min-w-0">
+    <h3 className="font-semibold truncate">Dashboard Executivo</h3>
+    <p className="text-sm text-muted-foreground line-clamp-1">KPIs e métricas detalhadas</p>
+  </div>
+</CardContent>
+```
+
+E no grid container, usar `grid-rows-1` para forçar altura uniforme:
+
+```tsx
+// Adicionar h-full no Card wrapper
+<Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
 ```
 
 ---
 
-## Fluxo de Usuário Final
+## Resultado Visual Esperado
 
-### Portal do Incorporador (`/portal-incorporador/planejamento`)
-1. Usuário seleciona empreendimento
-2. Vê apenas abas **Timeline** e **Dashboard**
-3. Na Timeline, clica em uma barra de tarefa
-4. Modal abre com detalhes completos (somente leitura)
+Antes:
+```text
+┌───────────────────┐ ┌───────────────────┐ ┌─────────────────┐ ┌───────────────────┐
+│ Dashboard         │ │ Forecast      →   │ │ Marketing   →   │ │ Planejamento      │
+│ Executivo         │ │ Previsões e       │ │ Tickets de      │ │ Cronograma de     │
+│ KPIs e métricas   │ │ atividades        │ │ criação         │ │ tarefas           │
+│ detalhadas     →  │ └───────────────────┘ └─────────────────┘ │                →  │
+└───────────────────┘                                           └───────────────────┘
+     (mais alto)         (menor)                (menor)             (mais alto)
+```
 
-### Sistema Principal (`/planejamento`)
-1. Usuário continua tendo todas as 3 abas
-2. Na Timeline, clica em uma tarefa
-3. Modal abre com detalhes + histórico
+Depois:
+```text
+┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│ Dashboard         │ │ Forecast      →   │ │ Marketing     →   │ │ Planejamento  →   │
+│ Executivo         │ │ Previsões e ativi │ │ Tickets de criação│ │ Cronograma de ... │
+│ KPIs e métricas...│ │                   │ │                   │ │                   │
+└───────────────────┘ └───────────────────┘ └───────────────────┘ └───────────────────┘
+         (todos com altura uniforme)
+```
 
 ---
 
-## Observações Técnicas
+## Código Final do Dashboard Simplificado
 
-- O componente `TarefaDetalheDialog` será reutilizável em ambos os contextos
-- A largura adaptável da coluna usa `w-fit` com min/max constraints para evitar extremos
-- O histórico já existe no hook `usePlanejamentoHistorico` e será integrado ao modal
-- O modal é somente visualização (não permite edição direta)
+O `PortalIncorporadorDashboard.tsx` ficará apenas com os 4 KPIs, que já são renderizados na página principal abaixo dos cards de navegação.
 
