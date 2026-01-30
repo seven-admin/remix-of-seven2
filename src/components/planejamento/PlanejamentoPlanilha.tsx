@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { ResponsaveisEditor } from './ResponsaveisEditor';
 import { EditarEmLoteDialog } from './EditarEmLoteDialog';
+import { ExcluirEmLoteDialog } from './ExcluirEmLoteDialog';
 
 interface Props {
   empreendimentoId: string;
@@ -40,6 +41,7 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
   const [newItemValue, setNewItemValue] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editEmLoteOpen, setEditEmLoteOpen] = useState(false);
+  const [excluirEmLoteOpen, setExcluirEmLoteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Agrupar itens por fase
@@ -353,6 +355,10 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
             <Edit2 className="h-4 w-4 mr-2" />
             Editar em Lote
           </Button>
+          <Button size="sm" variant="destructive" onClick={() => setExcluirEmLoteOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Excluir
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
             Cancelar
           </Button>
@@ -364,6 +370,19 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
         open={editEmLoteOpen}
         onOpenChange={setEditEmLoteOpen}
         selectedIds={selectedIds}
+        empreendimentoId={empreendimentoId}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          refetch();
+        }}
+      />
+
+      {/* Dialog de exclusão em lote */}
+      <ExcluirEmLoteDialog
+        open={excluirEmLoteOpen}
+        onOpenChange={setExcluirEmLoteOpen}
+        selectedIds={selectedIds}
+        items={itens || []}
         empreendimentoId={empreendimentoId}
         onSuccess={() => {
           setSelectedIds(new Set());
