@@ -64,6 +64,7 @@ import PortalClientes from "./pages/PortalClientes";
 import NovaPropostaComercial from "./pages/NovaPropostaComercial";
 import SemAcesso from "./pages/SemAcesso";
 import Planejamento from "./pages/Planejamento";
+import PlanejamentoConfiguracoes from "./pages/PlanejamentoConfiguracoes";
 
 const queryClient = new QueryClient();
 
@@ -262,6 +263,11 @@ const App = () => (
             <Route path="/planejamento" element={
               <ProtectedRoute moduleName="planejamento">
                 <Planejamento />
+              </ProtectedRoute>
+            } />
+            <Route path="/planejamento/configuracoes" element={
+              <ProtectedRoute moduleName="planejamento_config" adminOnly>
+                <PlanejamentoConfiguracoes />
               </ProtectedRoute>
             } />
             <Route path="/eventos" element={

@@ -159,6 +159,16 @@ const menuGroups: MenuGroup[] = [
       { icon: Kanban, label: 'Etapas de Tickets', path: '/marketing/etapas', moduleName: 'projetos_marketing_config', adminOnly: true },
     ],
   },
+  // Planejamento
+  {
+    label: 'Planejamento',
+    icon: ClipboardList,
+    color: CORES_SIDEBAR.utilidades,
+    items: [
+      { icon: ClipboardList, label: 'Cronograma', path: '/planejamento', moduleName: 'planejamento' },
+      { icon: Settings, label: 'Configurações', path: '/planejamento/configuracoes', moduleName: 'planejamento_config', adminOnly: true },
+    ],
+  },
   // Eventos
   {
     label: 'Eventos',
