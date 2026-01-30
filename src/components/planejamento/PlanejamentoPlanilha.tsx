@@ -416,6 +416,14 @@ function ItemRow({
 }: ItemRowProps) {
   const isEditingItem = editingCell?.id === item.id && editingCell?.field === 'item';
   const [obsOpen, setObsOpen] = useState(false);
+  const [localObs, setLocalObs] = useState(item.obs || '');
+
+  // Sincronizar localObs quando o item mudar e o popover estiver fechado
+  useEffect(() => {
+    if (!obsOpen) {
+      setLocalObs(item.obs || '');
+    }
+  }, [item.obs, obsOpen]);
 
   return (
     <TableRow className={cn("hover:bg-muted/20", isSelected && "bg-primary/5")}>
@@ -519,7 +527,16 @@ function ItemRow({
 
       {/* Observações */}
       <TableCell className="py-1">
-        <Popover open={obsOpen} onOpenChange={setObsOpen}>
+        <Popover 
+          open={obsOpen} 
+          onOpenChange={(open) => {
+            // Salvar ao fechar se houve alteração
+            if (!open && localObs !== (item.obs || '')) {
+              onSelectChange(item.id, 'obs', localObs);
+            }
+            setObsOpen(open);
+          }}
+        >
           <PopoverTrigger asChild>
             <Button 
               variant="ghost" 
@@ -538,8 +555,8 @@ function ItemRow({
                 </p>
               ) : (
                 <Textarea
-                  value={item.obs || ''}
-                  onChange={(e) => onSelectChange(item.id, 'obs', e.target.value)}
+                  value={localObs}
+                  onChange={(e) => setLocalObs(e.target.value)}
                   placeholder="Digite observações..."
                   rows={4}
                 />
