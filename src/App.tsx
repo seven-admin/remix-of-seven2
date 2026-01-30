@@ -63,6 +63,7 @@ import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import PortalClientes from "./pages/PortalClientes";
 import NovaPropostaComercial from "./pages/NovaPropostaComercial";
 import SemAcesso from "./pages/SemAcesso";
+import Planejamento from "./pages/Planejamento";
 
 const queryClient = new QueryClient();
 
@@ -254,6 +255,13 @@ const App = () => (
             <Route path="/marketing/briefings" element={
               <ProtectedRoute moduleName="briefings">
                 <Briefings />
+              </ProtectedRoute>
+            } />
+            
+            {/* Planejamento */}
+            <Route path="/planejamento" element={
+              <ProtectedRoute moduleName="planejamento">
+                <Planejamento />
               </ProtectedRoute>
             } />
             <Route path="/eventos" element={
