@@ -1,104 +1,218 @@
 
-# Plano: Corrigir Campo de Observações no Planejamento
 
-## Problema Identificado
+# Plano: Melhorias no Timeline de Planejamento
 
-O campo de observações (`obs`) na planilha de planejamento **não está salvando os dados** devido a uma condição de corrida:
+## Resumo das Alterações Solicitadas
 
-### Fluxo Problemático Atual (linha 542)
-
-```tsx
-<Textarea
-  value={item.obs || ''}
-  onChange={(e) => onSelectChange(item.id, 'obs', e.target.value)}
-  ...
-/>
-```
-
-**O que acontece:**
-1. Usuário digita "A" → dispara `updateItem.mutate({ id, obs: 'A' })`
-2. Mutation executa e chama `invalidateQueries`
-3. React Query refaz a consulta ao banco
-4. Usuário digita "B" → dispara `updateItem.mutate({ id, obs: 'AB' })`
-5. **Resposta do passo 3 chega** com `obs: 'A'` → sobrescreve o campo
-6. Usuário vê "A" em vez de "AB"
-
-Esse ciclo se repete, resultando em perda de dados ou comportamento imprevisível.
+1. **Remover aba "Planilha"** do Portal do Incorporador (somente Timeline e Dashboard)
+2. **Coluna "Tarefas" adaptável** ao tamanho do texto
+3. **Modal de detalhamento** ao clicar em uma tarefa na Timeline (para ambos os portais)
 
 ---
 
-## Solução
+## 1. Remover Aba "Planilha" do Portal Incorporador
 
-Usar um **estado local** para o campo de observações e salvar apenas quando o popover for fechado (padrão debounced/onBlur).
+### Arquivo: `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx`
+
+**Alterações:**
+- Mudar `activeTab` inicial de `'planilha'` para `'timeline'`
+- Remover o `TabsTrigger` da aba "Planilha"
+- Remover o `TabsContent` da aba "Planilha"
+- Remover import do componente `PlanejamentoPlanilha`
+- Remover import do ícone `ClipboardList` (se não for mais usado)
+
+**Resultado:**
+O incorporador verá apenas duas abas: Timeline e Dashboard.
 
 ---
 
-## Alterações em `src/components/planejamento/PlanejamentoPlanilha.tsx`
+## 2. Coluna "Tarefas" Adaptável
 
-### 1. Adicionar Estado Local no ItemRow
+### Arquivo: `src/components/planejamento/PlanejamentoTimeline.tsx`
 
+**Situação Atual:**
+A coluna de tarefas tem largura fixa de 200px (linha 297: `w-[200px]`).
+
+**Solução:**
+- Mudar de `w-[200px]` para `min-w-[200px] w-auto max-w-[350px]`
+- Remover `truncate` dos nomes das tarefas para permitir quebra de linha
+- Adicionar `whitespace-nowrap` nos itens curtos ou `break-words` para longos
+
+**Implementação:**
 ```tsx
-function ItemRow({ ... }: ItemRowProps) {
-  const isEditingItem = editingCell?.id === item.id && editingCell?.field === 'item';
-  const [obsOpen, setObsOpen] = useState(false);
-  const [localObs, setLocalObs] = useState(item.obs || ''); // NOVO
+// Antes (linha 297)
+<div className="w-[200px] flex-shrink-0 border-r bg-card z-10">
 
-  // Sincronizar quando o item mudar (ex: após refetch)
-  useEffect(() => {
-    if (!obsOpen) {
-      setLocalObs(item.obs || '');
-    }
-  }, [item.obs, obsOpen]);
+// Depois
+<div className="min-w-[200px] w-fit max-w-[350px] flex-shrink-0 border-r bg-card z-10">
 ```
 
-### 2. Modificar o Textarea
-
+Para os nomes das tarefas, usar `text-ellipsis overflow-hidden` apenas quando muito longos, ou permitir quebra de linha:
 ```tsx
-<Textarea
-  value={localObs}  // Usar estado local
-  onChange={(e) => setLocalObs(e.target.value)}  // Atualizar apenas estado local
-  placeholder="Digite observações..."
-  rows={4}
-/>
+// Antes (linha 326-327)
+className="border-b flex items-center px-3 text-sm truncate hover:bg-muted/20"
+title={item.item}
+
+// Depois
+className="border-b flex items-center px-3 text-sm hover:bg-muted/20"
+title={item.item}
+// Texto se ajusta naturalmente
 ```
 
-### 3. Salvar ao Fechar o Popover
+---
 
+## 3. Modal de Detalhamento ao Clicar na Tarefa
+
+### Novo Componente: `src/components/planejamento/TarefaDetalheDialog.tsx`
+
+Modal que exibe informações completas da tarefa quando clicada na Timeline.
+
+**Campos exibidos:**
+- Nome da tarefa (item)
+- Fase
+- Status (com badge colorido)
+- Data início e Data fim
+- Responsáveis (lista com avatares)
+- Observações
+- Histórico de alterações (usando `usePlanejamentoHistorico`)
+
+**Estrutura do componente:**
 ```tsx
-<Popover 
-  open={obsOpen} 
-  onOpenChange={(open) => {
-    if (!open && localObs !== (item.obs || '')) {
-      // Salvar apenas se houve alteração
-      onSelectChange(item.id, 'obs', localObs);
-    }
-    setObsOpen(open);
-  }}
+interface TarefaDetalheDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: PlanejamentoItemWithRelations | null;
+}
+
+export function TarefaDetalheDialog({ open, onOpenChange, item }: TarefaDetalheDialogProps) {
+  const { historico, isLoading: loadingHistorico } = usePlanejamentoHistorico(item?.id);
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Detalhes da Tarefa</DialogTitle>
+        </DialogHeader>
+        
+        {/* Conteúdo com informações da tarefa */}
+        {/* Tabs: Detalhes | Histórico */}
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### Modificação: `src/components/planejamento/PlanejamentoTimeline.tsx`
+
+**Adicionar estado e handler:**
+```tsx
+const [selectedItem, setSelectedItem] = useState<PlanejamentoItemWithRelations | null>(null);
+const [detalheOpen, setDetalheOpen] = useState(false);
+
+const handleItemClick = (item: PlanejamentoItemWithRelations) => {
+  setSelectedItem(item);
+  setDetalheOpen(true);
+};
+```
+
+**Modificar as barras clicáveis (linha 411-430):**
+```tsx
+<div
+  className={cn(
+    "absolute top-1 h-[calc(100%-8px)] rounded-md cursor-pointer transition-all hover:brightness-110",
+    pos.isOverdue ? "bg-destructive/80" : ""
+  )}
+  style={{...}}
+  onClick={() => handleItemClick(item)}  // NOVO
 >
 ```
 
+**Modificar os nomes na coluna (linha 323-331):**
+```tsx
+<div 
+  key={item.id}
+  className="border-b flex items-center px-3 text-sm hover:bg-muted/20 cursor-pointer"
+  style={{ height: ROW_HEIGHT }}
+  title={item.item}
+  onClick={() => handleItemClick(item)}  // NOVO
+>
+```
+
+**Renderizar o dialog no final:**
+```tsx
+<TarefaDetalheDialog
+  open={detalheOpen}
+  onOpenChange={setDetalheOpen}
+  item={selectedItem}
+/>
+```
+
 ---
 
-## Arquivo a Modificar
+## Arquivos a Criar/Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Corrigir gerenciamento de estado do campo obs |
+| `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx` | Remover aba Planilha |
+| `src/components/planejamento/PlanejamentoTimeline.tsx` | Coluna adaptável + onClick para modal |
+| `src/components/planejamento/TarefaDetalheDialog.tsx` | **Criar** - Modal de detalhamento |
 
 ---
 
-## Resultado Esperado
+## Layout do Modal de Detalhamento
 
-1. Usuário clica no ícone de observações
-2. Popover abre com o valor atual
-3. Usuário digita livremente sem disparar requisições
-4. Ao fechar o popover (clicar fora ou ESC), o valor é salvo
-5. Dados persistem corretamente no banco
+```text
+┌─────────────────────────────────────────────────────┐
+│  Detalhes da Tarefa                              ✕  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  [Nome da Tarefa]                                   │
+│                                                     │
+│  [Badge: Fase]  [Badge: Status]  [Badge: Atrasado?] │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│                                                     │
+│  📅 Data Início: 15/01/2026                         │
+│  📅 Data Fim: 30/01/2026                            │
+│                                                     │
+│  👤 Responsáveis:                                   │
+│     • João Silva (Principal)                        │
+│     • Maria Santos (Apoio)                          │
+│                                                     │
+│  📝 Observações:                                    │
+│     Lorem ipsum dolor sit amet...                   │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│                                                     │
+│  📜 Histórico de Alterações:                        │
+│     • 28/01 - Status alterado: Pendente → Em And... │
+│     • 25/01 - Data fim alterada: 28/01 → 30/01      │
+│     • 15/01 - Tarefa criada por Admin               │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Benefícios Adicionais
+## Fluxo de Usuário Final
 
-- **Performance**: Apenas 1 requisição ao fechar, em vez de 1 por keystroke
-- **UX**: Usuário não perde o foco durante digitação
-- **Estabilidade**: Elimina condição de corrida
+### Portal do Incorporador (`/portal-incorporador/planejamento`)
+1. Usuário seleciona empreendimento
+2. Vê apenas abas **Timeline** e **Dashboard**
+3. Na Timeline, clica em uma barra de tarefa
+4. Modal abre com detalhes completos (somente leitura)
+
+### Sistema Principal (`/planejamento`)
+1. Usuário continua tendo todas as 3 abas
+2. Na Timeline, clica em uma tarefa
+3. Modal abre com detalhes + histórico
+
+---
+
+## Observações Técnicas
+
+- O componente `TarefaDetalheDialog` será reutilizável em ambos os contextos
+- A largura adaptável da coluna usa `w-fit` com min/max constraints para evitar extremos
+- O histórico já existe no hook `usePlanejamentoHistorico` e será integrado ao modal
+- O modal é somente visualização (não permite edição direta)
+
