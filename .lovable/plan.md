@@ -1,103 +1,169 @@
 
 
-# Plano: Correções de Layout no Portal do Incorporador
+# Plano: Exclusão de Tarefas em Lote
 
-## Alterações Solicitadas
+## Contexto
 
-1. Remover o card "Seus Empreendimentos" (não tem função)
-2. Remover o alerta "Dados em configuração"
-3. Corrigir layout dos cards de navegação para terem tamanho uniforme
+O módulo de Planejamento já possui edição em lote, mas não há opção para excluir múltiplas tarefas de uma vez. A exclusão atual é feita item a item (botão de lixeira em cada linha).
 
 ---
 
-## Arquivos a Modificar
+## Implementação
+
+### 1. Adicionar Mutation de Exclusão em Lote no Hook
+
+**Arquivo:** `src/hooks/usePlanejamentoItens.ts`
+
+Adicionar nova mutation `deleteItemsBulk`:
+
+```tsx
+const deleteItemsBulk = useMutation({
+  mutationFn: async (ids: string[]) => {
+    const { error } = await supabase
+      .from('planejamento_itens')
+      .update({ is_active: false })
+      .in('id', ids);
+
+    if (error) throw error;
+    return ids.length;
+  },
+  onSuccess: (count) => {
+    queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
+    toast.success(`${count} item(ns) removido(s) com sucesso`);
+  },
+  onError: (error) => {
+    toast.error('Erro ao remover itens: ' + error.message);
+  }
+});
+```
+
+---
+
+### 2. Adicionar Botão de Exclusão na Barra Flutuante
+
+**Arquivo:** `src/components/planejamento/PlanejamentoPlanilha.tsx`
+
+Modificar a barra flutuante para incluir botão de exclusão com confirmação:
+
+```tsx
+{/* Barra flutuante de seleção */}
+{!readOnly && selectedIds.size > 0 && (
+  <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4 z-50">
+    <span className="text-sm font-medium">
+      {selectedIds.size} item(ns) selecionado(s)
+    </span>
+    <Button size="sm" onClick={() => setEditEmLoteOpen(true)}>
+      <Edit2 className="h-4 w-4 mr-2" />
+      Editar em Lote
+    </Button>
+    <Button 
+      size="sm" 
+      variant="destructive"
+      onClick={() => setExcluirEmLoteOpen(true)}  // NOVO
+    >
+      <Trash2 className="h-4 w-4 mr-2" />
+      Excluir
+    </Button>
+    <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
+      Cancelar
+    </Button>
+  </div>
+)}
+```
+
+---
+
+### 3. Criar Dialog de Confirmação de Exclusão
+
+**Arquivo:** `src/components/planejamento/ExcluirEmLoteDialog.tsx` (novo)
+
+Modal de confirmação com lista resumida dos itens a serem excluídos:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  Excluir Tarefas                                 ✕  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ⚠️ Atenção                                         │
+│                                                     │
+│  Você está prestes a excluir 5 tarefa(s).           │
+│  Esta ação não pode ser desfeita.                   │
+│                                                     │
+│  Tarefas selecionadas:                              │
+│  • Aprovar projeto arquitetônico                    │
+│  • Validar memorial descritivo                      │
+│  • Enviar documentação para cartório                │
+│  • ...e mais 2 itens                                │
+│                                                     │
+│                    [Cancelar]  [Confirmar Exclusão] │
+└─────────────────────────────────────────────────────┘
+```
+
+**Estrutura do componente:**
+
+```tsx
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedIds: Set<string>;
+  items: PlanejamentoItemWithRelations[];
+  empreendimentoId: string;
+  onSuccess: () => void;
+}
+
+export function ExcluirEmLoteDialog({ ... }: Props) {
+  const { deleteItemsBulk } = usePlanejamentoItens({ empreendimento_id: empreendimentoId });
+  
+  const selectedItems = items.filter(i => selectedIds.has(i.id));
+  const displayLimit = 5;
+  const remaining = selectedItems.length - displayLimit;
+
+  const handleConfirm = async () => {
+    await deleteItemsBulk.mutateAsync(Array.from(selectedIds));
+    onSuccess();
+    onOpenChange(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {/* Conteúdo do alert */}
+    </AlertDialog>
+  );
+}
+```
+
+---
+
+## Arquivos a Criar/Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx` | Remover card e alerta |
-| `src/components/portal-incorporador/PortalIncorporadorLayout.tsx` | Corrigir altura uniforme dos cards |
+| `src/hooks/usePlanejamentoItens.ts` | Adicionar `deleteItemsBulk` mutation |
+| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Adicionar botão "Excluir" e integrar dialog |
+| `src/components/planejamento/ExcluirEmLoteDialog.tsx` | **Criar** - Dialog de confirmação |
 
 ---
 
-## 1. Remover Card "Seus Empreendimentos" e Alerta
+## Fluxo do Usuário
 
-### `src/pages/portal-incorporador/PortalIncorporadorDashboard.tsx`
-
-**Remover:**
-- O bloco do Alert "Dados em configuração" (linhas 62-71)
-- O card "Seus Empreendimentos" completo (linhas 127-188)
-- Imports não utilizados: `Alert`, `AlertDescription`, `AlertTitle`, `AlertTriangle`, `Badge`, `User`, `Package`
-- Variáveis não utilizadas: `hasUnidadesData`, `hasNegociacoesData`, `hasAnyData`, `gestorMap`, `loadingGestores`
-- Hook não utilizado: `useGestoresMultiplosEmpreendimentos`
-
-**Manter:**
-- Os 4 KPIs principais (Empreendimentos, Unidades Disponíveis, VGV Vendido, Vendas do Mês)
-
----
-
-## 2. Corrigir Layout Uniforme dos Cards de Navegação
-
-### `src/components/portal-incorporador/PortalIncorporadorLayout.tsx`
-
-**Problema atual:**
-Os cards têm alturas diferentes porque o conteúdo interno varia (textos de descrição com 1 ou 2 linhas).
-
-**Solução:**
-Adicionar altura fixa ao conteúdo e garantir que o texto seja truncado:
-
-```tsx
-// Antes
-<CardContent className="p-6 flex items-center gap-4">
-  <div className="flex-1">
-    <h3 className="font-semibold">Dashboard Executivo</h3>
-    <p className="text-sm text-muted-foreground">KPIs e métricas detalhadas</p>
-  </div>
-</CardContent>
-
-// Depois
-<CardContent className="p-6 flex items-center gap-4 h-full">
-  <div className="flex-1 min-w-0">
-    <h3 className="font-semibold truncate">Dashboard Executivo</h3>
-    <p className="text-sm text-muted-foreground line-clamp-1">KPIs e métricas detalhadas</p>
-  </div>
-</CardContent>
-```
-
-E no grid container, usar `grid-rows-1` para forçar altura uniforme:
-
-```tsx
-// Adicionar h-full no Card wrapper
-<Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-```
+1. Usuário seleciona múltiplas tarefas via checkboxes
+2. Barra flutuante aparece com opções "Editar em Lote" e "Excluir"
+3. Ao clicar em "Excluir":
+   - Modal de confirmação abre
+   - Exibe lista resumida dos itens selecionados
+   - Aviso de que a ação não pode ser desfeita
+4. Ao confirmar:
+   - Todas as tarefas são marcadas como `is_active: false` (soft delete)
+   - Toast de sucesso é exibido
+   - Seleção é limpa
+   - Lista é atualizada
 
 ---
 
-## Resultado Visual Esperado
+## Considerações de Segurança
 
-Antes:
-```text
-┌───────────────────┐ ┌───────────────────┐ ┌─────────────────┐ ┌───────────────────┐
-│ Dashboard         │ │ Forecast      →   │ │ Marketing   →   │ │ Planejamento      │
-│ Executivo         │ │ Previsões e       │ │ Tickets de      │ │ Cronograma de     │
-│ KPIs e métricas   │ │ atividades        │ │ criação         │ │ tarefas           │
-│ detalhadas     →  │ └───────────────────┘ └─────────────────┘ │                →  │
-└───────────────────┘                                           └───────────────────┘
-     (mais alto)         (menor)                (menor)             (mais alto)
-```
-
-Depois:
-```text
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
-│ Dashboard         │ │ Forecast      →   │ │ Marketing     →   │ │ Planejamento  →   │
-│ Executivo         │ │ Previsões e ativi │ │ Tickets de criação│ │ Cronograma de ... │
-│ KPIs e métricas...│ │                   │ │                   │ │                   │
-└───────────────────┘ └───────────────────┘ └───────────────────┘ └───────────────────┘
-         (todos com altura uniforme)
-```
-
----
-
-## Código Final do Dashboard Simplificado
-
-O `PortalIncorporadorDashboard.tsx` ficará apenas com os 4 KPIs, que já são renderizados na página principal abaixo dos cards de navegação.
+- A exclusão é soft delete (mantém dados no banco)
+- Apenas administradores podem ver/usar a funcionalidade (controlado por `readOnly`)
+- RLS no banco já restringe DELETE/UPDATE para admins
+- Confirmação obrigatória antes de executar
 
