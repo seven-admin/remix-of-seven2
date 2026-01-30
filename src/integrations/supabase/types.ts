@@ -3749,6 +3749,201 @@ export type Database = {
           },
         ]
       }
+      planejamento_fases: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          nome: string
+          ordem: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          nome: string
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          nome?: string
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      planejamento_historico: {
+        Row: {
+          campo_alterado: string
+          created_at: string | null
+          id: string
+          item_id: string
+          user_id: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          campo_alterado: string
+          created_at?: string | null
+          id?: string
+          item_id: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          campo_alterado?: string
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planejamento_historico_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "planejamento_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_historico_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planejamento_itens: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          empreendimento_id: string
+          fase_id: string
+          id: string
+          is_active: boolean | null
+          item: string
+          obs: string | null
+          ordem: number | null
+          responsavel_tecnico_id: string | null
+          status_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          empreendimento_id: string
+          fase_id: string
+          id?: string
+          is_active?: boolean | null
+          item: string
+          obs?: string | null
+          ordem?: number | null
+          responsavel_tecnico_id?: string | null
+          status_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          empreendimento_id?: string
+          fase_id?: string
+          id?: string
+          is_active?: boolean | null
+          item?: string
+          obs?: string | null
+          ordem?: number | null
+          responsavel_tecnico_id?: string | null
+          status_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planejamento_itens_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_itens_empreendimento_id_fkey"
+            columns: ["empreendimento_id"]
+            isOneToOne: false
+            referencedRelation: "empreendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_itens_fase_id_fkey"
+            columns: ["fase_id"]
+            isOneToOne: false
+            referencedRelation: "planejamento_fases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_itens_responsavel_tecnico_id_fkey"
+            columns: ["responsavel_tecnico_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planejamento_itens_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "planejamento_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planejamento_status: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_final: boolean | null
+          nome: string
+          ordem: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_final?: boolean | null
+          nome: string
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_final?: boolean | null
+          nome?: string
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       plano_contas: {
         Row: {
           categoria: string
