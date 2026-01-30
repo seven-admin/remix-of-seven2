@@ -1,169 +1,210 @@
 
 
-# Plano: Exclusão de Tarefas em Lote
+# Plano: Refatoração do Portal do Incorporador - Marketing e Forecast
 
 ## Contexto
 
-O módulo de Planejamento já possui edição em lote, mas não há opção para excluir múltiplas tarefas de uma vez. A exclusão atual é feita item a item (botão de lixeira em cada linha).
+O usuário solicitou ajustes em duas páginas do Portal do Incorporador:
+
+1. **Marketing** (`/portal-incorporador/marketing`): Simplificar layout, reduzir importância dos atrasados, manter apenas dois gráficos + lista de próximas entregas
+2. **Forecast** (`/portal-incorporador/forecast`): Corrigir layout quebrado dos cards de "Novos Atendimentos" e "Retornos"
 
 ---
 
-## Implementação
+## Problemas Identificados
 
-### 1. Adicionar Mutation de Exclusão em Lote no Hook
+### Marketing
+- Layout atual tem 4 KPIs + 2 gráficos + 2 listas (muito denso)
+- Tickets atrasados têm muito destaque visual
+- Gráfico "Por Categoria" mostra apenas badges (não é um gráfico visual)
 
-**Arquivo:** `src/hooks/usePlanejamentoItens.ts`
+### Forecast
+- Componente `AtendimentosResumo` renderiza dois cards lado a lado dentro de um grid de 2 colunas
+- Resultado: 2 cards que ocupam só metade da largura (quebrados visualmente)
+- O grid pai já é `lg:grid-cols-2`, e o componente interno também é `md:grid-cols-2`
 
-Adicionar nova mutation `deleteItemsBulk`:
+---
 
-```tsx
-const deleteItemsBulk = useMutation({
-  mutationFn: async (ids: string[]) => {
-    const { error } = await supabase
-      .from('planejamento_itens')
-      .update({ is_active: false })
-      .in('id', ids);
+## 1. Refatoração do Marketing
 
-    if (error) throw error;
-    return ids.length;
-  },
-  onSuccess: (count) => {
-    queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
-    toast.success(`${count} item(ns) removido(s) com sucesso`);
-  },
-  onError: (error) => {
-    toast.error('Erro ao remover itens: ' + error.message);
-  }
-});
+### Arquivo: `src/pages/portal-incorporador/PortalIncorporadorMarketing.tsx`
+
+**Novo layout simplificado:**
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  [Tickets Ativos: 7]  [Em Produção: 3]  [Concluídos: 2]  [⚠️ 2]│  <- KPIs compactos
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────┐ ┌─────────────────────────────────┐
+│   Tickets por Etapa         │ │    Por Categoria                │
+│   (donut chart)             │ │    (donut chart)                │
+│                             │ │                                 │
+│   ○ Briefing (2)            │ │    ○ Design Gráfico (3)         │
+│   ○ Produção (3)            │ │    ○ Render 3D (2)              │
+│   ○ Revisão (1)             │ │    ○ Vídeo (2)                  │
+└─────────────────────────────┘ └─────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│   Próximas Entregas                                        [7]  │
+│─────────────────────────────────────────────────────────────────│
+│   MKT-042  |  Banner promocional       |  Design Gráfico  | 2d │
+│   MKT-038  |  Vídeo institucional      |  Vídeo           | 4d │
+│   MKT-045  |  Render fachada           |  Render 3D       | 7d │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
+**Alterações:**
+1. Manter os 4 KPIs compactos (já estão bons)
+2. Card "Tickets Atrasados" (lista) → REMOVIDO (contador já está no KPI)
+3. Card "Por Categoria" → Transformar em gráfico de donut (como o de Etapas)
+4. Lista "Próximas Entregas" → Mover para baixo dos gráficos, ocupando largura total
+
 ---
 
-### 2. Adicionar Botão de Exclusão na Barra Flutuante
+## 2. Correção do Gráfico de Categorias
 
-**Arquivo:** `src/components/planejamento/PlanejamentoPlanilha.tsx`
+O gráfico atual mostra apenas badges com texto. Será convertido para um donut chart similar ao de Etapas.
 
-Modificar a barra flutuante para incluir botão de exclusão com confirmação:
-
+**De:**
 ```tsx
-{/* Barra flutuante de seleção */}
-{!readOnly && selectedIds.size > 0 && (
-  <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4 z-50">
-    <span className="text-sm font-medium">
-      {selectedIds.size} item(ns) selecionado(s)
-    </span>
-    <Button size="sm" onClick={() => setEditEmLoteOpen(true)}>
-      <Edit2 className="h-4 w-4 mr-2" />
-      Editar em Lote
-    </Button>
-    <Button 
-      size="sm" 
-      variant="destructive"
-      onClick={() => setExcluirEmLoteOpen(true)}  // NOVO
-    >
-      <Trash2 className="h-4 w-4 mr-2" />
-      Excluir
-    </Button>
-    <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
-      Cancelar
-    </Button>
-  </div>
+<div className="space-y-3">
+  {data.porCategoria.map((cat) => (
+    <div key={cat.categoria} className="flex items-center justify-between">
+      <span className="text-sm">{cat.label}</span>
+      <Badge variant="outline">{cat.total}</Badge>
+    </div>
+  ))}
+</div>
+```
+
+**Para:**
+```tsx
+{data.porCategoria.length === 0 ? (
+  <p className="text-center text-muted-foreground py-8">Sem dados</p>
+) : (
+  <>
+    <ResponsiveContainer width="100%" height={180}>
+      <PieChart>
+        <Pie
+          data={porCategoriaChart}
+          cx="50%"
+          cy="50%"
+          innerRadius={50}
+          outerRadius={70}
+          paddingAngle={2}
+          dataKey="value"
+        >
+          {porCategoriaChart.map((entry, index) => (
+            <Cell key={`cell-cat-${index}`} fill={CATEGORIA_COLORS[index % CATEGORIA_COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+    <div className="flex flex-wrap justify-center gap-3 mt-2">
+      {porCategoriaChart.map((item, index) => (
+        <div key={index} className="flex items-center gap-2 text-xs">
+          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: CATEGORIA_COLORS[index % CATEGORIA_COLORS.length] }} />
+          <span className="text-muted-foreground">{item.name} ({item.value})</span>
+        </div>
+      ))}
+    </div>
+  </>
 )}
 ```
 
 ---
 
-### 3. Criar Dialog de Confirmação de Exclusão
+## 3. Correção do Forecast - Atendimentos
 
-**Arquivo:** `src/components/planejamento/ExcluirEmLoteDialog.tsx` (novo)
+### Arquivo: `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx`
 
-Modal de confirmação com lista resumida dos itens a serem excluídos:
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Excluir Tarefas                                 ✕  │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ⚠️ Atenção                                         │
-│                                                     │
-│  Você está prestes a excluir 5 tarefa(s).           │
-│  Esta ação não pode ser desfeita.                   │
-│                                                     │
-│  Tarefas selecionadas:                              │
-│  • Aprovar projeto arquitetônico                    │
-│  • Validar memorial descritivo                      │
-│  • Enviar documentação para cartório                │
-│  • ...e mais 2 itens                                │
-│                                                     │
-│                    [Cancelar]  [Confirmar Exclusão] │
-└─────────────────────────────────────────────────────┘
+**Problema atual (linha 169-171):**
+```tsx
+<div className="grid gap-4 lg:grid-cols-2">
+  <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
+</div>
 ```
 
-**Estrutura do componente:**
+O componente `AtendimentosResumo` já retorna um grid com 2 cards. Quando colocado dentro de outro grid de 2 colunas, fica deslocado.
+
+**Solução:** Usar `lg:col-span-2` ou remover o wrapper:
 
 ```tsx
-interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedIds: Set<string>;
-  items: PlanejamentoItemWithRelations[];
-  empreendimentoId: string;
-  onSuccess: () => void;
-}
-
-export function ExcluirEmLoteDialog({ ... }: Props) {
-  const { deleteItemsBulk } = usePlanejamentoItens({ empreendimento_id: empreendimentoId });
-  
-  const selectedItems = items.filter(i => selectedIds.has(i.id));
-  const displayLimit = 5;
-  const remaining = selectedItems.length - displayLimit;
-
-  const handleConfirm = async () => {
-    await deleteItemsBulk.mutateAsync(Array.from(selectedIds));
-    onSuccess();
-    onOpenChange(false);
-  };
-
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      {/* Conteúdo do alert */}
-    </AlertDialog>
-  );
-}
+{/* Atendimentos - ocupa largura total */}
+<AtendimentosResumo empreendimentoIds={empreendimentoIds} />
 ```
+
+Assim o componente interno gerencia seu próprio layout corretamente.
 
 ---
 
-## Arquivos a Criar/Modificar
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/hooks/usePlanejamentoItens.ts` | Adicionar `deleteItemsBulk` mutation |
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Adicionar botão "Excluir" e integrar dialog |
-| `src/components/planejamento/ExcluirEmLoteDialog.tsx` | **Criar** - Dialog de confirmação |
+| `src/pages/portal-incorporador/PortalIncorporadorMarketing.tsx` | Simplificar layout, gráfico de categorias |
+| `src/pages/portal-incorporador/PortalIncorporadorForecast.tsx` | Corrigir wrapper do AtendimentosResumo |
 
 ---
 
-## Fluxo do Usuário
+## Resultado Visual Esperado
 
-1. Usuário seleciona múltiplas tarefas via checkboxes
-2. Barra flutuante aparece com opções "Editar em Lote" e "Excluir"
-3. Ao clicar em "Excluir":
-   - Modal de confirmação abre
-   - Exibe lista resumida dos itens selecionados
-   - Aviso de que a ação não pode ser desfeita
-4. Ao confirmar:
-   - Todas as tarefas são marcadas como `is_active: false` (soft delete)
-   - Toast de sucesso é exibido
-   - Seleção é limpa
-   - Lista é atualizada
+### Marketing (Novo Layout)
+```text
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│ Ativos  │ │Em Prod. │ │Concluíd.│ │Atrasados│  <- 4 KPIs
+│   7     │ │   3     │ │   2     │ │   2     │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘
+
+┌─────────────────┐ ┌─────────────────┐
+│ Por Etapa       │ │ Por Categoria   │  <- 2 Donuts
+│    [DONUT]      │ │    [DONUT]      │
+│ ● Briefing  (2) │ │ ● Design    (3) │
+│ ● Produção  (3) │ │ ● Render    (2) │
+└─────────────────┘ └─────────────────┘
+
+┌─────────────────────────────────────┐
+│ Próximas Entregas (7 dias)      [4] │  <- Lista completa
+│ ─────────────────────────────────── │
+│ MKT-042  Banner promo    Design  2d │
+│ MKT-038  Vídeo inst.     Vídeo   4d │
+└─────────────────────────────────────┘
+```
+
+### Forecast (Atendimentos Corrigidos)
+```text
+┌─────────────────────┐ ┌─────────────────────┐
+│ Novos Atendimentos  │ │ Retornos            │
+│        0            │ │        0            │
+│ ████████████░░ 0%   │ │ ████████████░░ 0%   │
+│ Pend: 0 • Conc: 0   │ │ Pend: 0 • Conc: 0   │
+└─────────────────────┘ └─────────────────────┘
+      (ocupam a largura total corretamente)
+```
 
 ---
 
-## Considerações de Segurança
+## Detalhes Técnicos
 
-- A exclusão é soft delete (mantém dados no banco)
-- Apenas administradores podem ver/usar a funcionalidade (controlado por `readOnly`)
-- RLS no banco já restringe DELETE/UPDATE para admins
-- Confirmação obrigatória antes de executar
+### Cores para Categorias
+```tsx
+const CATEGORIA_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+];
+```
+
+### Preparação de Dados para o Gráfico
+```tsx
+// Converter porCategoria para formato do gráfico
+const porCategoriaChart = data.porCategoria.map(cat => ({
+  name: cat.label,
+  value: cat.total,
+}));
+```
 
