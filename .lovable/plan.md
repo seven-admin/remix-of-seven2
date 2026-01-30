@@ -1,158 +1,172 @@
 
+# Plano: Implementar Funcionalidade de Importação no Módulo de Planejamento
 
-# Plano: Restrições de Permissão, Portal Incorporador e Desativação de Usuários
+## Problema Identificado
 
-## Resumo das Solicitações
-1. **Planejamento somente para Admins**: Apenas super_admin e admin podem criar/editar itens do planejamento
-2. **Portal do Incorporador - Visualização**: Adicionar aba de Planejamento no portal para leitura
-3. **Desativar Usuários**: Forma de "esconder" usuários inativos das listas de seleção, mantendo histórico
+O botão "Importar" na página de Planejamento existe visualmente, mas **não possui nenhuma funcionalidade** - é apenas um `<Button>` sem `onClick` ou diálogo associado. Isso faz com que nada aconteça quando o usuário clica no botão.
 
----
+## Solução
 
-## 1. Restringir Edição do Planejamento para Admins
-
-### Alterações no Componente `PlanejamentoPlanilha.tsx`
-- Usar o hook `usePermissions()` para verificar se o usuário é admin
-- Definir `readOnly` automaticamente quando não for admin/super_admin
-- Ocultar botões de criar, editar, duplicar e excluir para não-admins
-
-### Alterações no Componente `PlanejamentoTimeline.tsx`
-- Adicionar prop `readOnly` similar à planilha
-- Desativar interações de edição quando `readOnly=true`
-
-### Alterações na Página `Planejamento.tsx`
-- Passar `readOnly={!isAdmin()}` para os componentes filhos
-- Ocultar botões de Importar/Exportar para não-admins
-
-### Políticas RLS (Banco de Dados)
-- A política de INSERT/UPDATE/DELETE na tabela `planejamento_itens` já deve restringir apenas para admins
-- Adicionar verificação explícita via RLS:
-  - `INSERT`: apenas `is_admin(auth.uid())`
-  - `UPDATE`: apenas `is_admin(auth.uid())`
-  - `DELETE`: apenas `is_admin(auth.uid())`
+Criar um componente completo de importação de itens de planejamento a partir de arquivos Excel/CSV, seguindo o padrão já existente no sistema (`ImportarUnidadesDialog`).
 
 ---
 
-## 2. Aba de Planejamento no Portal do Incorporador
-
-### Nova Página: `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx`
-- Reutilizar os componentes `PlanejamentoPlanilha` e `PlanejamentoTimeline`
-- Forçar `readOnly={true}` para ambos
-- Adicionar seletor de empreendimento filtrado pelos empreendimentos do incorporador
-- Usar hook `useIncorporadorEmpreendimentos()` para listar apenas os vinculados
-
-### Atualizar Layout: `PortalIncorporadorLayout.tsx`
-- Adicionar novo card de navegação para "Planejamento"
-- Configurar título e subtítulo para a nova rota
-
-### Atualizar Rotas: `src/App.tsx`
-- Adicionar rota `/portal-incorporador/planejamento`
-- Importar o novo componente
-
-### Exportar no Index: `src/pages/portal-incorporador/index.ts`
-- Adicionar export do novo componente
-
----
-
-## 3. Desativação de Usuários nas Listas
-
-### Comportamento Atual
-A tabela `profiles` já possui a coluna `is_active` (boolean).
-
-### Problema Atual
-O hook `useFuncionariosSeven` já filtra por `is_active = true`, então usuários inativos não aparecem nas listas de seleção de responsáveis. Outros hooks de seleção de usuários podem não ter esse filtro.
-
-### Ajustes Necessários
-
-#### Hook `useFuncionariosSeven.ts`
-- Já está correto (filtra `is_active = true`)
-
-#### Verificar outros hooks de seleção de perfis
-- Garantir que todos usem `.eq('is_active', true)`
-
-#### UI de Desativação (já existe em `Usuarios.tsx`)
-- O switch `is_active` já está presente no formulário de edição
-- Quando desativado, o usuário para de aparecer nas listas de seleção
-- Os dados históricos (atividades, planejamento, etc.) permanecem vinculados
-
-#### Considerações sobre Dashboards
-- Os dashboards já fazem joins com a tabela `profiles` e podem mostrar dados de usuários inativos
-- Isso é o comportamento desejado: manter contabilização mesmo após desativação
-
----
-
-## Arquivos a Modificar/Criar
+## Arquivos a Criar/Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/Planejamento.tsx` | Adicionar controle de permissão `readOnly` |
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Já tem `readOnly`, apenas verificar propagação |
-| `src/components/planejamento/PlanejamentoTimeline.tsx` | Adicionar prop `readOnly` |
-| `src/pages/portal-incorporador/PortalIncorporadorPlanejamento.tsx` | **Criar** - Nova página |
-| `src/pages/portal-incorporador/index.ts` | Adicionar export |
-| `src/components/portal-incorporador/PortalIncorporadorLayout.tsx` | Adicionar card de navegação |
-| `src/App.tsx` | Adicionar rota do planejamento no portal |
-| Migração SQL | Adicionar políticas RLS restritivas para INSERT/UPDATE/DELETE |
+| `src/components/planejamento/ImportarPlanejamentoDialog.tsx` | **Criar** - Componente de importação |
+| `src/pages/Planejamento.tsx` | Modificar - Conectar botão ao diálogo |
+| `src/hooks/usePlanejamentoItens.ts` | Adicionar mutation para criação em lote |
 
 ---
 
-## Detalhes Técnicos
+## Detalhes de Implementação
 
-### Política RLS para Planejamento (SQL)
-```sql
--- Apenas admins podem inserir
-CREATE POLICY "Admins can insert planejamento_itens"
-ON public.planejamento_itens FOR INSERT
-TO authenticated
-WITH CHECK (public.is_admin(auth.uid()));
+### 1. Novo Componente: `ImportarPlanejamentoDialog.tsx`
 
--- Apenas admins podem atualizar
-CREATE POLICY "Admins can update planejamento_itens"
-ON public.planejamento_itens FOR UPDATE
-TO authenticated
-USING (public.is_admin(auth.uid()))
-WITH CHECK (public.is_admin(auth.uid()));
+**Fluxo em 5 etapas:**
 
--- Apenas admins podem deletar
-CREATE POLICY "Admins can delete planejamento_itens"
-ON public.planejamento_itens FOR DELETE
-TO authenticated
-USING (public.is_admin(auth.uid()));
+1. **Upload** - Arrastar/selecionar arquivo Excel ou CSV
+2. **Mapear Colunas** - Associar colunas do Excel aos campos do sistema:
+   - `item` (obrigatório) - Nome da tarefa
+   - `fase` (obrigatório) - Fase do planejamento
+   - `status` (obrigatório) - Status inicial
+   - `responsavel` (opcional) - Responsável técnico
+   - `data_inicio` (opcional) - Data de início
+   - `data_fim` (opcional) - Data de fim
+   - `obs` (opcional) - Observações
+3. **Mapear Valores** - Associar valores do Excel com entidades existentes:
+   - Fases: Match por nome ou criar nova
+   - Status: Match por nome
+   - Responsáveis: Match por nome
+4. **Preview** - Visualizar dados processados com indicadores de erros/avisos
+5. **Resultado** - Resumo da importação (sucesso, erros, criados)
 
--- Políticas similares para planejamento_fases e planejamento_status
-```
+**Recursos:**
+- Detecção automática de colunas por nome (ex: "tarefa" → `item`, "fase" → `fase_id`)
+- Sugestões de mapeamento por similaridade
+- Validação de campos obrigatórios
+- Tratamento de duplicatas (opção ignorar/atualizar)
+- Criação automática de fases/status não existentes (com confirmação)
+- Parser robusto para CSV com delimitadores `;` ou `,`
+- Formatação de datas (dd/mm/yyyy, yyyy-mm-dd, etc.)
 
-### Lógica de Permissão no Frontend
+**UI Components usados:**
+- `Dialog`, `ScrollArea`, `Table`, `Select`, `Checkbox`
+- `Badge` para indicar erros/avisos
+- `Progress` para etapas
+- `Alert` para mensagens de validação
+
+### 2. Modificação: `Planejamento.tsx`
+
+Conectar o botão existente ao novo diálogo:
+
 ```tsx
-// Em Planejamento.tsx
-const { isAdmin } = usePermissions();
-const canEdit = isAdmin();
+const [importDialogOpen, setImportDialogOpen] = useState(false);
 
-// Passar para componentes
-<PlanejamentoPlanilha 
-  empreendimentoId={empreendimentoId} 
-  readOnly={!canEdit} 
+// No botão existente
+<Button 
+  variant="outline" 
+  size="sm" 
+  disabled={!empreendimentoId}
+  onClick={() => setImportDialogOpen(true)}
+>
+  <Upload className="h-4 w-4 mr-2" />
+  Importar
+</Button>
+
+// Adicionar o diálogo
+<ImportarPlanejamentoDialog
+  open={importDialogOpen}
+  onOpenChange={setImportDialogOpen}
+  empreendimentoId={empreendimentoId}
 />
 ```
 
-### Filtro de Empreendimentos para Incorporador
-```tsx
-// Em PortalIncorporadorPlanejamento.tsx
-const { empreendimentoIds, empreendimentos } = useIncorporadorEmpreendimentos();
+### 3. Hook: Adicionar Criação em Lote
 
-// Seletor mostra apenas empreendimentos vinculados
-<Select value={selectedEmp} onValueChange={setSelectedEmp}>
-  {empreendimentos.map(emp => (
-    <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
-  ))}
-</Select>
+Adicionar ao `usePlanejamentoItens.ts`:
+
+```tsx
+const createItemsBulk = useMutation({
+  mutationFn: async (items: PlanejamentoItemCreate[]) => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    const itemsWithUser = items.map((item, index) => ({
+      ...item,
+      created_by: userData.user?.id,
+      ordem: item.ordem ?? index + 1
+    }));
+    
+    const { data, error } = await supabase
+      .from('planejamento_itens')
+      .insert(itemsWithUser)
+      .select();
+
+    if (error) throw error;
+    return data;
+  },
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
+    toast.success(`${data.length} itens importados com sucesso`);
+  },
+  onError: (error) => {
+    toast.error('Erro ao importar itens: ' + error.message);
+  }
+});
 ```
 
 ---
 
-## Resultado Esperado
+## Campos do Sistema para Mapeamento
 
-1. **Usuários não-admin** verão o Planejamento em modo somente leitura (sem botões de ação)
-2. **Incorporadores** terão acesso ao Planejamento pelo portal com visualização dos seus empreendimentos
-3. **Usuários desativados** deixam de aparecer em seletores de responsáveis mas mantêm seus registros históricos nos dashboards
+| Campo | Obrigatório | Tipo | Aliases para Detecção |
+|-------|-------------|------|----------------------|
+| item | Sim | Texto | tarefa, task, item, nome, descricao, atividade |
+| fase | Sim | Lookup | fase, etapa, phase, categoria |
+| status | Sim | Lookup | status, situacao, estado, state |
+| responsavel | Não | Lookup | responsavel, responsável, owner, assignee |
+| data_inicio | Não | Data | inicio, início, data_inicio, start |
+| data_fim | Não | Data | fim, término, data_fim, end, prazo |
+| obs | Não | Texto | obs, observacao, observações, notes, comentario |
+
+---
+
+## Tratamento de Dados
+
+### Parsing de Datas
+Suportar múltiplos formatos:
+- `dd/mm/yyyy` (BR)
+- `yyyy-mm-dd` (ISO)
+- `mm/dd/yyyy` (US)
+
+### Parsing de Valores
+- Normalizar strings (trim, uppercase para comparação)
+- Remover acentos para matching
+
+### Mapeamento de Entidades
+1. Match exato por nome
+2. Match por similaridade (> 70%)
+3. Sugerir criação de nova entidade
+
+---
+
+## Comportamento Esperado
+
+1. Admin clica em "Importar"
+2. Arrasta arquivo Excel para o diálogo
+3. Sistema detecta colunas automaticamente
+4. Usuário ajusta mapeamentos se necessário
+5. Sistema mostra preview com validação
+6. Usuário confirma importação
+7. Itens são criados no banco de dados
+8. Planilha é atualizada automaticamente
+
+---
+
+## Dependências
+
+- `xlsx` (já instalado) - Parsing de Excel
+- Hooks existentes: `usePlanejamentoFases`, `usePlanejamentoStatus`, `useFuncionariosSeven`
 
