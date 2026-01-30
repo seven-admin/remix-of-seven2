@@ -165,10 +165,8 @@ export default function PortalIncorporadorForecast() {
             <ProximasAtividades empreendimentoIds={empreendimentoIds} />
           </div>
 
-          {/* Atendimentos */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
-          </div>
+          {/* Atendimentos - ocupa largura total */}
+          <AtendimentosResumo empreendimentoIds={empreendimentoIds} />
         </TabsContent>
 
         {/* Atividades Tab */}

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CORES_ARRAY, TOOLTIP_STYLE } from '@/lib/chartColors';
 
 const CATEGORIA_LABELS: Record<string, string> = {
   'render_3d': 'Render 3D',
@@ -28,16 +29,6 @@ const CATEGORIA_LABELS: Record<string, string> = {
   'video_animacao': 'Vídeo/Animação',
   'evento': 'Evento',
   'pedido_orcamento': 'Orçamento',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  'briefing': 'Aguardando Análise',
-  'triagem': 'Triagem',
-  'em_producao': 'Em Produção',
-  'revisao': 'Revisão',
-  'aprovacao_cliente': 'Aprovação Cliente',
-  'ajuste': 'Ajuste',
-  'concluido': 'Concluído',
 };
 
 const ETAPA_COLORS = [
@@ -103,7 +94,6 @@ export default function PortalIncorporadorMarketing() {
       }).length;
       
       const emProducao = allTickets.filter(t => t.status === 'em_producao').length;
-      const aguardandoAprovacao = allTickets.filter(t => t.status === 'aprovacao_cliente').length;
       const concluidosPeriodo = allTickets.filter(t => t.status === 'concluido').length;
       
       // Tickets atrasados - exclui etapas finais
@@ -162,32 +152,25 @@ export default function PortalIncorporadorMarketing() {
       })).filter(e => e.value > 0);
       
       // Por categoria
-      const categoriaCounts: Record<string, { total: number; interno: number; externo: number }> = {};
+      const categoriaCounts: Record<string, number> = {};
       allTickets.forEach(t => {
         if (!categoriaCounts[t.categoria]) {
-          categoriaCounts[t.categoria] = { total: 0, interno: 0, externo: 0 };
+          categoriaCounts[t.categoria] = 0;
         }
-        categoriaCounts[t.categoria].total++;
-        if (t.is_interno) {
-          categoriaCounts[t.categoria].interno++;
-        } else {
-          categoriaCounts[t.categoria].externo++;
-        }
+        categoriaCounts[t.categoria]++;
       });
       
-      const porCategoria = Object.entries(categoriaCounts).map(([cat, counts]) => ({
-        categoria: cat,
-        label: CATEGORIA_LABELS[cat] || cat,
-        ...counts,
-      }));
+      const porCategoria = Object.entries(categoriaCounts).map(([cat, total], idx) => ({
+        name: CATEGORIA_LABELS[cat] || cat,
+        value: total,
+        color: CORES_ARRAY[idx % CORES_ARRAY.length],
+      })).filter(e => e.value > 0);
       
       return {
         ticketsAtivos,
         emProducao,
-        aguardandoAprovacao,
         concluidosPeriodo,
         atrasados: ticketsAtrasados.length,
-        ticketsAtrasados,
         proximasEntregas,
         porEtapa,
         porCategoria,
@@ -229,6 +212,18 @@ export default function PortalIncorporadorMarketing() {
       </div>
     );
   }
+
+  // Tooltip customizado para os gráficos
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) => {
+    if (!active || !payload?.[0]) return null;
+    const item = payload[0];
+    return (
+      <div style={TOOLTIP_STYLE} className="p-3">
+        <p className="font-medium text-sm">{item.name}</p>
+        <p className="text-sm text-muted-foreground">{item.value} ticket(s)</p>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -294,7 +289,7 @@ export default function PortalIncorporadorMarketing() {
       {/* Gráficos */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Tickets por Etapa</CardTitle>
           </CardHeader>
           <CardContent>
@@ -317,13 +312,13 @@ export default function PortalIncorporadorMarketing() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-2">
                   {data.porEtapa.map((item, index) => (
                     <div key={index} className="flex items-center gap-2 text-xs">
-                      <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                      <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
                       <span className="text-muted-foreground">{item.name} ({item.value})</span>
                     </div>
                   ))}
@@ -334,120 +329,90 @@ export default function PortalIncorporadorMarketing() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Por Categoria</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {data.porCategoria.map((cat) => (
-                <div key={cat.categoria} className="flex items-center justify-between">
-                  <span className="text-sm">{cat.label}</span>
-                  <div className="flex gap-2 items-center">
-                    <Badge variant="outline">{cat.total}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      ({cat.interno} int / {cat.externo} ext)
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Listas */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Tickets Atrasados */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Tickets Atrasados</CardTitle>
-            <Badge variant="destructive">{data.ticketsAtrasados.length}</Badge>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              {data.ticketsAtrasados.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhum ticket atrasado 🎉
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {data.ticketsAtrasados.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="p-3 border rounded-lg bg-destructive/5 border-destructive/20"
+            {data.porCategoria.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Sem dados</p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={data.porCategoria}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={2}
+                      dataKey="value"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{ticket.titulo}</p>
-                          <p className="text-xs text-muted-foreground">{ticket.codigo}</p>
-                        </div>
-                        <Badge variant="destructive" className="text-xs">
-                          {ticket.dias_atraso}d atraso
-                        </Badge>
-                      </div>
-                      <div className="mt-2 flex gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">
-                          {CATEGORIA_LABELS[ticket.categoria] || ticket.categoria}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {STATUS_LABELS[ticket.status] || ticket.status}
-                        </Badge>
-                      </div>
+                      {data.porCategoria.map((entry, index) => (
+                        <Cell key={`cell-cat-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-2">
+                  {data.porCategoria.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs">
+                      <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground">{item.name} ({item.value})</span>
                     </div>
                   ))}
                 </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Próximas Entregas */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Próximas Entregas (7 dias)</CardTitle>
-            <Badge>{data.proximasEntregas.length}</Badge>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              {data.proximasEntregas.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhuma entrega prevista
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {data.proximasEntregas.map((ticket) => (
-                    <div key={ticket.id} className="p-3 border rounded-lg">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{ticket.titulo}</p>
-                          <p className="text-xs text-muted-foreground">{ticket.codigo}</p>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {ticket.data_previsao && format(parseISO(ticket.data_previsao), 'dd/MM', { locale: ptBR })}
-                        </div>
-                      </div>
-                      <div className="mt-2 flex gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">
-                          {CATEGORIA_LABELS[ticket.categoria] || ticket.categoria}
-                        </Badge>
-                        {ticket.dias_restantes !== undefined && (
-                          <Badge 
-                            variant={ticket.dias_restantes <= 1 ? 'destructive' : 'secondary'} 
-                            className="text-xs"
-                          >
-                            {ticket.dias_restantes === 0 ? 'Hoje' : `${ticket.dias_restantes}d`}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Próximas Entregas - Largura total */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">Próximas Entregas (7 dias)</CardTitle>
+          <Badge variant="secondary">{data.proximasEntregas.length}</Badge>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[280px]">
+            {data.proximasEntregas.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma entrega prevista
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {data.proximasEntregas.map((ticket) => (
+                  <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">{ticket.codigo}</span>
+                      <span className="text-sm truncate">{ticket.titulo}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Badge variant="outline" className="text-xs">
+                        {CATEGORIA_LABELS[ticket.categoria] || ticket.categoria}
+                      </Badge>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground w-16 justify-end">
+                        <Calendar className="h-3 w-3" />
+                        {ticket.data_previsao && format(parseISO(ticket.data_previsao), 'dd/MM', { locale: ptBR })}
+                      </div>
+                      {ticket.dias_restantes !== undefined && (
+                        <Badge 
+                          variant={ticket.dias_restantes <= 1 ? 'destructive' : 'secondary'} 
+                          className="text-xs w-12 justify-center"
+                        >
+                          {ticket.dias_restantes === 0 ? 'Hoje' : `${ticket.dias_restantes}d`}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   );
 }
