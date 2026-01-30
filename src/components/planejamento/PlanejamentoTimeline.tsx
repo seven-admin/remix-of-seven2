@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +10,9 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { usePlanejamentoItens } from '@/hooks/usePlanejamentoItens';
 import { usePlanejamentoFases } from '@/hooks/usePlanejamentoFases';
-import type { PlanejamentoItemWithRelations, PlanejamentoFase } from '@/types/planejamento.types';
+import type { PlanejamentoItemWithRelations } from '@/types/planejamento.types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TarefaDetalheDialog } from './TarefaDetalheDialog';
 
 interface Props {
   empreendimentoId: string;
@@ -37,6 +38,13 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
   const [currentDate, setCurrentDate] = useState(new Date());
   const [zoom, setZoom] = useState<ZoomLevel>('week');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedItem, setSelectedItem] = useState<PlanejamentoItemWithRelations | null>(null);
+  const [detalheOpen, setDetalheOpen] = useState(false);
+
+  const handleItemClick = (item: PlanejamentoItemWithRelations) => {
+    setSelectedItem(item);
+    setDetalheOpen(true);
+  };
 
   // Calcular range de datas baseado nos itens
   const dateRange = useMemo(() => {
@@ -294,7 +302,7 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
       <Card className="overflow-hidden">
         <div className="relative flex">
           {/* Coluna fixa de fases/itens */}
-          <div className="w-[200px] flex-shrink-0 border-r bg-card z-10">
+          <div className="min-w-[200px] w-fit max-w-[350px] flex-shrink-0 border-r bg-card z-10">
             {/* Header */}
             <div 
               className="border-b bg-muted/50 flex items-center px-3 font-medium text-sm"
@@ -315,7 +323,7 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
                     className="border-b bg-muted/30 flex items-center gap-2 px-3 font-medium text-sm"
                     style={{ height: FASE_ROW_HEIGHT }}
                   >
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: fase.cor }} />
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: fase.cor }} />
                     <span className="truncate">{fase.nome}</span>
                   </div>
 
@@ -323,11 +331,12 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
                   {faseItens.map(item => (
                     <div 
                       key={item.id}
-                      className="border-b flex items-center px-3 text-sm truncate hover:bg-muted/20"
+                      className="border-b flex items-center px-3 text-sm hover:bg-muted/20 cursor-pointer"
                       style={{ height: ROW_HEIGHT }}
                       title={item.item}
+                      onClick={() => handleItemClick(item)}
                     >
-                      {item.item}
+                      <span className="truncate">{item.item}</span>
                     </div>
                   ))}
                 </div>
@@ -422,6 +431,7 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
                                       width: pos.width,
                                       backgroundColor: pos.isOverdue ? undefined : (item.status?.cor || fase.cor),
                                     }}
+                                    onClick={() => handleItemClick(item)}
                                   >
                                     <div className="flex items-center gap-1 px-2 h-full text-xs text-white font-medium truncate">
                                       {pos.isOverdue && <AlertTriangle className="h-3 w-3 flex-shrink-0" />}
@@ -444,6 +454,7 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
                                     {pos.isOverdue && (
                                       <p className="text-destructive font-medium">⚠ Atrasado</p>
                                     )}
+                                    <p className="text-xs text-primary mt-1">Clique para detalhes</p>
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
@@ -490,6 +501,13 @@ export function PlanejamentoTimeline({ empreendimentoId, readOnly = false }: Pro
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de detalhes */}
+      <TarefaDetalheDialog
+        open={detalheOpen}
+        onOpenChange={setDetalheOpen}
+        item={selectedItem}
+      />
     </div>
   );
 }
