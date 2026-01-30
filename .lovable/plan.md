@@ -1,172 +1,134 @@
 
-# Plano: Implementar Funcionalidade de Importação no Módulo de Planejamento
 
-## Problema Identificado
+# Plano: Corrigir Erro de SelectItem e Remover Botão Config Redundante
 
-O botão "Importar" na página de Planejamento existe visualmente, mas **não possui nenhuma funcionalidade** - é apenas um `<Button>` sem `onClick` ou diálogo associado. Isso faz com que nada aconteça quando o usuário clica no botão.
+## Problema 1: Erro do Select.Item
 
-## Solução
+O erro ocorre porque componentes `SelectItem` do Radix UI **não permitem valor vazio** (`value=""`). Existem duas ocorrências no arquivo `ImportarPlanejamentoDialog.tsx`:
 
-Criar um componente completo de importação de itens de planejamento a partir de arquivos Excel/CSV, seguindo o padrão já existente no sistema (`ImportarUnidadesDialog`).
+- **Linha 507**: `<SelectItem value="">Não mapear</SelectItem>` (mapeamento de colunas)
+- **Linha 627**: `<SelectItem value="">Não atribuir</SelectItem>` (mapeamento de responsáveis)
+
+### Solução
+
+Substituir `value=""` por um valor especial como `value="__none__"` e tratar esse valor especialmente na lógica de onChange.
+
+**Alterações em `src/components/planejamento/ImportarPlanejamentoDialog.tsx`:**
+
+1. Mudar `<SelectItem value="">Não mapear</SelectItem>` para `<SelectItem value="__none__">Não mapear</SelectItem>`
+2. Mudar `<SelectItem value="">Não atribuir</SelectItem>` para `<SelectItem value="__none__">Não atribuir</SelectItem>`
+3. Ajustar os handlers de `onValueChange` para converter `"__none__"` para `""`
 
 ---
 
-## Arquivos a Criar/Modificar
+## Problema 2: Botão Config Redundante
+
+O botão "Config" na página `/planejamento` é redundante porque já existe um item no sidebar:
+
+**Sidebar.tsx (linhas 79-82):**
+```tsx
+{
+  label: 'Planejamento',
+  items: [
+    { icon: ClipboardList, label: 'Cronograma', path: '/planejamento', ... },
+    { icon: Settings, label: 'Configurações', path: '/planejamento/configuracoes', ... }, // JÁ EXISTE!
+  ],
+}
+```
+
+### Solução
+
+Remover o botão "Config" do arquivo `src/pages/Planejamento.tsx`.
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/planejamento/ImportarPlanejamentoDialog.tsx` | **Criar** - Componente de importação |
-| `src/pages/Planejamento.tsx` | Modificar - Conectar botão ao diálogo |
-| `src/hooks/usePlanejamentoItens.ts` | Adicionar mutation para criação em lote |
+| `src/components/planejamento/ImportarPlanejamentoDialog.tsx` | Corrigir SelectItem com value vazio |
+| `src/pages/Planejamento.tsx` | Remover botão Config redundante |
 
 ---
 
-## Detalhes de Implementação
+## Alterações Detalhadas
 
-### 1. Novo Componente: `ImportarPlanejamentoDialog.tsx`
+### 1. ImportarPlanejamentoDialog.tsx
 
-**Fluxo em 5 etapas:**
-
-1. **Upload** - Arrastar/selecionar arquivo Excel ou CSV
-2. **Mapear Colunas** - Associar colunas do Excel aos campos do sistema:
-   - `item` (obrigatório) - Nome da tarefa
-   - `fase` (obrigatório) - Fase do planejamento
-   - `status` (obrigatório) - Status inicial
-   - `responsavel` (opcional) - Responsável técnico
-   - `data_inicio` (opcional) - Data de início
-   - `data_fim` (opcional) - Data de fim
-   - `obs` (opcional) - Observações
-3. **Mapear Valores** - Associar valores do Excel com entidades existentes:
-   - Fases: Match por nome ou criar nova
-   - Status: Match por nome
-   - Responsáveis: Match por nome
-4. **Preview** - Visualizar dados processados com indicadores de erros/avisos
-5. **Resultado** - Resumo da importação (sucesso, erros, criados)
-
-**Recursos:**
-- Detecção automática de colunas por nome (ex: "tarefa" → `item`, "fase" → `fase_id`)
-- Sugestões de mapeamento por similaridade
-- Validação de campos obrigatórios
-- Tratamento de duplicatas (opção ignorar/atualizar)
-- Criação automática de fases/status não existentes (com confirmação)
-- Parser robusto para CSV com delimitadores `;` ou `,`
-- Formatação de datas (dd/mm/yyyy, yyyy-mm-dd, etc.)
-
-**UI Components usados:**
-- `Dialog`, `ScrollArea`, `Table`, `Select`, `Checkbox`
-- `Badge` para indicar erros/avisos
-- `Progress` para etapas
-- `Alert` para mensagens de validação
-
-### 2. Modificação: `Planejamento.tsx`
-
-Conectar o botão existente ao novo diálogo:
-
+**Linha 507 - Mapeamento de Colunas:**
 ```tsx
-const [importDialogOpen, setImportDialogOpen] = useState(false);
+// De:
+<SelectItem value="">Não mapear</SelectItem>
 
-// No botão existente
-<Button 
-  variant="outline" 
-  size="sm" 
-  disabled={!empreendimentoId}
-  onClick={() => setImportDialogOpen(true)}
->
-  <Upload className="h-4 w-4 mr-2" />
-  Importar
+// Para:
+<SelectItem value="__none__">Não mapear</SelectItem>
+```
+
+**Handler correspondente (linha 499-501):**
+```tsx
+// De:
+onValueChange={(value) =>
+  setColumnMapping((prev) => ({ ...prev, [key]: value }))
+}
+
+// Para:
+onValueChange={(value) =>
+  setColumnMapping((prev) => ({ ...prev, [key]: value === '__none__' ? '' : value }))
+}
+```
+
+**Linha 627 - Mapeamento de Responsáveis:**
+```tsx
+// De:
+<SelectItem value="">Não atribuir</SelectItem>
+
+// Para:
+<SelectItem value="__none__">Não atribuir</SelectItem>
+```
+
+**Handler correspondente (linha 616-620):**
+```tsx
+// De:
+onValueChange={(id) =>
+  setValueMapping((prev) => ({
+    ...prev,
+    responsaveis: { ...prev.responsaveis, [value]: id },
+  }))
+}
+
+// Para:
+onValueChange={(id) =>
+  setValueMapping((prev) => ({
+    ...prev,
+    responsaveis: { ...prev.responsaveis, [value]: id === '__none__' ? '' : id },
+  }))
+}
+```
+
+### 2. Planejamento.tsx
+
+**Remover o botão Config (linhas 51-55):**
+```tsx
+// Remover este bloco:
+<Button variant="outline" size="sm" asChild>
+  <a href="/planejamento/configuracoes">
+    <Settings className="h-4 w-4 mr-2" />
+    Config
+  </a>
 </Button>
-
-// Adicionar o diálogo
-<ImportarPlanejamentoDialog
-  open={importDialogOpen}
-  onOpenChange={setImportDialogOpen}
-  empreendimentoId={empreendimentoId}
-/>
 ```
 
-### 3. Hook: Adicionar Criação em Lote
-
-Adicionar ao `usePlanejamentoItens.ts`:
-
+**Remover import não utilizado:**
 ```tsx
-const createItemsBulk = useMutation({
-  mutationFn: async (items: PlanejamentoItemCreate[]) => {
-    const { data: userData } = await supabase.auth.getUser();
-    
-    const itemsWithUser = items.map((item, index) => ({
-      ...item,
-      created_by: userData.user?.id,
-      ordem: item.ordem ?? index + 1
-    }));
-    
-    const { data, error } = await supabase
-      .from('planejamento_itens')
-      .insert(itemsWithUser)
-      .select();
-
-    if (error) throw error;
-    return data;
-  },
-  onSuccess: (data) => {
-    queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
-    toast.success(`${data.length} itens importados com sucesso`);
-  },
-  onError: (error) => {
-    toast.error('Erro ao importar itens: ' + error.message);
-  }
-});
+// Remover 'Settings' do import de lucide-react se não for mais usado
 ```
 
 ---
 
-## Campos do Sistema para Mapeamento
+## Resultado Esperado
 
-| Campo | Obrigatório | Tipo | Aliases para Detecção |
-|-------|-------------|------|----------------------|
-| item | Sim | Texto | tarefa, task, item, nome, descricao, atividade |
-| fase | Sim | Lookup | fase, etapa, phase, categoria |
-| status | Sim | Lookup | status, situacao, estado, state |
-| responsavel | Não | Lookup | responsavel, responsável, owner, assignee |
-| data_inicio | Não | Data | inicio, início, data_inicio, start |
-| data_fim | Não | Data | fim, término, data_fim, end, prazo |
-| obs | Não | Texto | obs, observacao, observações, notes, comentario |
-
----
-
-## Tratamento de Dados
-
-### Parsing de Datas
-Suportar múltiplos formatos:
-- `dd/mm/yyyy` (BR)
-- `yyyy-mm-dd` (ISO)
-- `mm/dd/yyyy` (US)
-
-### Parsing de Valores
-- Normalizar strings (trim, uppercase para comparação)
-- Remover acentos para matching
-
-### Mapeamento de Entidades
-1. Match exato por nome
-2. Match por similaridade (> 70%)
-3. Sugerir criação de nova entidade
-
----
-
-## Comportamento Esperado
-
-1. Admin clica em "Importar"
-2. Arrasta arquivo Excel para o diálogo
-3. Sistema detecta colunas automaticamente
-4. Usuário ajusta mapeamentos se necessário
-5. Sistema mostra preview com validação
-6. Usuário confirma importação
-7. Itens são criados no banco de dados
-8. Planilha é atualizada automaticamente
-
----
-
-## Dependências
-
-- `xlsx` (já instalado) - Parsing de Excel
-- Hooks existentes: `usePlanejamentoFases`, `usePlanejamentoStatus`, `useFuncionariosSeven`
+1. O erro de `Select.Item` não ocorrerá mais ao anexar arquivos
+2. O fluxo de importação funcionará corretamente com opções "Não mapear" e "Não atribuir"
+3. A interface ficará mais limpa sem o botão Config redundante
+4. Usuários continuam tendo acesso às configurações via sidebar
 
