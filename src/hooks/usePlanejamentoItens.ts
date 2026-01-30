@@ -215,6 +215,25 @@ export function usePlanejamentoItens(filters?: PlanejamentoFilters) {
     }
   });
 
+  const deleteItemsBulk = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('planejamento_itens')
+        .update({ is_active: false })
+        .in('id', ids);
+
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['planejamento-itens'] });
+      toast.success(`${count} item(ns) removido(s) com sucesso`);
+    },
+    onError: (error) => {
+      toast.error('Erro ao remover itens: ' + error.message);
+    }
+  });
+
   return {
     itens,
     isLoading,
@@ -224,6 +243,7 @@ export function usePlanejamentoItens(filters?: PlanejamentoFilters) {
     deleteItem,
     duplicateItem,
     reorderItems,
-    createItemsBulk
+    createItemsBulk,
+    deleteItemsBulk
   };
 }
