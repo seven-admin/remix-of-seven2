@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,19 +8,18 @@ import { ClipboardList, CalendarDays, BarChart3, Settings, Download, Upload } fr
 import { useEmpreendimentosSelect } from '@/hooks/useEmpreendimentosSelect';
 import { PlanejamentoPlanilha } from '@/components/planejamento/PlanejamentoPlanilha';
 import { PlanejamentoDashboard } from '@/components/planejamento/PlanejamentoDashboard';
+import { PlanejamentoTimeline } from '@/components/planejamento/PlanejamentoTimeline';
 
 export default function Planejamento() {
   const [empreendimentoId, setEmpreendimentoId] = useState<string>('');
   const [activeTab, setActiveTab] = useState('planilha');
-  const { data: empreendimentos, isLoading: loadingEmpreendimentos } = useEmpreendimentosSelect();
+  const { data: empreendimentos } = useEmpreendimentosSelect();
 
   return (
-    <MainLayout>
-      <PageHeader 
-        title="Planejamento" 
-        subtitle="Gerencie o cronograma de tarefas por empreendimento"
-      />
-
+    <MainLayout
+      title="Planejamento"
+      subtitle="Gerencie o cronograma de tarefas por empreendimento"
+    >
       <div className="space-y-4">
         {/* Seletor de Empreendimento */}
         <Card>
@@ -85,12 +83,7 @@ export default function Planejamento() {
             </TabsContent>
 
             <TabsContent value="timeline" className="mt-4">
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  <CalendarDays className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Timeline/Gantt será implementado em breve</p>
-                </CardContent>
-              </Card>
+              <PlanejamentoTimeline empreendimentoId={empreendimentoId} />
             </TabsContent>
 
             <TabsContent value="dashboard" className="mt-4">
