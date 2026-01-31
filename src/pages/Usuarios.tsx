@@ -379,15 +379,26 @@ export default function Usuarios() {
   };
 
   // Ativar usuário individual
-  const handleActivateUser = async (userId: string) => {
-    await activateCorretor.mutateAsync(userId);
+  const handleActivateUser = async (user: UserWithRole) => {
+    await activateCorretor.mutateAsync({
+      userId: user.id,
+      email: user.email,
+      nome: user.full_name
+    });
     fetchUsers();
   };
 
   // Ativar em lote
   const handleBulkActivate = async () => {
     if (selectedUsers.size === 0) return;
-    await bulkActivate.mutateAsync(Array.from(selectedUsers));
+    const usersToActivate = users
+      .filter(u => selectedUsers.has(u.id))
+      .map(u => ({
+        userId: u.id,
+        email: u.email,
+        nome: u.full_name
+      }));
+    await bulkActivate.mutateAsync(usersToActivate);
     setSelectedUsers(new Set());
     fetchUsers();
   };
@@ -719,14 +730,14 @@ export default function Usuarios() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleActivateUser(user.id)}
+                                  onClick={() => handleActivateUser(user)}
                                   disabled={activateCorretor.isPending}
                                   title="Ativar usuário"
                                 >
                                   {activateCorretor.isPending ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
-                                    <UserCheck className="h-4 w-4 text-green-600" />
+                                    <UserCheck className="h-4 w-4 text-success" />
                                   )}
                                 </Button>
                               )}
