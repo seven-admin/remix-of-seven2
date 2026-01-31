@@ -132,14 +132,16 @@ export function useDeleteMidia() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, empreendimentoId, url }: { id: string; empreendimentoId: string; url: string }) => {
-      // Extract file path from URL
-      const urlParts = url.split('/empreendimentos-midias/');
-      if (urlParts.length > 1) {
-        const filePath = urlParts[1];
-        await supabase.storage
-          .from('empreendimentos-midias')
-          .remove([filePath]);
+    mutationFn: async ({ id, empreendimentoId, url, tipo }: { id: string; empreendimentoId: string; url: string; tipo?: string }) => {
+      // Links não têm arquivo no storage
+      if (tipo !== 'link') {
+        const urlParts = url.split('/empreendimentos-midias/');
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          await supabase.storage
+            .from('empreendimentos-midias')
+            .remove([filePath]);
+        }
       }
 
       // Delete record
@@ -159,6 +161,41 @@ export function useDeleteMidia() {
     onError: (error) => {
       console.error('Erro ao remover mídia:', error);
       toast.error('Erro ao remover mídia');
+    },
+  });
+}
+
+export function useAddMidiaLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ empreendimentoId, nome, url }: { 
+      empreendimentoId: string; 
+      nome: string; 
+      url: string 
+    }) => {
+      const { data, error } = await supabase
+        .from('empreendimento_midias')
+        .insert({
+          empreendimento_id: empreendimentoId,
+          tipo: 'link',
+          nome,
+          url,
+          is_capa: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, { empreendimentoId }) => {
+      queryClient.invalidateQueries({ queryKey: ['empreendimento-midias', empreendimentoId] });
+      toast.success('Link adicionado com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Erro ao adicionar link:', error);
+      toast.error('Erro ao adicionar link');
     },
   });
 }

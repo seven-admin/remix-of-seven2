@@ -5,7 +5,7 @@ export type EmpreendimentoTipo = 'loteamento' | 'condominio' | 'predio' | 'comer
 export type EmpreendimentoStatus = 'lancamento' | 'obra' | 'entregue';
 export type UnidadeStatus = 'disponivel' | 'reservada' | 'negociacao' | 'contrato' | 'vendida' | 'bloqueada';
 export type DocumentoTipo = 'registro_incorporacao' | 'matricula' | 'projeto' | 'licenca' | 'contrato' | 'memorial' | 'outro';
-export type MidiaTipo = 'imagem' | 'video' | 'tour_virtual' | 'pdf';
+export type MidiaTipo = 'imagem' | 'video' | 'tour_virtual' | 'pdf' | 'link';
 
 // Labels e cores
 export const EMPREENDIMENTO_TIPO_LABELS: Record<EmpreendimentoTipo, string> = {

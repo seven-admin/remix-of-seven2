@@ -5,11 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Building2, MapPin, Loader2, Eye, X, Send } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Building2, MapPin, Loader2, Eye, X, Send, TableIcon, Image } from 'lucide-react';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useUnidades } from '@/hooks/useUnidades';
 import { EMPREENDIMENTO_STATUS_LABELS, EMPREENDIMENTO_TIPO_LABELS } from '@/types/empreendimentos.types';
 import { SolicitarReservaDialog } from '@/components/portal/SolicitarReservaDialog';
+import { ValoresReadOnlyTable } from '@/components/portal/ValoresReadOnlyTable';
+import { MidiasReadOnlyList } from '@/components/portal/MidiasReadOnlyList';
 import { formatarMoeda } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { ordenarUnidadesPorBlocoENumero } from '@/lib/unidadeUtils';
@@ -26,6 +29,7 @@ export default function PortalEmpreendimentos() {
   const [unidadesSelecionadas, setUnidadesSelecionadas] = useState<UnidadeSimples[]>([]);
   const [dialogEnviarOpen, setDialogEnviarOpen] = useState(false);
   const [filtroBloco, setFiltroBloco] = useState<string>('todos');
+  const [activeTab, setActiveTab] = useState<string>('unidades');
 
   // Exibir empreendimentos em lançamento ou em obra (status relevantes para corretores)
   const { data: empreendimentos, isLoading: loadingEmps } = useEmpreendimentos();
@@ -87,6 +91,7 @@ export default function PortalEmpreendimentos() {
     setSelectedEmpId(null);
     setUnidadesSelecionadas([]);
     setFiltroBloco('todos');
+    setActiveTab('unidades');
   };
 
   const handleToggleUnidade = (unidade: UnidadeSimples) => {
@@ -158,7 +163,7 @@ export default function PortalEmpreendimentos() {
                   onClick={() => setSelectedEmpId(emp.id)}
                 >
                   <Eye className="h-4 w-4 mr-2" />
-                  Ver Unidades
+                  Ver Detalhes
                 </Button>
               </CardContent>
             </Card>
@@ -174,143 +179,172 @@ export default function PortalEmpreendimentos() {
         </div>
       )}
 
-      {/* Dialog de Unidades */}
+      {/* Dialog de Detalhes do Empreendimento */}
       <Dialog open={!!selectedEmpId} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 flex-shrink-0 border-b">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <DialogTitle>
-                Unidades Disponíveis - {empreendimentoSelecionado?.nome}
-              </DialogTitle>
-              
-              {blocosDisponiveis.length > 0 && (
-                <Select value={filtroBloco} onValueChange={setFiltroBloco}>
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue placeholder="Filtrar por quadra" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as quadras</SelectItem>
-                    {blocosDisponiveis.map(bloco => (
-                      <SelectItem key={bloco} value={bloco}>
-                        {bloco}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            <DialogTitle>
+              {empreendimentoSelecionado?.nome}
+            </DialogTitle>
           </DialogHeader>
 
-          {/* Conteúdo com scroll */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {loadingUnidades ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : unidadesFiltradas.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  {filtroBloco !== 'todos' 
-                    ? `Nenhuma unidade disponível em ${filtroBloco}.`
-                    : 'Nenhuma unidade disponível neste empreendimento.'}
-                </p>
-                {filtroBloco !== 'todos' ? (
-                  <Button variant="outline" onClick={() => setFiltroBloco('todos')}>
-                    Ver todas as quadras
-                  </Button>
-                ) : (
-                  <Button variant="outline" onClick={handleCloseDialog}>
-                    Voltar
-                  </Button>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-6 pt-2 border-b flex-shrink-0">
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="unidades" className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Unidades</span>
+                </TabsTrigger>
+                <TabsTrigger value="valores" className="flex items-center gap-2">
+                  <TableIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tabela de Valores</span>
+                </TabsTrigger>
+                <TabsTrigger value="midias" className="flex items-center gap-2">
+                  <Image className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mídias</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Aba Unidades */}
+            <TabsContent value="unidades" className="flex-1 flex flex-col overflow-hidden m-0">
+              {/* Header com filtro */}
+              <div className="p-4 border-b flex-shrink-0">
+                {blocosDisponiveis.length > 0 && (
+                  <Select value={filtroBloco} onValueChange={setFiltroBloco}>
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Filtrar por quadra" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todas as quadras</SelectItem>
+                      {blocosDisponiveis.map(bloco => (
+                        <SelectItem key={bloco} value={bloco}>
+                          {bloco}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
-            ) : (
-              <div className="space-y-4">
-                {unidadesAgrupadasPorBloco.map(([blocoNome, unidadesBloco]) => (
-                  <div key={blocoNome}>
-                    {/* Header do bloco */}
-                    <h4 className="font-medium text-sm text-muted-foreground mb-2 px-1">
-                      {blocoNome} ({unidadesBloco.length})
-                    </h4>
-                    
-                    {/* Lista de unidades */}
-                    <div className="border rounded-lg divide-y">
-                      {unidadesBloco.map((unidade) => {
-                        const selecionada = isUnidadeSelecionada(unidade.id);
-                        return (
-                          <label
-                            key={unidade.id}
-                            className={cn(
-                              "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors",
-                              selecionada && "bg-primary/5"
-                            )}
-                          >
-                            <Checkbox
-                              checked={selecionada}
-                              onCheckedChange={() => handleToggleUnidade({
-                                id: unidade.id,
-                                numero: unidade.numero,
-                                valor: unidade.valor || 0,
-                                bloco: unidade.bloco
-                              })}
-                            />
-                            
-                            <div className="flex-1 flex items-center justify-between gap-2 min-w-0">
-                              <div className="flex items-center gap-3">
-                                <span className="font-medium">
-                                  Unidade {unidade.numero}
-                                </span>
-                                {unidade.tipologia && (
-                                  <span className="text-sm text-muted-foreground hidden sm:inline">
-                                    {unidade.tipologia.nome}
-                                  </span>
+
+              {/* Conteúdo com scroll */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {loadingUnidades ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : unidadesFiltradas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                    <p className="text-muted-foreground mb-4">
+                      {filtroBloco !== 'todos' 
+                        ? `Nenhuma unidade disponível em ${filtroBloco}.`
+                        : 'Nenhuma unidade disponível neste empreendimento.'}
+                    </p>
+                    {filtroBloco !== 'todos' && (
+                      <Button variant="outline" onClick={() => setFiltroBloco('todos')}>
+                        Ver todas as quadras
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {unidadesAgrupadasPorBloco.map(([blocoNome, unidadesBloco]) => (
+                      <div key={blocoNome}>
+                        {/* Header do bloco */}
+                        <h4 className="font-medium text-sm text-muted-foreground mb-2 px-1">
+                          {blocoNome} ({unidadesBloco.length})
+                        </h4>
+                        
+                        {/* Lista de unidades */}
+                        <div className="border rounded-lg divide-y">
+                          {unidadesBloco.map((unidade) => {
+                            const selecionada = isUnidadeSelecionada(unidade.id);
+                            return (
+                              <label
+                                key={unidade.id}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                                  selecionada && "bg-primary/5"
                                 )}
-                              </div>
-                              <span className="font-semibold text-primary whitespace-nowrap">
-                                {formatarMoeda(unidade.valor || 0)}
-                              </span>
-                            </div>
-                          </label>
-                        );
-                      })}
+                              >
+                                <Checkbox
+                                  checked={selecionada}
+                                  onCheckedChange={() => handleToggleUnidade({
+                                    id: unidade.id,
+                                    numero: unidade.numero,
+                                    valor: unidade.valor || 0,
+                                    bloco: unidade.bloco
+                                  })}
+                                />
+                                
+                                <div className="flex-1 flex items-center justify-between gap-2 min-w-0">
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-medium">
+                                      Unidade {unidade.numero}
+                                    </span>
+                                    {unidade.tipologia && (
+                                      <span className="text-sm text-muted-foreground hidden sm:inline">
+                                        {unidade.tipologia.nome}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-primary whitespace-nowrap">
+                                    {formatarMoeda(unidade.valor || 0)}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer fixo com seleção */}
+              {unidadesSelecionadas.length > 0 && (
+                <div className="flex-shrink-0 border-t bg-muted/30 p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {unidadesSelecionadas.length} unidade{unidadesSelecionadas.length > 1 ? 's' : ''} selecionada{unidadesSelecionadas.length > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-lg font-semibold">{formatarMoeda(valorTotal)}</p>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button 
+                        variant="outline" 
+                        onClick={handleLimparSelecao}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Limpar
+                      </Button>
+                      <Button 
+                        onClick={() => setDialogEnviarOpen(true)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Solicitar Reserva
+                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Footer fixo com seleção */}
-          {unidadesSelecionadas.length > 0 && (
-            <div className="flex-shrink-0 border-t bg-muted/30 p-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    {unidadesSelecionadas.length} unidade{unidadesSelecionadas.length > 1 ? 's' : ''} selecionada{unidadesSelecionadas.length > 1 ? 's' : ''}
-                  </p>
-                  <p className="text-lg font-semibold">{formatarMoeda(valorTotal)}</p>
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleLimparSelecao}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Limpar
-                  </Button>
-                  <Button 
-                    onClick={() => setDialogEnviarOpen(true)}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Solicitar Reserva
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+            {/* Aba Tabela de Valores */}
+            <TabsContent value="valores" className="flex-1 overflow-y-auto p-6 m-0">
+              {selectedEmpId && <ValoresReadOnlyTable empreendimentoId={selectedEmpId} />}
+            </TabsContent>
+
+            {/* Aba Mídias */}
+            <TabsContent value="midias" className="flex-1 overflow-y-auto p-6 m-0">
+              {selectedEmpId && <MidiasReadOnlyList empreendimentoId={selectedEmpId} />}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
