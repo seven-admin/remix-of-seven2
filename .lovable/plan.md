@@ -1,92 +1,74 @@
 
 
-# Plano: Corrigir Layout da Planilha de Planejamento
+# Plano: Atualização de Valores das Unidades - Reserva do Lago
 
-## Problema Identificado
+## Resumo da Importação
 
-Quando as fases estão colapsadas vs expandidas, o layout da tabela "pula" porque:
-
-- **Colapsado**: A linha da fase usa `colSpan=7` e ocupa toda a largura
-- **Expandido**: Cada coluna tem largura fixa definida (Item/Tarefa 280px, Status 160px, etc.)
-
-Isso causa um desalinhamento visual quando o usuário expande/colapsa fases.
-
----
-
-## Solução
-
-Modificar a estrutura para que a linha da fase **não use colSpan** e mantenha as mesmas colunas que as linhas de itens, preservando a consistência visual.
-
-### Alteração na linha da fase (linhas 216-244):
-
-**De:**
-```tsx
-<TableRow className="bg-muted/30 hover:bg-muted/40 cursor-pointer">
-  {!readOnly && (
-    <TableCell className="py-2">
-      <Checkbox ... />
-    </TableCell>
-  )}
-  <TableCell colSpan={readOnly ? 7 : 7} className="py-2" onClick={() => toggleFase(fase.id)}>
-    <div className="flex items-center gap-2 font-medium">
-      {/* chevron + cor + nome + badge */}
-    </div>
-  </TableCell>
-</TableRow>
-```
-
-**Para:**
-```tsx
-<TableRow className="bg-muted/30 hover:bg-muted/40 cursor-pointer" onClick={() => toggleFase(fase.id)}>
-  {!readOnly && (
-    <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
-      <Checkbox ... />
-    </TableCell>
-  )}
-  <TableCell className="py-2">
-    <div className="flex items-center gap-2 font-medium">
-      {/* chevron + cor + nome + badge */}
-    </div>
-  </TableCell>
-  <TableCell className="py-2"></TableCell>  {/* Responsáveis - vazio */}
-  <TableCell className="py-2"></TableCell>  {/* Status - vazio */}
-  <TableCell className="py-2"></TableCell>  {/* Início - vazio */}
-  <TableCell className="py-2"></TableCell>  {/* Fim - vazio */}
-  <TableCell className="py-2"></TableCell>  {/* Obs - vazio */}
-  {!readOnly && <TableCell className="py-2"></TableCell>}  {/* Ações - vazio */}
-</TableRow>
-```
+| Item | Valor |
+|------|-------|
+| Empreendimento | Reserva do Lago |
+| ID | `13fc62b0-c926-48de-8a53-2c63efcdfdc0` |
+| Total de unidades no banco | 406 |
+| Total de registros no CSV | 406 |
+| Campo a atualizar | `valor` |
+| Chave de identificação | Quadra (bloco) + Lote (unidade) |
 
 ---
 
-## Arquivo a Modificar
+## Mapeamento de Dados
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Remover `colSpan` da linha de fase e adicionar células vazias |
+**Conversão necessária:**
+- CSV `quadra: 1` → Banco `bloco_nome: "01"` (adicionar zero à esquerda)
+- CSV `unidade: 1` → Banco `numero: "01"` (adicionar zero à esquerda)
+- CSV `valor: 1114947,06` → Banco `valor: 1114947.06` (trocar vírgula por ponto)
 
 ---
 
-## Resultado Visual Esperado
+## Exemplos de Atualização
 
-```text
-Antes (colapsado):
-┌──────────────────────────────────────────────────────────────────────────────────────┐
-│ ○  > ● Fase 01 - Atendimento  7                                                      │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+| Quadra | Lote | Valor CSV | Valor Banco (atual) | Novo Valor |
+|--------|------|-----------|---------------------|------------|
+| 1 | 1 | 1114947,06 | 1100.00 | 1114947.06 |
+| 1 | 2 | 700376,47 | 1000.00 | 700376.47 |
+| 2 | 1 | 494426,47 | 1050.00 | 494426.47 |
+| 20 | 5 | 685752,94 | (último) | 685752.94 |
 
-Depois (colapsado - mesma estrutura de colunas):
-┌────┬─────────────────────────────┬──────────┬────────┬───────┬───────┬─────┬────────┐
-│ ○  │ > ● Fase 01 - Atendimento 7 │          │        │       │       │     │        │
-└────┴─────────────────────────────┴──────────┴────────┴───────┴───────┴─────┴────────┘
-         (colunas vazias mantêm a largura consistente)
+---
+
+## Processo de Execução
+
+Serão gerados comandos SQL de UPDATE para cada unidade:
+
+```sql
+UPDATE unidades 
+SET valor = 1114947.06, updated_at = NOW()
+WHERE id = '368844ee-2fe9-428c-8c2b-132a191c62f0';
 ```
 
-Assim, quando o usuário expandir a fase, as colunas já estarão alinhadas e não haverá "salto" no layout.
+Para garantir a integridade, a atualização será feita:
+1. Buscando o ID de cada unidade pelo match de bloco + número
+2. Atualizando apenas o campo `valor`
+3. Atualizando o timestamp `updated_at`
 
 ---
 
 ## Detalhes Técnicos
 
-A mudança é simples: remover o `colSpan` e criar células vazias para cada coluna do cabeçalho. Isso garante que a tabela sempre renderize com as mesmas larguras de coluna, independente do estado de colapso.
+Como são 406 registros, a atualização será dividida em lotes menores para evitar timeout.
+
+A query de match será:
+```sql
+SELECT u.id
+FROM unidades u
+JOIN blocos b ON u.bloco_id = b.id
+WHERE b.nome = LPAD('1', 2, '0')  -- '01'
+  AND u.numero = LPAD('1', 2, '0') -- '01'
+  AND u.empreendimento_id = '13fc62b0-c926-48de-8a53-2c63efcdfdc0'
+```
+
+---
+
+## Próximos Passos
+
+Após sua aprovação, executarei as atualizações em lotes usando o sistema de INSERT/UPDATE do Supabase, garantindo que cada unidade seja atualizada corretamente pelo match de Quadra + Lote.
 
