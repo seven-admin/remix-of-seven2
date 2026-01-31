@@ -1,211 +1,227 @@
 
+# Plano: Reestruturação do Portal do Corretor
 
-# Plano: Cadastro de URLs na aba Mídias + Visualização no Portal do Corretor
+## Resumo das Mudanças
 
-## Resumo
-
-Adicionar funcionalidade de cadastro de links externos na aba Mídias do empreendimento e permitir que corretores visualizem essas mídias e uma tabela simplificada de valores no Portal do Corretor.
+Transformar a experiência do Portal do Corretor com três melhorias:
+1. **Mudar de modal para página** - Ao clicar em "Ver Detalhes", abre uma página dedicada ao invés de modal
+2. **Unificar Unidades e Tabela de Valores** - Uma única aba com lista tabular + filtro + seleção múltipla
+3. **Estilizar header** - Aplicar cor de fundo escura igual à sidebar (HSL 0 0% 18%)
 
 ---
 
-## 1. Alteração no Banco de Dados
+## 1. Nova Estrutura de Rotas
 
-### 1.1 Adicionar novo tipo ao enum `midia_tipo`
-
-```sql
-ALTER TYPE midia_tipo ADD VALUE 'link';
+### Rotas Atuais
+```
+/portal-corretor/empreendimentos  →  Lista de cards
 ```
 
-Isso permitirá cadastrar mídias do tipo "link" na mesma tabela `empreendimento_midias`.
-
----
-
-## 2. Atualizar Tipos TypeScript
-
-### 2.1 Arquivo: `src/types/empreendimentos.types.ts`
-
-Adicionar `'link'` ao tipo `MidiaTipo`:
-
-```typescript
-export type MidiaTipo = 'imagem' | 'video' | 'tour_virtual' | 'pdf' | 'link';
+### Novas Rotas
+```
+/portal-corretor/empreendimentos       →  Lista de cards
+/portal-corretor/empreendimentos/:id   →  Página de detalhe com abas
 ```
 
----
-
-## 3. Modificar a Aba de Mídias
-
-### 3.1 Arquivo: `src/components/empreendimentos/MidiasTab.tsx`
-
-Adicionar um formulário simples para cadastrar URLs com:
-- Campo **Título** (nome do link)
-- Campo **URL** (endereço do link)
-- Botão **Adicionar Link**
-
-A seção de links ficará separada das mídias de imagem/vídeo, com uma lista exibindo:
-- Título do link
-- URL (clicável, abre em nova aba)
-- Botão de deletar
-
-### 3.2 Arquivo: `src/hooks/useEmpreendimentoMidias.ts`
-
-Adicionar mutação `useAddMidiaLink` para inserir links diretamente no banco:
-
-```typescript
-export function useAddMidiaLink() {
-  return useMutation({
-    mutationFn: async ({ empreendimentoId, nome, url }: { 
-      empreendimentoId: string; 
-      nome: string; 
-      url: string 
-    }) => {
-      const { data, error } = await supabase
-        .from('empreendimento_midias')
-        .insert({
-          empreendimento_id: empreendimentoId,
-          tipo: 'link',
-          nome,
-          url,
-          is_capa: false,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    // ... invalidação de queries
-  });
-}
+### Alteração em `src/App.tsx`
+```tsx
+<Route path="empreendimentos" element={<PortalEmpreendimentos />} />
+<Route path="empreendimentos/:id" element={<PortalEmpreendimentoDetalhe />} />
 ```
 
 ---
 
-## 4. Portal do Corretor - Visualização de Detalhes
+## 2. Nova Página de Detalhe do Empreendimento
 
-### 4.1 Criar nova página: `src/pages/PortalEmpreendimentoDetalhe.tsx`
+### Arquivo: `src/pages/PortalEmpreendimentoDetalhe.tsx` (novo)
 
-Quando o corretor clicar em "Ver Unidades" ou em um card de empreendimento, abrirá um dialog/página com:
+Estrutura com duas abas:
 
-**Aba 1 - Unidades (atual)**
-- Lista de unidades disponíveis para solicitar reserva
+| Aba | Conteúdo |
+|-----|----------|
+| **Unidades** | Tabela com Quadra, Lote, Valor + filtro por quadra + checkboxes para seleção |
+| **Mídias** | Links e galeria de imagens/vídeos (já existente) |
 
-**Aba 2 - Tabela de Valores (nova)**
-- Tabela simples somente leitura mostrando:
-  - Quadra/Bloco
-  - Número
-  - Valor
+### Aba Unidades Unificada
+- Lista estilo tabela corrida (semelhante à aba "Tabela de Valores" atual)
+- Adicionar coluna de checkbox para seleção múltipla
+- Manter filtro por Quadra/Bloco
+- Footer fixo com resumo da seleção e botão "Solicitar Reserva"
+- Mostrar apenas unidades disponíveis
 
-**Aba 3 - Mídias/Links (nova)**
-- Lista de links cadastrados
-- Exibição de imagens/vídeos
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ← Voltar                             Empreendimento: Reserva do Lago        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [ Unidades ]  [ Mídias ]                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Filtrar: [Todas as quadras ▼]                                               │
+│                                                                              │
+│  ┌────┬────────────┬────────────┬──────────────────┐                         │
+│  │ ☐  │ Quadra     │ Lote       │ Valor            │                         │
+│  ├────┼────────────┼────────────┼──────────────────┤                         │
+│  │ ☑  │ 01         │ 01         │ R$ 500.000,00    │                         │
+│  │ ☐  │ 01         │ 02         │ R$ 480.000,00    │                         │
+│  │ ☑  │ 02         │ 01         │ R$ 520.000,00    │                         │
+│  └────┴────────────┴────────────┴──────────────────┘                         │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  2 unidades selecionadas                                                     │
+│  Total: R$ 1.020.000,00                  [ Limpar ] [ Solicitar Reserva ]   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-### 4.2 Modificar: `src/pages/PortalEmpreendimentos.tsx`
+---
 
-Transformar o dialog atual em um sistema de abas:
+## 3. Ajustar Página de Listagem
+
+### Arquivo: `src/pages/PortalEmpreendimentos.tsx`
+
+Modificações:
+- Remover todo o código do Dialog
+- Alterar botão "Ver Detalhes" para usar `navigate`
+- Remover estados do modal (selectedEmpId, etc.)
 
 ```tsx
-<Tabs defaultValue="unidades">
-  <TabsList>
-    <TabsTrigger value="unidades">Unidades</TabsTrigger>
-    <TabsTrigger value="valores">Tabela de Valores</TabsTrigger>
-    <TabsTrigger value="midias">Mídias</TabsTrigger>
-  </TabsList>
+// Antes
+<Button onClick={() => setSelectedEmpId(emp.id)}>
+  Ver Detalhes
+</Button>
 
-  <TabsContent value="unidades">
-    {/* Conteúdo atual de seleção de unidades */}
-  </TabsContent>
-
-  <TabsContent value="valores">
-    <ValoresReadOnlyTable empreendimentoId={selectedEmpId} />
-  </TabsContent>
-
-  <TabsContent value="midias">
-    <MidiasReadOnlyList empreendimentoId={selectedEmpId} />
-  </TabsContent>
-</Tabs>
+// Depois
+<Button onClick={() => navigate(`/portal-corretor/empreendimentos/${emp.id}`)}>
+  Ver Detalhes
+</Button>
 ```
 
 ---
 
-## 5. Novos Componentes Read-Only para Portal
+## 4. Atualizar Header do Portal (Cor Escura)
 
-### 5.1 Criar: `src/components/portal/ValoresReadOnlyTable.tsx`
+### Arquivo: `src/components/portal/PortalLayout.tsx`
 
-Tabela simples de visualização:
+A sidebar usa as variáveis CSS:
+- `--sidebar-background: 0 0% 18%` (fundo escuro)
+- `--sidebar-foreground: 0 0% 95%` (texto claro)
 
-| Quadra | Lote | Valor |
-|--------|------|-------|
-| 01 | 01 | R$ 500.000,00 |
-| 01 | 02 | R$ 480.000,00 |
+### Alterações no Header
 
-Características:
-- Sem edição
-- Sem ações
-- Apenas dados de unidades disponíveis
+**Antes:**
+```tsx
+<header className="bg-background/95 ...">
+  <Link className="text-muted-foreground hover:text-foreground">
+  <p className="text-sm font-medium">{profile?.full_name}</p>
+```
 
-### 5.2 Criar: `src/components/portal/MidiasReadOnlyList.tsx`
+**Depois:**
+```tsx
+<header className="bg-sidebar ...">
+  <Link className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
+  <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
+```
 
-Lista de mídias e links:
-- **Links**: exibidos como lista clicável
-- **Imagens/Vídeos**: galeria simples de visualização
+### Mudanças Específicas:
+- Header: `bg-sidebar` ao invés de `bg-background/95`
+- Border: `border-sidebar-border` ao invés de `border-b`
+- Links inativos: `text-sidebar-foreground/70`
+- Links ativos: `bg-primary text-primary-foreground` (manter)
+- Hover: `hover:bg-sidebar-accent`
+- Nome do usuário: `text-sidebar-foreground`
+- Rótulo "Corretor": `text-sidebar-foreground/60`
+- Logo: Adicionar `brightness-0 invert opacity-90` igual à sidebar principal
+
+### Navegação Mobile
+- Mesmo tratamento de cores para consistência
 
 ---
 
-## 6. Resumo dos Arquivos
+## 5. Atualizar routeTitles
+
+Adicionar rota dinâmica para página de detalhe:
+
+```tsx
+const routeTitles: Record<string, { title: string; subtitle?: string }> = {
+  // ... rotas existentes
+};
+
+// No componente, verificar se é rota de detalhe:
+const isEmpreendimentoDetalhe = location.pathname.startsWith('/portal-corretor/empreendimentos/');
+```
+
+Na página de detalhe, o título será renderizado pelo próprio componente (não pelo PortalLayout).
+
+---
+
+## 6. Resumo de Arquivos
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/migrations/...` | Adicionar 'link' ao enum `midia_tipo` |
-| `src/types/empreendimentos.types.ts` | Atualizar tipo `MidiaTipo` |
-| `src/hooks/useEmpreendimentoMidias.ts` | Adicionar `useAddMidiaLink` |
-| `src/components/empreendimentos/MidiasTab.tsx` | Adicionar formulário de cadastro de links |
-| `src/pages/PortalEmpreendimentos.tsx` | Adicionar abas de Valores e Mídias |
-| `src/components/portal/ValoresReadOnlyTable.tsx` | **Novo** - Tabela read-only de valores |
-| `src/components/portal/MidiasReadOnlyList.tsx` | **Novo** - Lista read-only de mídias/links |
+| `src/App.tsx` | Adicionar rota `/portal-corretor/empreendimentos/:id` |
+| `src/pages/PortalEmpreendimentoDetalhe.tsx` | **Novo** - Página de detalhe com abas |
+| `src/pages/PortalEmpreendimentos.tsx` | Simplificar - remover modal, usar navigate |
+| `src/components/portal/PortalLayout.tsx` | Aplicar cores da sidebar no header |
+| `src/components/portal/ValoresReadOnlyTable.tsx` | Remover (será incorporado na nova página) |
 
 ---
 
-## 7. Fluxo Visual
+## Detalhes Técnicos
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  ADMIN: Aba Mídias do Empreendimento                                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │  Cadastrar Link                                                       │    │
-│  │  ┌────────────────────────┐  ┌────────────────────────────────────┐ │    │
-│  │  │ Título do Link          │  │ URL                                 │ │    │
-│  │  └────────────────────────┘  └────────────────────────────────────┘ │    │
-│  │                                                    [ Adicionar Link ] │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  Links Cadastrados:                                                          │
-│  • Book Digital - https://drive.google.com/...                    [🗑️]     │
-│  • Vídeo Tour - https://youtube.com/...                           [🗑️]     │
-└─────────────────────────────────────────────────────────────────────────────┘
+### Nova Página de Detalhe
+```tsx
+// src/pages/PortalEmpreendimentoDetalhe.tsx
+export default function PortalEmpreendimentoDetalhe() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { data: empreendimento } = useEmpreendimentos();
+  const { data: unidades } = useUnidades(id);
+  
+  // Filtro e seleção
+  const [filtroBloco, setFiltroBloco] = useState('todos');
+  const [unidadesSelecionadas, setUnidadesSelecionadas] = useState([]);
+  
+  // Apenas unidades disponíveis
+  const unidadesDisponiveis = unidades?.filter(u => u.status === 'disponivel');
+  
+  return (
+    <div>
+      {/* Header com botão voltar e nome */}
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" onClick={() => navigate('/portal-corretor/empreendimentos')}>
+          <ArrowLeft /> Voltar
+        </Button>
+        <h1>{empreendimento?.nome}</h1>
+      </div>
+      
+      <Tabs defaultValue="unidades">
+        <TabsList>
+          <TabsTrigger value="unidades">Unidades</TabsTrigger>
+          <TabsTrigger value="midias">Mídias</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="unidades">
+          {/* Tabela com checkbox + filtro */}
+        </TabsContent>
+        
+        <TabsContent value="midias">
+          <MidiasReadOnlyList empreendimentoId={id} />
+        </TabsContent>
+      </Tabs>
+      
+      {/* Footer fixo com seleção */}
+    </div>
+  );
+}
 ```
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  PORTAL CORRETOR: Detalhes do Empreendimento                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  [ Unidades ]  [ Tabela de Valores ]  [ Mídias ]                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  Aba "Tabela de Valores":                                                    │
-│  ┌────────────┬────────────┬──────────────────┐                              │
-│  │ Quadra     │ Lote       │ Valor            │                              │
-│  ├────────────┼────────────┼──────────────────┤                              │
-│  │ 01         │ 01         │ R$ 500.000,00    │                              │
-│  │ 01         │ 02         │ R$ 480.000,00    │                              │
-│  └────────────┴────────────┴──────────────────┘                              │
-│                                                                              │
-│  Aba "Mídias":                                                               │
-│  Links:                                                                       │
-│  🔗 Book Digital (abre em nova aba)                                          │
-│  🔗 Vídeo Tour (abre em nova aba)                                            │
-│                                                                              │
-│  Galeria:                                                                     │
-│  [img1] [img2] [img3]                                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
+### Estilos do Header
+```tsx
+// Classes CSS para o header escuro
+<header className="sticky top-0 z-50 w-full border-b border-sidebar-border bg-sidebar">
+  <Link className={cn(
+    'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+    isActive
+      ? 'bg-primary text-primary-foreground'
+      : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+  )}>
 ```
-
