@@ -69,7 +69,7 @@ const registerSchema = z.object({
   creci: z.string().min(1, 'CRECI é obrigatório'),
   cidade: z.string().min(2, 'Cidade é obrigatória'),
   uf: z.string().min(2, 'Estado é obrigatório'),
-  telefone: z.string().optional(),
+  telefone: z.string().min(14, 'WhatsApp é obrigatório'),
   aceite_termos: z.literal(true, { errorMap: () => ({ message: 'Você deve aceitar os termos de uso' }) })
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'As senhas não conferem',
@@ -321,14 +321,18 @@ export function CorretorRegisterForm({ onBack }: CorretorRegisterFormProps) {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="telefone">Telefone/WhatsApp</Label>
+              <Label htmlFor="telefone">WhatsApp *</Label>
               <Input
                 id="telefone"
                 value={formData.telefone}
                 onChange={(e) => handleChange('telefone', e.target.value)}
                 placeholder="(00) 00000-0000"
                 maxLength={15}
+                className={errors.telefone ? 'border-destructive' : ''}
               />
+              {errors.telefone && (
+                <p className="text-xs text-destructive">{errors.telefone}</p>
+              )}
             </div>
           </div>
 
