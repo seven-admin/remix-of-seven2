@@ -335,9 +335,14 @@ export default function Usuarios() {
     }
   };
 
+  // Usuários não-corretores (corretores aparecem na aba Corretores)
+  const nonCorretorUsers = useMemo(() => 
+    users.filter(user => user.role !== 'corretor')
+  , [users]);
+
   // Filtered users com filtro de pendentes
   const filteredUsers = useMemo(() => {
-    let result = users.filter(user =>
+    let result = nonCorretorUsers.filter(user =>
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -347,12 +352,12 @@ export default function Usuarios() {
     }
     
     return result;
-  }, [users, searchTerm, showOnlyPendentes]);
+  }, [nonCorretorUsers, searchTerm, showOnlyPendentes]);
 
-  // Usuários pendentes (para badge)
+  // Usuários pendentes (para badge) - excluindo corretores
   const pendentesCount = useMemo(() => 
-    users.filter(u => !u.is_active).length
-  , [users]);
+    nonCorretorUsers.filter(u => !u.is_active).length
+  , [nonCorretorUsers]);
 
   // Toggle seleção de usuário
   const toggleUserSelection = (userId: string) => {
@@ -485,7 +490,7 @@ export default function Usuarios() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+              <div className="text-2xl font-bold">{nonCorretorUsers.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -495,7 +500,7 @@ export default function Usuarios() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'admin' || u.role === 'super_admin').length}
+                {nonCorretorUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length}
               </div>
             </CardContent>
           </Card>
@@ -506,7 +511,7 @@ export default function Usuarios() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.is_active).length}
+                {nonCorretorUsers.filter(u => u.is_active).length}
               </div>
             </CardContent>
           </Card>
@@ -517,7 +522,7 @@ export default function Usuarios() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => !u.is_active).length}
+                {nonCorretorUsers.filter(u => !u.is_active).length}
               </div>
             </CardContent>
           </Card>
