@@ -27,7 +27,7 @@ import { useUpdateUnidadesMemorial } from '@/hooks/useUnidades';
 import { UNIDADE_STATUS_LABELS, UNIDADE_STATUS_COLORS } from '@/types/empreendimentos.types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { parseDecimalInput } from '@/lib/calculoFinanciamento';
+import { parseDecimalInput } from '@/lib/utils';
 
 interface UnidadesMemorialTabProps {
   empreendimentoId: string;
