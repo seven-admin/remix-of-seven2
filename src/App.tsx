@@ -35,6 +35,7 @@ import Contratos from "./pages/Contratos";
 import Comissoes from "./pages/Comissoes";
 import PortalDashboard from "./pages/PortalDashboard";
 import PortalEmpreendimentos from "./pages/PortalEmpreendimentos";
+import PortalEmpreendimentoDetalhe from "./pages/PortalEmpreendimentoDetalhe";
 import PortalSolicitacoes from "./pages/PortalSolicitacoes";
 import ConfiguracaoNegociacoes from "./pages/ConfiguracaoNegociacoes";
 import Relatorios from "./pages/Relatorios";
@@ -303,6 +304,7 @@ const App = () => (
             >
               <Route index element={<PortalDashboard />} />
               <Route path="empreendimentos" element={<PortalEmpreendimentos />} />
+              <Route path="empreendimentos/:id" element={<PortalEmpreendimentoDetalhe />} />
               <Route path="solicitacoes" element={<PortalSolicitacoes />} />
               <Route path="clientes" element={<PortalClientes />} />
             </Route>
