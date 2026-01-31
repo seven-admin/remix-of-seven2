@@ -1,142 +1,162 @@
 
+# Plano: Exibir Mapa de Unidades no Portal do Corretor
 
-# Plano: Corrigir Vínculo de Corretor Ausente
+## Resumo
 
-## Diagnóstico do Problema
-
-O usuário `teste@mail.com` (CORRETOR TESTE) tem:
-- Profile na tabela `profiles`
-- Role `corretor` na tabela `user_roles`
-- **NÃO TEM** registro na tabela `corretores`
-
-O hook `useMeuCorretor` busca na tabela `corretores` por `user_id` ou `email`. Como não existe registro, retorna `null` e o Portal do Corretor exibe o alerta.
-
-**Causa raiz**: Quando o administrador cria um usuário com role "corretor" pela interface de Usuários, não é criado automaticamente um registro na tabela `corretores`. Diferente do auto-cadastro pela edge function `register-corretor`, que cria tudo corretamente.
+Adicionar uma nova aba "Mapa" na página de detalhes do empreendimento (`PortalEmpreendimentoDetalhe.tsx`) no Portal do Corretor. Esta aba exibirá o mapa interativo das unidades para empreendimentos do tipo **loteamento** ou **condomínio** que possuam mapa configurado.
 
 ---
 
-## Solução Proposta
+## Contexto Atual
 
-Modificar a aba Corretores na página de Usuários para:
+1. **MapaInterativo**: Componente já existe e funciona em `src/components/mapa/MapaInterativo.tsx`
+   - Aceita props: `empreendimentoId` e `readonly` (opcional)
+   - Exibe mapa com polígonos/marcadores coloridos por status
+   - Permite zoom, pan e clique para ver detalhes da unidade
+   
+2. **PortalEmpreendimentoDetalhe**: Página atual tem 2 abas:
+   - **Unidades**: Tabela com unidades disponíveis para seleção
+   - **Mídias**: Lista de mídias do empreendimento
 
-1. **Detectar corretores sem vínculo**: Mostrar alerta visual quando `corretor_id` é `null`
-2. **Criar registro automaticamente**: Botão para criar o registro na tabela `corretores` vinculando ao usuário
-3. **Melhorar a ativação**: Quando ativar um corretor sem vínculo, criar o registro automaticamente
+3. **Tipos com Mapa**: Somente `loteamento` e `condominio` usam mapa interativo
 
 ---
 
-## Alterações Necessárias
+## Implementação Proposta
 
-### 1. Atualizar `CorretoresUsuariosTab.tsx`
+### Modificar `src/pages/PortalEmpreendimentoDetalhe.tsx`
 
-Adicionar indicador visual e ação para corretores sem vínculo:
+Adicionar uma terceira aba "Mapa" que:
+1. **Só aparece** para empreendimentos do tipo `loteamento` ou `condominio`
+2. **Exibe** o componente `MapaInterativo` em modo **readonly**
+3. **Permite** ao corretor visualizar a disponibilidade de unidades no mapa
 
-- Na tabela, mostrar badge de alerta quando `corretor_id === null`
-- Adicionar botão "Criar Vínculo" que cria o registro na tabela `corretores`
-- Modificar a ativação para criar o vínculo automaticamente se não existir
+---
 
-### 2. Adicionar mutation `useCreateCorretorVinculo` no hook
+## Interface Visual
 
-Nova mutation para criar registro na tabela `corretores`:
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│  ← Voltar   RESIDENCIAL PRIMAVERA                                          │
+│             Campo Grande, MS                                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│  [Unidades]  [Mapa]  [Mídias]                                              │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                    │   │
+│  │                     MAPA INTERATIVO                                │   │
+│  │                                                                    │   │
+│  │     ┌───┐  ┌───┐  ┌───┐  ┌───┐                                    │   │
+│  │     │ 1 │  │ 2 │  │ 3 │  │ 4 │  Quadra A                          │   │
+│  │     └───┘  └───┘  └───┘  └───┘                                    │   │
+│  │                                                                    │   │
+│  │     ┌───┐  ┌───┐  ┌───┐  ┌───┐                                    │   │
+│  │     │ 5 │  │ 6 │  │ 7 │  │ 8 │  Quadra B                          │   │
+│  │     └───┘  └───┘  └───┘  └───┘                                    │   │
+│  │                                                                    │   │
+│  │  [Zoom +] [Zoom -] [Reset]                Legenda: ■ ■ ■ ■ ■      │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  Clique em uma unidade para ver detalhes                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Código a Modificar
+
+### `src/pages/PortalEmpreendimentoDetalhe.tsx`
 
 ```typescript
-export function useCreateCorretorVinculo() {
-  return useMutation({
-    mutationFn: async (data: { 
-      userId: string; 
-      email: string; 
-      nome: string;
-      cpf?: string;
-      creci?: string;
-    }) => {
-      const { error } = await supabase
-        .from('corretores')
-        .insert({
-          user_id: data.userId,
-          email: data.email,
-          nome_completo: data.nome,
-          cpf: data.cpf || null,
-          creci: data.creci || null,
-          is_active: true
-        });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['corretores-usuarios'] });
-      queryClient.invalidateQueries({ queryKey: ['meu-corretor'] });
-      toast.success('Vínculo de corretor criado com sucesso');
-    }
-  });
-}
-```
+// Adicionar import
+import { MapaInterativo } from '@/components/mapa/MapaInterativo';
+import { Map } from 'lucide-react';
 
-### 3. Modificar `useActivateCorretor` para criar vínculo
+// Verificar se empreendimento suporta mapa
+const suportaMapa = empreendimento?.tipo === 'loteamento' || empreendimento?.tipo === 'condominio';
 
-Alterar o hook de ativação para:
-1. Verificar se existe registro em `corretores` com o `user_id`
-2. Se não existir, criar o registro antes de ativar
-3. Continuar com o processo de ativação normal
+// Adicionar aba Mapa (condicional)
+<TabsList>
+  <TabsTrigger value="unidades" className="flex items-center gap-2">
+    <Building2 className="h-4 w-4" />
+    Unidades
+  </TabsTrigger>
+  {suportaMapa && (
+    <TabsTrigger value="mapa" className="flex items-center gap-2">
+      <Map className="h-4 w-4" />
+      Mapa
+    </TabsTrigger>
+  )}
+  <TabsTrigger value="midias" className="flex items-center gap-2">
+    <Image className="h-4 w-4" />
+    Mídias
+  </TabsTrigger>
+</TabsList>
 
----
-
-## Interface Atualizada
-
-### Tabela de Corretores
-
-```
-┌────┬────────────────┬─────────────┬────────────┬───────────┐
-│ ☐  │ Corretor       │ CPF         │ Status     │ Ações     │
-├────┼────────────────┼─────────────┼────────────┼───────────┤
-│ ☐  │ CORRETOR TESTE │ ⚠️ Sem CPF  │ 🟠 Ativo   │ [Editar]  │
-│    │ teste@mail.com │ ⚠️ Vínculo  │ sem vínculo│ [Vincular]│
-│    │                │   pendente  │            │           │
-└────┴────────────────┴─────────────┴────────────┴───────────┘
-```
-
-Badge de alerta:
-- `⚠️ Vínculo pendente` - quando `corretor_id === null`
-- Botão "Vincular" abre dialog para preencher CPF/CRECI e criar registro
-
-### Dialog de Criação de Vínculo
-
-```
-┌─────────────────────────────────────────────────┐
-│  Criar Vínculo de Corretor                [X]  │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  O usuário CORRETOR TESTE possui role de        │
-│  corretor mas não tem registro profissional.    │
-│                                                 │
-│  Preencha os dados obrigatórios:                │
-│                                                 │
-│  CPF *                                          │
-│  [___.___.___-__                            ]   │
-│                                                 │
-│  CRECI *                                        │
-│  [_____________________________             ]   │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│                    [Cancelar]  [Criar Vínculo]  │
-└─────────────────────────────────────────────────┘
+// Conteúdo da aba Mapa
+{suportaMapa && (
+  <TabsContent value="mapa" className="space-y-4">
+    <MapaInterativo empreendimentoId={id!} readonly />
+  </TabsContent>
+)}
 ```
 
 ---
 
-## Resumo de Arquivos
+## Comportamento
+
+### Corretor Visualiza Mapa
+
+1. Acessa detalhes de um empreendimento tipo loteamento/condomínio
+2. Vê 3 abas: Unidades, Mapa, Mídias
+3. Clica em "Mapa"
+4. Visualiza o mapa interativo com:
+   - Polígonos/marcadores coloridos por status
+   - Legenda de cores
+   - Zoom e pan
+   - Ao clicar em uma unidade, vê popup com detalhes
+
+### Modo Readonly
+
+O mapa será exibido em modo `readonly`:
+- **Sem** botão de edição
+- **Sem** possibilidade de criar/mover polígonos
+- Apenas visualização e interação básica
+
+---
+
+## Empreendimentos Sem Mapa Configurado
+
+Se o empreendimento suporta mapa mas não tem imagem configurada:
+- O componente `MapaInterativo` já exibe mensagem apropriada
+- "Faça upload da imagem do mapa do empreendimento para começar a marcar as unidades"
+- **Obs**: No Portal do Corretor (readonly), essa mensagem deve ser adaptada para não mostrar upload
+
+### Ajuste Necessário no MapaInterativo
+
+Quando não há mapa e está em modo `readonly`, exibir mensagem simples:
+```
+"Mapa não configurado para este empreendimento"
+```
+
+Em vez de mostrar o formulário de upload.
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/useCorretoresUsuarios.ts` | Adicionar mutation `useCreateCorretorVinculo` |
-| `src/hooks/useActivateCorretor.ts` | Criar vínculo automaticamente ao ativar se não existir |
-| `src/components/usuarios/CorretoresUsuariosTab.tsx` | Adicionar indicador visual e dialog para criar vínculo |
+| `src/pages/PortalEmpreendimentoDetalhe.tsx` | Adicionar aba "Mapa" condicional com MapaInterativo readonly |
+| `src/components/mapa/MapaInterativo.tsx` | Ajustar comportamento quando não há mapa + readonly |
 
 ---
 
-## Resultado Esperado
+## Resultado Final
 
-1. Admin vê claramente quais corretores precisam de vínculo
-2. Pode criar o vínculo rapidamente com CPF e CRECI
-3. O corretor passa a acessar o Portal do Corretor normalmente
-4. Novos corretores ativados terão vínculo criado automaticamente
-
+1. **Empreendimentos loteamento/condomínio**: Exibem 3 abas (Unidades, Mapa, Mídias)
+2. **Outros tipos (prédio/comercial)**: Mantêm 2 abas (Unidades, Mídias)
+3. **Mapa configurado**: Corretor visualiza interativamente
+4. **Mapa não configurado**: Mensagem informativa
+5. **Modo readonly**: Sem opções de edição, apenas visualização
