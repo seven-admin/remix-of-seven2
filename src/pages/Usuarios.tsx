@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { UserPermissionsTab } from '@/components/usuarios/UserPermissionsTabNew';
 import { UserEmpreendimentosTab } from '@/components/usuarios/UserEmpreendimentosTab';
+import { CorretoresUsuariosTab } from '@/components/usuarios/CorretoresUsuariosTab';
 import { RolesManager } from '@/components/configuracoes/RolesManager';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useActivateCorretor, useBulkActivateCorretores } from '@/hooks/useActivateCorretor';
@@ -443,6 +444,13 @@ export default function Usuarios() {
             >
               <Users className="h-4 w-4 mr-2" />
               Usuários
+            </TabsTrigger>
+            <TabsTrigger 
+              value="corretores"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-muted-foreground data-[state=active]:text-foreground"
+            >
+              <UserCheck className="h-4 w-4 mr-2" />
+              Corretores
             </TabsTrigger>
             {(isSuperAdmin() || isAdmin()) && (
               <TabsTrigger 
@@ -1108,6 +1116,11 @@ export default function Usuarios() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </TabsContent>
+
+        {/* Corretores Tab Content */}
+        <TabsContent value="corretores" className="space-y-6">
+          <CorretoresUsuariosTab />
         </TabsContent>
 
         {/* Perfis Tab Content */}
