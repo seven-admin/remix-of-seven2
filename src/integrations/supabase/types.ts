@@ -5520,7 +5520,7 @@ export type Database = {
         | "fechado"
         | "perdido"
       lead_temperatura: "frio" | "morno" | "quente"
-      midia_tipo: "imagem" | "video" | "tour_virtual" | "pdf"
+      midia_tipo: "imagem" | "video" | "tour_virtual" | "pdf" | "link"
       parcela_status: "pendente" | "paga" | "atrasada" | "cancelada"
       pendencia_status: "aberta" | "resolvida" | "cancelada"
       prioridade_projeto: "baixa" | "media" | "alta" | "urgente"
@@ -5762,7 +5762,7 @@ export const Constants = {
         "perdido",
       ],
       lead_temperatura: ["frio", "morno", "quente"],
-      midia_tipo: ["imagem", "video", "tour_virtual", "pdf"],
+      midia_tipo: ["imagem", "video", "tour_virtual", "pdf", "link"],
       parcela_status: ["pendente", "paga", "atrasada", "cancelada"],
       pendencia_status: ["aberta", "resolvida", "cancelada"],
       prioridade_projeto: ["baixa", "media", "alta", "urgente"],
