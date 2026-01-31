@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useCorretoresUsuarios, useUpdateCorretorUsuario, useDeleteCorretorUsuario, CorretorUsuario } from '@/hooks/useCorretoresUsuarios';
+import { useCorretoresUsuarios, useUpdateCorretorUsuario, useDeleteCorretorUsuario, useCreateCorretorVinculo, CorretorUsuario } from '@/hooks/useCorretoresUsuarios';
 import { useActivateCorretor, useBulkActivateCorretores } from '@/hooks/useActivateCorretor';
 import { UserEmpreendimentosTab } from './UserEmpreendimentosTab';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { 
   Search, 
@@ -28,7 +29,9 @@ import {
   UserCheck,
   Clock,
   Users,
-  MapPin
+  MapPin,
+  AlertTriangle,
+  Link
 } from 'lucide-react';
 
 const UF_LIST = [
@@ -62,16 +65,24 @@ export function CorretoresUsuariosTab() {
   const { data: corretores = [], isLoading, refetch } = useCorretoresUsuarios();
   const updateMutation = useUpdateCorretorUsuario();
   const deleteMutation = useDeleteCorretorUsuario();
+  const createVinculoMutation = useCreateCorretorVinculo();
   const activateCorretor = useActivateCorretor();
   const bulkActivate = useBulkActivateCorretores();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyPendentes, setShowOnlyPendentes] = useState(false);
+  const [showOnlySemVinculo, setShowOnlySemVinculo] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingCorretor, setEditingCorretor] = useState<CorretorUsuario | null>(null);
   const [activeTab, setActiveTab] = useState('dados');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // Dialog de vinculação
+  const [isVinculoDialogOpen, setIsVinculoDialogOpen] = useState(false);
+  const [vinculoCorretor, setVinculoCorretor] = useState<CorretorUsuario | null>(null);
+  const [vinculoCpf, setVinculoCpf] = useState('');
+  const [vinculoCreci, setVinculoCreci] = useState('');
 
   // Form state
   const [editFullName, setEditFullName] = useState('');
@@ -87,7 +98,8 @@ export function CorretoresUsuariosTab() {
     total: corretores.length,
     ativos: corretores.filter(c => c.is_active).length,
     pendentes: corretores.filter(c => !c.is_active).length,
-    comImobiliaria: corretores.filter(c => c.imobiliaria_id).length
+    comImobiliaria: corretores.filter(c => c.imobiliaria_id).length,
+    semVinculo: corretores.filter(c => !c.corretor_id).length
   }), [corretores]);
 
   // Filtered corretores
@@ -102,9 +114,13 @@ export function CorretoresUsuariosTab() {
     if (showOnlyPendentes) {
       result = result.filter(c => !c.is_active);
     }
+
+    if (showOnlySemVinculo) {
+      result = result.filter(c => !c.corretor_id);
+    }
     
     return result;
-  }, [corretores, searchTerm, showOnlyPendentes]);
+  }, [corretores, searchTerm, showOnlyPendentes, showOnlySemVinculo]);
 
   // Selection handlers
   const toggleUserSelection = (userId: string) => {
@@ -198,15 +214,51 @@ export function CorretoresUsuariosTab() {
   };
 
   // Activation handlers
-  const handleActivateUser = async (userId: string) => {
-    await activateCorretor.mutateAsync(userId);
+  const handleActivateUser = async (corretor: CorretorUsuario) => {
+    await activateCorretor.mutateAsync({
+      userId: corretor.id,
+      email: corretor.email,
+      nome: corretor.full_name,
+      cpf: corretor.cpf || undefined,
+      creci: corretor.creci || undefined
+    });
     refetch();
   };
 
   const handleBulkActivate = async () => {
     if (selectedUsers.size === 0) return;
-    await bulkActivate.mutateAsync(Array.from(selectedUsers));
+    const usersToActivate = corretores
+      .filter(c => selectedUsers.has(c.id))
+      .map(c => ({
+        userId: c.id,
+        email: c.email,
+        nome: c.full_name
+      }));
+    await bulkActivate.mutateAsync(usersToActivate);
     setSelectedUsers(new Set());
+    refetch();
+  };
+
+  // Vincular corretor handlers
+  const handleOpenVinculoDialog = (corretor: CorretorUsuario) => {
+    setVinculoCorretor(corretor);
+    setVinculoCpf('');
+    setVinculoCreci('');
+    setIsVinculoDialogOpen(true);
+  };
+
+  const handleCreateVinculo = async () => {
+    if (!vinculoCorretor) return;
+    
+    await createVinculoMutation.mutateAsync({
+      userId: vinculoCorretor.id,
+      email: vinculoCorretor.email,
+      nome: vinculoCorretor.full_name,
+      cpf: vinculoCpf || undefined,
+      creci: vinculoCreci || undefined
+    });
+    
+    setIsVinculoDialogOpen(false);
     refetch();
   };
 
@@ -230,7 +282,7 @@ export function CorretoresUsuariosTab() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -258,6 +310,15 @@ export function CorretoresUsuariosTab() {
             <div className="text-2xl font-bold">{stats.pendentes}</div>
           </CardContent>
         </Card>
+        <Card className={stats.semVinculo > 0 ? 'border-warning' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sem Vínculo</CardTitle>
+            <AlertTriangle className={`h-4 w-4 ${stats.semVinculo > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.semVinculo > 0 ? 'text-warning' : ''}`}>{stats.semVinculo}</div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Com Imobiliária</CardTitle>
@@ -268,6 +329,17 @@ export function CorretoresUsuariosTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Alert for sem vínculo */}
+      {stats.semVinculo > 0 && (
+        <Alert variant="default" className="border-warning bg-warning/10">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="ml-2">
+            <strong>{stats.semVinculo} corretor(es)</strong> possuem role "corretor" mas não têm registro profissional. 
+            Eles não conseguem acessar o Portal do Corretor. Use o botão "Vincular" para criar o registro.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filters and Actions */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -290,6 +362,17 @@ export function CorretoresUsuariosTab() {
             />
             <Label htmlFor="pendentes" className="text-sm whitespace-nowrap cursor-pointer">
               Pendentes
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="semVinculo"
+              checked={showOnlySemVinculo}
+              onCheckedChange={(checked) => setShowOnlySemVinculo(!!checked)}
+            />
+            <Label htmlFor="semVinculo" className="text-sm whitespace-nowrap cursor-pointer">
+              Sem Vínculo
             </Label>
           </div>
         </div>
@@ -380,26 +463,50 @@ export function CorretoresUsuariosTab() {
                       : '-'}
                   </TableCell>
                   <TableCell>
-                    {corretor.is_active ? (
-                      <Badge variant="secondary" className="text-success">
-                        <CheckCircle2 className="mr-1 h-3 w-3" />
-                        Ativo
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-warning">
-                        <Clock className="mr-1 h-3 w-3" />
-                        Pendente
-                      </Badge>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      {corretor.is_active ? (
+                        <Badge variant="secondary" className="text-success w-fit">
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-warning w-fit">
+                          <Clock className="mr-1 h-3 w-3" />
+                          Pendente
+                        </Badge>
+                      )}
+                      {!corretor.corretor_id && (
+                        <Badge variant="outline" className="text-warning border-warning w-fit">
+                          <AlertTriangle className="mr-1 h-3 w-3" />
+                          Sem vínculo
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {!corretor.corretor_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenVinculoDialog(corretor)}
+                          disabled={createVinculoMutation.isPending}
+                          title="Criar vínculo profissional"
+                        >
+                          {createVinculoMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                       {!corretor.is_active && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleActivateUser(corretor.id)}
+                          onClick={() => handleActivateUser(corretor)}
                           disabled={activateCorretor.isPending}
+                          title="Ativar corretor"
                         >
                           {activateCorretor.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -412,6 +519,7 @@ export function CorretoresUsuariosTab() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditCorretor(corretor)}
+                        title="Editar corretor"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -570,6 +678,64 @@ export function CorretoresUsuariosTab() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vincular Dialog */}
+      <Dialog open={isVinculoDialogOpen} onOpenChange={setIsVinculoDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar Vínculo de Corretor</DialogTitle>
+            <DialogDescription>
+              {vinculoCorretor?.full_name} ({vinculoCorretor?.email})
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <Alert variant="default" className="border-warning bg-warning/10">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertDescription className="ml-2 text-sm">
+                Este usuário possui role "corretor" mas não tem registro profissional.
+                Preencha os dados abaixo para criar o vínculo.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <Label>CPF</Label>
+              <Input
+                value={vinculoCpf}
+                onChange={(e) => setVinculoCpf(formatCpf(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>CRECI</Label>
+              <Input
+                value={vinculoCreci}
+                onChange={(e) => setVinculoCreci(e.target.value)}
+                placeholder="00000-F"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsVinculoDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateVinculo}
+              disabled={createVinculoMutation.isPending}
+            >
+              {createVinculoMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Link className="mr-2 h-4 w-4" />
+              )}
+              Criar Vínculo
             </Button>
           </DialogFooter>
         </DialogContent>

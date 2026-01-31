@@ -171,3 +171,44 @@ export function useDeleteCorretorUsuario() {
     }
   });
 }
+
+// Mutation para criar vínculo de corretor (quando falta registro na tabela corretores)
+export function useCreateCorretorVinculo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { 
+      userId: string; 
+      email: string; 
+      nome: string;
+      cpf?: string;
+      creci?: string;
+    }) => {
+      const { data: insertedData, error } = await supabase
+        .from('corretores')
+        .insert({
+          user_id: data.userId,
+          email: data.email,
+          nome_completo: data.nome,
+          cpf: data.cpf?.replace(/\D/g, '') || null,
+          creci: data.creci || null,
+          is_active: true
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return insertedData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['corretores-usuarios'] });
+      queryClient.invalidateQueries({ queryKey: ['meu-corretor'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast.success('Vínculo de corretor criado com sucesso');
+    },
+    onError: (error: Error) => {
+      console.error('Error creating corretor vinculo:', error);
+      toast.error('Erro ao criar vínculo: ' + error.message);
+    }
+  });
+}
