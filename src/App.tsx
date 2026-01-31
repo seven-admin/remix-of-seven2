@@ -57,7 +57,7 @@ import TiposParcela from "./pages/TiposParcela";
 import AssinarContrato from "./pages/AssinarContrato";
 import DashboardExecutivo from "./pages/DashboardExecutivo";
 import Solicitacoes from "./pages/Solicitacoes";
-import Simulador from "./pages/Simulador";
+
 import DashboardMarketing from "./pages/DashboardMarketing";
 import EquipeMarketing from "./pages/EquipeMarketing";
 import TermosUso from "./pages/TermosUso";
@@ -325,12 +325,6 @@ const App = () => (
               <Route path="planejamento" element={<PortalIncorporadorPlanejamento />} />
             </Route>
             
-            {/* Utilidades */}
-            <Route path="/simulador" element={
-              <ProtectedRoute moduleName="simulador">
-                <Simulador />
-              </ProtectedRoute>
-            } />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

@@ -180,15 +180,6 @@ const menuGroups: MenuGroup[] = [
       { icon: ClipboardList, label: 'Templates', path: '/eventos/templates', moduleName: 'eventos_templates', adminOnly: true },
     ],
   },
-  // Utilidades
-  {
-    label: 'Utilidades',
-    icon: Calculator,
-    color: CORES_SIDEBAR.utilidades,
-    items: [
-      { icon: Calculator, label: 'Simulador', path: '/simulador', moduleName: 'simulador' },
-    ],
-  },
   // Sistema
   {
     label: 'Sistema',

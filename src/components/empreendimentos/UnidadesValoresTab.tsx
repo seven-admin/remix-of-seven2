@@ -32,7 +32,7 @@ import { useBlocos } from '@/hooks/useBlocos';
 import { useConfiguracaoComercial } from '@/hooks/useConfiguracaoComercial';
 import { UNIDADE_STATUS_LABELS, UNIDADE_STATUS_COLORS, UnidadeStatus } from '@/types/empreendimentos.types';
 import { cn } from '@/lib/utils';
-import { parseDecimalInput } from '@/lib/calculoFinanciamento';
+import { parseDecimalInput } from '@/lib/utils';
 import { HistoricoPrecoDialog } from '@/components/unidades/HistoricoPrecoDialog';
 import { toast } from 'sonner';
 
