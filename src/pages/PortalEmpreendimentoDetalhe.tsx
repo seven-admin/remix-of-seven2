@@ -197,6 +197,7 @@ export default function PortalEmpreendimentoDetalhe() {
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Quadra</TableHead>
                       <TableHead>Lote</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -232,6 +233,11 @@ export default function PortalEmpreendimentoDetalhe() {
                             {unidade.bloco?.nome || '-'}
                           </TableCell>
                           <TableCell>{unidade.numero}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              Disponível
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-right font-semibold text-primary">
                             {formatarMoeda(unidade.valor || 0)}
                           </TableCell>
