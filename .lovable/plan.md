@@ -1,162 +1,94 @@
 
-# Plano: Exibir Mapa de Unidades no Portal do Corretor
+# Plano: Separar Corretores da Lista de Usuários
 
-## Resumo
+## Problema
 
-Adicionar uma nova aba "Mapa" na página de detalhes do empreendimento (`PortalEmpreendimentoDetalhe.tsx`) no Portal do Corretor. Esta aba exibirá o mapa interativo das unidades para empreendimentos do tipo **loteamento** ou **condomínio** que possuam mapa configurado.
+Na gestão de usuários, a aba "Usuários" exibe **todos** os usuários do sistema, incluindo corretores. Isso gera duplicação, pois os corretores também aparecem na aba "Corretores".
 
----
-
-## Contexto Atual
-
-1. **MapaInterativo**: Componente já existe e funciona em `src/components/mapa/MapaInterativo.tsx`
-   - Aceita props: `empreendimentoId` e `readonly` (opcional)
-   - Exibe mapa com polígonos/marcadores coloridos por status
-   - Permite zoom, pan e clique para ver detalhes da unidade
-   
-2. **PortalEmpreendimentoDetalhe**: Página atual tem 2 abas:
-   - **Unidades**: Tabela com unidades disponíveis para seleção
-   - **Mídias**: Lista de mídias do empreendimento
-
-3. **Tipos com Mapa**: Somente `loteamento` e `condominio` usam mapa interativo
+**Esperado**: Corretores devem aparecer **apenas** na aba "Corretores", nunca na aba "Usuários".
 
 ---
 
-## Implementação Proposta
+## Solução
 
-### Modificar `src/pages/PortalEmpreendimentoDetalhe.tsx`
-
-Adicionar uma terceira aba "Mapa" que:
-1. **Só aparece** para empreendimentos do tipo `loteamento` ou `condominio`
-2. **Exibe** o componente `MapaInterativo` em modo **readonly**
-3. **Permite** ao corretor visualizar a disponibilidade de unidades no mapa
+Modificar o filtro de usuários em `src/pages/Usuarios.tsx` para excluir automaticamente os usuários que possuem o role `corretor`.
 
 ---
 
-## Interface Visual
+## Alteração Necessária
 
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│  ← Voltar   RESIDENCIAL PRIMAVERA                                          │
-│             Campo Grande, MS                                                │
-├────────────────────────────────────────────────────────────────────────────┤
-│  [Unidades]  [Mapa]  [Mídias]                                              │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                            │
-│  ┌────────────────────────────────────────────────────────────────────┐   │
-│  │                                                                    │   │
-│  │                     MAPA INTERATIVO                                │   │
-│  │                                                                    │   │
-│  │     ┌───┐  ┌───┐  ┌───┐  ┌───┐                                    │   │
-│  │     │ 1 │  │ 2 │  │ 3 │  │ 4 │  Quadra A                          │   │
-│  │     └───┘  └───┘  └───┘  └───┘                                    │   │
-│  │                                                                    │   │
-│  │     ┌───┐  ┌───┐  ┌───┐  ┌───┐                                    │   │
-│  │     │ 5 │  │ 6 │  │ 7 │  │ 8 │  Quadra B                          │   │
-│  │     └───┘  └───┘  └───┘  └───┘                                    │   │
-│  │                                                                    │   │
-│  │  [Zoom +] [Zoom -] [Reset]                Legenda: ■ ■ ■ ■ ■      │   │
-│  └────────────────────────────────────────────────────────────────────┘   │
-│                                                                            │
-│  Clique em uma unidade para ver detalhes                                   │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+### Arquivo: `src/pages/Usuarios.tsx`
 
----
-
-## Código a Modificar
-
-### `src/pages/PortalEmpreendimentoDetalhe.tsx`
+Modificar o `filteredUsers` (useMemo) para excluir usuários com role = 'corretor':
 
 ```typescript
-// Adicionar import
-import { MapaInterativo } from '@/components/mapa/MapaInterativo';
-import { Map } from 'lucide-react';
+// ANTES (linha ~339-350)
+const filteredUsers = useMemo(() => {
+  let result = users.filter(user =>
+    user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  if (showOnlyPendentes) {
+    result = result.filter(user => !user.is_active);
+  }
+  
+  return result;
+}, [users, searchTerm, showOnlyPendentes]);
 
-// Verificar se empreendimento suporta mapa
-const suportaMapa = empreendimento?.tipo === 'loteamento' || empreendimento?.tipo === 'condominio';
-
-// Adicionar aba Mapa (condicional)
-<TabsList>
-  <TabsTrigger value="unidades" className="flex items-center gap-2">
-    <Building2 className="h-4 w-4" />
-    Unidades
-  </TabsTrigger>
-  {suportaMapa && (
-    <TabsTrigger value="mapa" className="flex items-center gap-2">
-      <Map className="h-4 w-4" />
-      Mapa
-    </TabsTrigger>
-  )}
-  <TabsTrigger value="midias" className="flex items-center gap-2">
-    <Image className="h-4 w-4" />
-    Mídias
-  </TabsTrigger>
-</TabsList>
-
-// Conteúdo da aba Mapa
-{suportaMapa && (
-  <TabsContent value="mapa" className="space-y-4">
-    <MapaInterativo empreendimentoId={id!} readonly />
-  </TabsContent>
-)}
+// DEPOIS
+const filteredUsers = useMemo(() => {
+  // Excluir corretores - eles aparecem na aba Corretores
+  let result = users.filter(user => user.role !== 'corretor');
+  
+  // Filtro de busca
+  result = result.filter(user =>
+    user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  if (showOnlyPendentes) {
+    result = result.filter(user => !user.is_active);
+  }
+  
+  return result;
+}, [users, searchTerm, showOnlyPendentes]);
 ```
 
----
+### Ajustar Stats Cards
 
-## Comportamento
+Os cards de estatísticas também devem ser atualizados para refletir apenas os usuários não-corretores:
 
-### Corretor Visualiza Mapa
+```typescript
+// Total de Usuários - excluir corretores
+{users.filter(u => u.role !== 'corretor').length}
 
-1. Acessa detalhes de um empreendimento tipo loteamento/condomínio
-2. Vê 3 abas: Unidades, Mapa, Mídias
-3. Clica em "Mapa"
-4. Visualiza o mapa interativo com:
-   - Polígonos/marcadores coloridos por status
-   - Legenda de cores
-   - Zoom e pan
-   - Ao clicar em uma unidade, vê popup com detalhes
+// Usuários Ativos - excluir corretores
+{users.filter(u => u.is_active && u.role !== 'corretor').length}
 
-### Modo Readonly
+// Usuários Inativos - excluir corretores
+{users.filter(u => !u.is_active && u.role !== 'corretor').length}
 
-O mapa será exibido em modo `readonly`:
-- **Sem** botão de edição
-- **Sem** possibilidade de criar/mover polígonos
-- Apenas visualização e interação básica
-
----
-
-## Empreendimentos Sem Mapa Configurado
-
-Se o empreendimento suporta mapa mas não tem imagem configurada:
-- O componente `MapaInterativo` já exibe mensagem apropriada
-- "Faça upload da imagem do mapa do empreendimento para começar a marcar as unidades"
-- **Obs**: No Portal do Corretor (readonly), essa mensagem deve ser adaptada para não mostrar upload
-
-### Ajuste Necessário no MapaInterativo
-
-Quando não há mapa e está em modo `readonly`, exibir mensagem simples:
+// Pendentes count para badge
+const pendentesCount = useMemo(() => 
+  users.filter(u => !u.is_active && u.role !== 'corretor').length
+, [users]);
 ```
-"Mapa não configurado para este empreendimento"
-```
-
-Em vez de mostrar o formulário de upload.
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/PortalEmpreendimentoDetalhe.tsx` | Adicionar aba "Mapa" condicional com MapaInterativo readonly |
-| `src/components/mapa/MapaInterativo.tsx` | Ajustar comportamento quando não há mapa + readonly |
 
 ---
 
 ## Resultado Final
 
-1. **Empreendimentos loteamento/condomínio**: Exibem 3 abas (Unidades, Mapa, Mídias)
-2. **Outros tipos (prédio/comercial)**: Mantêm 2 abas (Unidades, Mídias)
-3. **Mapa configurado**: Corretor visualiza interativamente
-4. **Mapa não configurado**: Mensagem informativa
-5. **Modo readonly**: Sem opções de edição, apenas visualização
+| Aba | Exibe |
+|-----|-------|
+| **Usuários** | Admin, Super Admin, Gestor de Produto, Incorporador, Equipe Marketing, etc. (todos exceto corretor) |
+| **Corretores** | Apenas usuários com role `corretor` |
+
+---
+
+## Impacto
+
+- Nenhuma alteração no banco de dados
+- Nenhuma alteração no backend
+- Apenas filtro no frontend
+- Os corretores continuam existindo, apenas não aparecem na aba errada
