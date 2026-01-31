@@ -1,366 +1,185 @@
 
-# Plano: Aba "Corretores" na Página de Usuários
+
+# Plano: Acesso Automático a Empreendimentos + Remoção do Simulador
 
 ## Resumo
 
-Criar uma aba dedicada na página de Usuários para gerenciar exclusivamente corretores que fizeram auto-cadastro, com CRUD completo, visualização de dados profissionais (CPF, CRECI, cidade/UF) e gestão de vínculos com empreendimentos.
+Duas alterações principais:
+
+1. **Corretores com acesso a todos os empreendimentos**: Modificar a lógica para que corretores sempre tenham acesso liberado a todos os empreendimentos, sem necessidade de vincular manualmente na tabela `user_empreendimentos`
+2. **Remover Utilidades/Simulador**: Excluir completamente o menu "Utilidades", a página do Simulador e todos os componentes/arquivos relacionados
 
 ---
 
-## Arquitetura
+## 1. Acesso Automático dos Corretores aos Empreendimentos
 
-A aba "Corretores" vai juntar dados de duas tabelas:
-- **profiles**: dados de usuário (nome, email, status, avatar)
-- **corretores**: dados profissionais (CPF, CRECI, cidade, UF, WhatsApp)
+### Estratégia
 
-O vínculo é feito por `corretores.user_id = profiles.id`
+Em vez de vincular cada corretor a cada empreendimento na tabela `user_empreendimentos` (que pode ficar desatualizada quando novos empreendimentos são criados), a abordagem será:
 
----
+**Modificar as consultas que filtram empreendimentos por usuário para ignorar o filtro quando o role for `corretor`.**
 
-## Alterações Necessárias
+Isso garante que:
+- Corretores sempre veem TODOS os empreendimentos ativos
+- Novos empreendimentos aparecem automaticamente para todos os corretores
+- Não precisa manter vínculos em `user_empreendimentos` para corretores
 
-### 1. Criar Hook `useCorretoresUsuarios.ts`
+### Arquivos a Modificar
 
-Novo hook específico para buscar corretores com dados unificados:
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useEmpreendimentos.ts` | Ignorar filtro de `user_empreendimentos` quando role = corretor |
+| `src/hooks/useEmpreendimentosSelect.ts` | Mesma lógica |
+| Consultas do Portal do Corretor | Retornar todos empreendimentos ativos |
+
+### Lógica Proposta
 
 ```typescript
-// src/hooks/useCorretoresUsuarios.ts
-interface CorretorUsuario {
-  // Dados do profile
-  id: string; // profile.id = user_id
-  full_name: string;
-  email: string;
-  phone: string | null;
-  avatar_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  
-  // Dados do corretor
-  corretor_id: string;
-  cpf: string | null;
-  creci: string | null;
-  cidade: string | null;
-  uf: string | null;
-  whatsapp: string | null;
-  imobiliaria?: { id: string; nome: string } | null;
+// Em hooks que filtram por user_empreendimentos
+const { role } = useAuth();
+
+// Se for corretor, buscar todos os empreendimentos ativos
+if (role === 'corretor') {
+  return supabase
+    .from('empreendimentos')
+    .select('*')
+    .eq('is_active', true);
 }
 
-export function useCorretoresUsuarios() {
-  return useQuery({
-    queryKey: ['corretores-usuarios'],
-    queryFn: async () => {
-      // Buscar profiles com role corretor
-      // Fazer join com tabela corretores
-      // Retornar dados unificados
-    }
-  });
-}
+// Para outros roles, manter filtro por vínculo
+// ...
 ```
 
 ---
 
-### 2. Criar Componente `CorretoresUsuariosTab.tsx`
+## 2. Remover Simulador do Sistema
 
-Novo componente para a aba de corretores:
+### Arquivos a Excluir
 
-```typescript
-// src/components/usuarios/CorretoresUsuariosTab.tsx
-
-Features:
-- Tabela com: Nome, Email, CPF, CRECI, Cidade/UF, WhatsApp, Status, Ações
-- Filtros: Busca, Pendentes de ativação, Por cidade
-- Ativação individual e em lote
-- Botão editar abre Dialog com:
-  - Aba Dados (editar nome, telefone, status)
-  - Aba Empreendimentos (usando UserEmpreendimentosTab existente)
-- Contador de pendentes com badge
-```
-
----
-
-### 3. Atualizar `Usuarios.tsx`
-
-Adicionar a nova aba no sistema de tabs:
-
-```tsx
-// Antes (2 abas):
-- Usuários
-- Perfis de Acesso
-
-// Depois (3 abas):
-- Usuários (todos menos corretores)
-- Corretores (nova aba dedicada)
-- Perfis de Acesso
-```
-
-A aba "Usuários" passará a filtrar corretores da listagem (para evitar duplicação).
-
----
-
-## Interface Visual
-
-### Aba Corretores
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ [Usuários]  [Corretores] (3 pendentes)  [Perfis de Acesso]         │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
-│  │   Total     │ │  Ativos     │ │  Pendentes  │ │Com Imobiliária│  │
-│  │     25      │ │     22      │ │      3      │ │     15       │   │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
-│                                                                     │
-│  [🔍 Buscar...          ]  [Pendentes ✓] [Selecionar Todos]        │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────┐│
-│  │ ☐ │ Nome           │ CPF          │ CRECI  │ Cidade/UF│ Status ││
-│  ├───┼────────────────┼──────────────┼────────┼──────────┼────────┤│
-│  │ ☐ │ João Silva     │ 123.456.789-00│ 12345 │ São Paulo/SP│Ativo ││
-│  │ ☑ │ Maria Santos   │ 987.654.321-00│ 54321 │ Curitiba/PR│Pendente│
-│  │ ☐ │ Pedro Oliveira │ 456.789.123-00│ 67890 │ BH/MG     │Ativo   │
-│  └─────────────────────────────────────────────────────────────────┘│
-│                                                                     │
-│                                    [Ativar Selecionados (1)]        │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Dialog de Edição
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Editar Corretor                                            [X]    │
-│  joao@email.com                                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│  [Dados]  [Empreendimentos]                                         │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Nome Completo                                                      │
-│  [João da Silva                                              ]      │
-│                                                                     │
-│  WhatsApp                                                           │
-│  [(67) 99999-9999                                            ]      │
-│                                                                     │
-│  CPF                 CRECI                                          │
-│  [123.456.789-00  ] [12345-MS                               ]      │
-│                                                                     │
-│  Cidade              UF                                             │
-│  [Campo Grande    ] [MS ▼                                   ]      │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────┐│
-│  │ Status do Usuário                                    [● ativo] ││
-│  │ Usuários inativos não podem acessar o sistema                  ││
-│  └─────────────────────────────────────────────────────────────────┘│
-│                                                                     │
-│  [Resetar Senha (Seven@1234)]                                       │
-│                                                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                           [Cancelar]  [Salvar]  [Excluir ⚠️]        │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Resumo de Arquivos
-
-| Arquivo | Ação |
+| Caminho | Tipo |
 |---------|------|
-| `src/hooks/useCorretoresUsuarios.ts` | **Novo** - Hook para buscar corretores com dados unificados |
-| `src/components/usuarios/CorretoresUsuariosTab.tsx` | **Novo** - Componente da aba Corretores |
-| `src/pages/Usuarios.tsx` | Adicionar aba Corretores, filtrar corretores da listagem principal |
+| `src/pages/Simulador.tsx` | Página |
+| `src/components/simulador/DadosClienteCard.tsx` | Componente |
+| `src/components/simulador/DadosEntradaCard.tsx` | Componente |
+| `src/components/simulador/DadosLoteCard.tsx` | Componente |
+| `src/components/simulador/GerarPdfButton.tsx` | Componente |
+| `src/components/simulador/OpcaoAVista.tsx` | Componente |
+| `src/components/simulador/OpcaoCurtoPrazo.tsx` | Componente |
+| `src/components/simulador/OpcaoFinanciamento.tsx` | Componente |
+| `src/components/simulador/ResumoCards.tsx` | Componente |
+| `src/components/simulador/index.ts` | Index |
+| `src/types/simulador.types.ts` | Types |
+| `src/lib/calculoFinanciamento.ts` | Lib (verificar se usado em outro lugar) |
+
+### Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/App.tsx` | Remover rota `/simulador` e import do Simulador |
+| `src/components/layout/Sidebar.tsx` | Remover grupo "Utilidades" com item Simulador |
 
 ---
 
-## Detalhes de Implementação
+## 3. Detalhes de Implementação
 
-### Hook `useCorretoresUsuarios.ts`
+### 3.1 Sidebar - Remover Utilidades
 
 ```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-
-export interface CorretorUsuario {
-  // profile data
-  id: string;
-  full_name: string;
-  email: string;
-  phone: string | null;
-  avatar_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  
-  // corretor data
-  corretor_id: string | null;
-  cpf: string | null;
-  creci: string | null;
-  cidade: string | null;
-  uf: string | null;
-  whatsapp: string | null;
-  imobiliaria_id: string | null;
-  imobiliaria_nome: string | null;
-}
-
-export function useCorretoresUsuarios() {
-  return useQuery({
-    queryKey: ['corretores-usuarios'],
-    queryFn: async (): Promise<CorretorUsuario[]> => {
-      // 1. Buscar user_roles com role corretor
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role_id, roles!inner(name)')
-        .eq('roles.name', 'corretor');
-
-      if (rolesError) throw rolesError;
-
-      const userIds = (userRoles || []).map(ur => ur.user_id);
-      if (userIds.length === 0) return [];
-
-      // 2. Buscar profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', userIds)
-        .order('created_at', { ascending: false });
-
-      if (profilesError) throw profilesError;
-
-      // 3. Buscar corretores com user_id
-      const { data: corretores, error: corretoresError } = await supabase
-        .from('corretores')
-        .select('*, imobiliaria:imobiliarias(id, nome)')
-        .in('user_id', userIds);
-
-      if (corretoresError) throw corretoresError;
-
-      // 4. Merge data
-      const corretoresMap = new Map(
-        (corretores || []).map(c => [c.user_id, c])
-      );
-
-      return (profiles || []).map(profile => {
-        const corretor = corretoresMap.get(profile.id);
-        return {
-          id: profile.id,
-          full_name: profile.full_name,
-          email: profile.email,
-          phone: profile.phone || null,
-          avatar_url: profile.avatar_url || null,
-          is_active: profile.is_active,
-          created_at: profile.created_at,
-          corretor_id: corretor?.id || null,
-          cpf: corretor?.cpf || null,
-          creci: corretor?.creci || null,
-          cidade: corretor?.cidade || null,
-          uf: corretor?.uf || null,
-          whatsapp: corretor?.telefone || null,
-          imobiliaria_id: corretor?.imobiliaria_id || null,
-          imobiliaria_nome: (corretor?.imobiliaria as any)?.nome || null
-        };
-      });
-    }
-  });
-}
-
-// Mutation para atualizar dados do corretor
-export function useUpdateCorretorUsuario() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      userId: string;
-      corretorId: string | null;
-      fullName: string;
-      phone: string | null;
-      isActive: boolean;
-      cpf?: string;
-      creci?: string;
-      cidade?: string;
-      uf?: string;
-    }) => {
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: data.fullName,
-          phone: data.phone,
-          is_active: data.isActive
-        })
-        .eq('id', data.userId);
-
-      if (profileError) throw profileError;
-
-      // Update corretor if exists
-      if (data.corretorId) {
-        const { error: corretorError } = await supabase
-          .from('corretores')
-          .update({
-            nome_completo: data.fullName,
-            cpf: data.cpf?.replace(/\D/g, '') || null,
-            creci: data.creci || null,
-            cidade: data.cidade || null,
-            uf: data.uf || null
-          })
-          .eq('id', data.corretorId);
-
-        if (corretorError) throw corretorError;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['corretores-usuarios'] });
-      toast.success('Corretor atualizado com sucesso');
-    },
-    onError: (error) => {
-      console.error('Error updating corretor:', error);
-      toast.error('Erro ao atualizar corretor');
-    }
-  });
-}
+// REMOVER este bloco completo (linhas 183-191):
+// Utilidades
+{
+  label: 'Utilidades',
+  icon: Calculator,
+  color: CORES_SIDEBAR.utilidades,
+  items: [
+    { icon: Calculator, label: 'Simulador', path: '/simulador', moduleName: 'simulador' },
+  ],
+},
 ```
 
-### Aba Corretores na `Usuarios.tsx`
+Também remover o import do `Calculator` se não for mais usado.
 
-Adicionar nova aba:
+### 3.2 App.tsx - Remover Rota
 
-```tsx
-<TabsTrigger 
-  value="corretores"
-  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary ..."
->
-  <UserCheck className="h-4 w-4 mr-2" />
-  Corretores
-  {corretoresPendentes > 0 && (
-    <Badge variant="secondary" className="ml-2">
-      {corretoresPendentes}
-    </Badge>
-  )}
-</TabsTrigger>
+```typescript
+// REMOVER (linha 60):
+import Simulador from "./pages/Simulador";
 
-<TabsContent value="corretores">
-  <CorretoresUsuariosTab />
-</TabsContent>
+// REMOVER (linhas 328-333):
+{/* Utilidades */}
+<Route path="/simulador" element={
+  <ProtectedRoute moduleName="simulador">
+    <Simulador />
+  </ProtectedRoute>
+} />
+```
+
+### 3.3 Hook de Empreendimentos para Corretores
+
+No hook que o Portal do Corretor usa para listar empreendimentos, modificar para:
+
+```typescript
+// src/hooks/useIncorporadorEmpreendimentos.ts ou equivalente
+export function usePortalEmpreendimentos() {
+  const { role, user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['portal-empreendimentos', role, user?.id],
+    queryFn: async () => {
+      // Corretores veem TODOS os empreendimentos ativos
+      if (role === 'corretor') {
+        const { data, error } = await supabase
+          .from('empreendimentos')
+          .select('*')
+          .eq('is_active', true)
+          .order('nome');
+        
+        if (error) throw error;
+        return data;
+      }
+      
+      // Outros roles: filtrar por vínculo
+      // ...
+    }
+  });
+}
 ```
 
 ---
 
-## Funcionalidades da Aba
+## 4. Resumo de Arquivos
 
-1. **Listagem**
-   - Tabela com todos os dados relevantes
-   - Busca por nome, CPF, CRECI, email
-   - Filtro por status (ativo/pendente)
-   
-2. **Ativação**
-   - Botão individual por linha
-   - Seleção múltipla + ativação em lote
-   - Vinculação automática a todos empreendimentos (usando hook existente)
+### Excluir (11 arquivos)
 
-3. **Edição**
-   - Dialog com abas: Dados e Empreendimentos
-   - Campos editáveis: Nome, WhatsApp, CPF, CRECI, Cidade, UF
-   - Switch de status ativo/inativo
-   - Botão resetar senha
+- `src/pages/Simulador.tsx`
+- `src/components/simulador/DadosClienteCard.tsx`
+- `src/components/simulador/DadosEntradaCard.tsx`
+- `src/components/simulador/DadosLoteCard.tsx`
+- `src/components/simulador/GerarPdfButton.tsx`
+- `src/components/simulador/OpcaoAVista.tsx`
+- `src/components/simulador/OpcaoCurtoPrazo.tsx`
+- `src/components/simulador/OpcaoFinanciamento.tsx`
+- `src/components/simulador/ResumoCards.tsx`
+- `src/components/simulador/index.ts`
+- `src/types/simulador.types.ts`
+- `src/lib/calculoFinanciamento.ts`
 
-4. **Exclusão**
-   - Botão com confirmação
-   - Exclui profile e corretor (cascade)
+### Modificar (3 arquivos)
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/App.tsx` | Remover import e rota do Simulador |
+| `src/components/layout/Sidebar.tsx` | Remover grupo Utilidades |
+| Hook de empreendimentos do Portal | Bypass do filtro para corretores |
+
+---
+
+## 5. Resultado Final
+
+Após as alterações:
+
+1. **Menu Utilidades**: Não aparece mais no sidebar
+2. **Rota /simulador**: Retorna 404 (NotFound)
+3. **Corretores**: Veem automaticamente todos os empreendimentos ativos no Portal do Corretor, sem necessidade de vínculos manuais em `user_empreendimentos`
+4. **Novos empreendimentos**: Aparecem automaticamente para todos os corretores
+
