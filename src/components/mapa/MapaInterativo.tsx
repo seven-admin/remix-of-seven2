@@ -467,8 +467,25 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
     );
   }
 
-  // No map configured - show upload
+  // No map configured
   if (!mapa) {
+    // In readonly mode, just show a simple message
+    if (readonly) {
+      return (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Map className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p className="text-muted-foreground">
+                Mapa não configurado para este empreendimento.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // In edit mode, show upload form
     return (
       <Card>
         <CardHeader>
