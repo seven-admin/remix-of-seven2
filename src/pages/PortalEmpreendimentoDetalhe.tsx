@@ -7,7 +7,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Building2, ArrowLeft, Loader2, X, Send, Image } from 'lucide-react';
+import { Building2, ArrowLeft, Loader2, X, Send, Image, Map } from 'lucide-react';
+import { MapaInterativo } from '@/components/mapa/MapaInterativo';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useUnidades } from '@/hooks/useUnidades';
 import { SolicitarReservaDialog } from '@/components/portal/SolicitarReservaDialog';
@@ -37,6 +38,9 @@ export default function PortalEmpreendimentoDetalhe() {
   const empreendimento = useMemo(() => {
     return empreendimentos?.find(e => e.id === id);
   }, [empreendimentos, id]);
+
+  // Verificar se empreendimento suporta mapa (loteamento ou condomínio)
+  const suportaMapa = empreendimento?.tipo === 'loteamento' || empreendimento?.tipo === 'condominio';
 
   const unidadesDisponiveis = useMemo(() => {
     const disponiveis = unidades?.filter(u => u.status === 'disponivel') || [];
@@ -138,6 +142,12 @@ export default function PortalEmpreendimentoDetalhe() {
             <Building2 className="h-4 w-4" />
             Unidades
           </TabsTrigger>
+          {suportaMapa && (
+            <TabsTrigger value="mapa" className="flex items-center gap-2">
+              <Map className="h-4 w-4" />
+              Mapa
+            </TabsTrigger>
+          )}
           <TabsTrigger value="midias" className="flex items-center gap-2">
             <Image className="h-4 w-4" />
             Mídias
@@ -283,6 +293,13 @@ export default function PortalEmpreendimentoDetalhe() {
             </Card>
           )}
         </TabsContent>
+
+        {/* Aba Mapa (condicional) */}
+        {suportaMapa && (
+          <TabsContent value="mapa" className="space-y-4">
+            <MapaInterativo empreendimentoId={id!} readonly />
+          </TabsContent>
+        )}
 
         {/* Aba Mídias */}
         <TabsContent value="midias">
