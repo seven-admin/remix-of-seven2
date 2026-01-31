@@ -2,3 +2,6 @@ project_id = "pizerpoxuqopekmbvohh"
 
 [functions.delete-imobiliaria]
 verify_jwt = false
+
+[functions.register-corretor]
+verify_jwt = false

@@ -27,12 +27,16 @@ import {
   Settings,
   Key,
   Trash2,
-  Building2
+  Building2,
+  UserCheck,
+  Clock
 } from 'lucide-react';
 import { UserPermissionsTab } from '@/components/usuarios/UserPermissionsTabNew';
 import { UserEmpreendimentosTab } from '@/components/usuarios/UserEmpreendimentosTab';
 import { RolesManager } from '@/components/configuracoes/RolesManager';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useActivateCorretor, useBulkActivateCorretores } from '@/hooks/useActivateCorretor';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface UserWithRole extends Profile {
   role?: AppRole | null;
@@ -49,9 +53,15 @@ export default function Usuarios() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [showOnlyPendentes, setShowOnlyPendentes] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   
   // Buscar roles dinâmicos do banco
   const { data: rolesFromDb = [] } = useRoles();
+  
+  // Hooks de ativação
+  const activateCorretor = useActivateCorretor();
+  const bulkActivate = useBulkActivateCorretores();
   
   // Helper para obter display_name do role
   const getRoleDisplayName = useMemo(() => {
@@ -324,10 +334,62 @@ export default function Usuarios() {
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtered users com filtro de pendentes
+  const filteredUsers = useMemo(() => {
+    let result = users.filter(user =>
+      user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    if (showOnlyPendentes) {
+      result = result.filter(user => !user.is_active);
+    }
+    
+    return result;
+  }, [users, searchTerm, showOnlyPendentes]);
+
+  // Usuários pendentes (para badge)
+  const pendentesCount = useMemo(() => 
+    users.filter(u => !u.is_active).length
+  , [users]);
+
+  // Toggle seleção de usuário
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  // Selecionar todos os pendentes visíveis
+  const selectAllPendentes = () => {
+    const pendentesIds = filteredUsers.filter(u => !u.is_active).map(u => u.id);
+    setSelectedUsers(new Set(pendentesIds));
+  };
+
+  // Limpar seleção
+  const clearSelection = () => {
+    setSelectedUsers(new Set());
+  };
+
+  // Ativar usuário individual
+  const handleActivateUser = async (userId: string) => {
+    await activateCorretor.mutateAsync(userId);
+    fetchUsers();
+  };
+
+  // Ativar em lote
+  const handleBulkActivate = async () => {
+    if (selectedUsers.size === 0) return;
+    await bulkActivate.mutateAsync(Array.from(selectedUsers));
+    setSelectedUsers(new Set());
+    fetchUsers();
+  };
 
   const getRoleBadgeVariant = (role?: AppRole | null) => {
     switch (role) {
@@ -445,19 +507,75 @@ export default function Usuarios() {
         {/* Users Table */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle>Usuários</CardTitle>
-                <CardDescription>Lista de todos os usuários do sistema</CardDescription>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle>Usuários</CardTitle>
+                  <CardDescription>Lista de todos os usuários do sistema</CardDescription>
+                </div>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar usuários..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
               </div>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar usuários..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+              
+              {/* Filtros e Ações em Lote */}
+              <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
+                <Button
+                  variant={showOnlyPendentes ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowOnlyPendentes(!showOnlyPendentes)}
+                  className="gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  Pendentes
+                  {pendentesCount > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {pendentesCount}
+                    </Badge>
+                  )}
+                </Button>
+
+                {showOnlyPendentes && filteredUsers.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllPendentes}
+                    >
+                      Selecionar Todos
+                    </Button>
+                    {selectedUsers.size > 0 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearSelection}
+                        >
+                          Limpar ({selectedUsers.size})
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkActivate}
+                          disabled={bulkActivate.isPending}
+                          className="gap-2"
+                        >
+                          {bulkActivate.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserCheck className="h-4 w-4" />
+                          )}
+                          Ativar Selecionados ({selectedUsers.size})
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -523,6 +641,9 @@ export default function Usuarios() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {showOnlyPendentes && (
+                          <TableHead className="w-12"></TableHead>
+                        )}
                         <TableHead>Usuário</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Perfil</TableHead>
@@ -540,6 +661,15 @@ export default function Usuarios() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => handleEditUser(user)}
                         >
+                          {showOnlyPendentes && (
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedUsers.has(user.id)}
+                                onCheckedChange={() => toggleUserSelection(user.id)}
+                                disabled={user.is_active}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
@@ -576,19 +706,36 @@ export default function Usuarios() {
                             {new Date(user.created_at).toLocaleDateString('pt-BR')}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditUser(user)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              {!user.is_active && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleActivateUser(user.id)}
+                                  disabled={activateCorretor.isPending}
+                                  title="Ativar usuário"
+                                >
+                                  {activateCorretor.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <UserCheck className="h-4 w-4 text-green-600" />
+                                  )}
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
                       {filteredUsers.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={showOnlyPendentes ? 9 : 8} className="text-center py-8 text-muted-foreground">
                             Nenhum usuário encontrado
                           </TableCell>
                         </TableRow>

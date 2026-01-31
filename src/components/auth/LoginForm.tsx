@@ -8,18 +8,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { z } from 'zod';
 import logo from '@/assets/logo.png';
 import { useConfiguracoesSistema } from '@/hooks/useConfiguracoesSistema';
+import { CorretorRegisterForm } from './CorretorRegisterForm';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
 });
 
+type AuthMode = 'login' | 'register';
 
 export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useAuth();
   const { data: configs, isError } = useConfiguracoesSistema();
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -160,58 +163,76 @@ export function LoginForm() {
             <h2 className="text-xl font-bold">Seven Group 360</h2>
           </div>
 
-          <Card className="border-border shadow-2xl">
-            <CardHeader className="text-center pb-2 pt-8">
-              <CardTitle className="text-2xl font-bold">Bem-vindo</CardTitle>
-              <CardDescription className="text-base mt-1">
-                Entre com suas credenciais para acessar
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <form onSubmit={handleLogin} className="space-y-5">
-                {loginError && (
-                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/20">
-                    {loginError}
-                  </div>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="h-11"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="login-password" className="text-sm font-medium">Senha</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="h-11"
-                    required
-                  />
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full h-11 text-sm font-semibold" 
-                  disabled={loginLoading}
-                >
-                  {loginLoading ? 'Entrando...' : 'Entrar'}
-                </Button>
-              </form>
+          {authMode === 'login' ? (
+            <>
+              <Card className="border-border shadow-2xl">
+                <CardHeader className="text-center pb-2 pt-8">
+                  <CardTitle className="text-2xl font-bold">Bem-vindo</CardTitle>
+                  <CardDescription className="text-base mt-1">
+                    Entre com suas credenciais para acessar
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    {loginError && (
+                      <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/20">
+                        {loginError}
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
+                      <Input
+                        id="login-email"
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="h-11"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="login-password" className="text-sm font-medium">Senha</Label>
+                      <Input
+                        id="login-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="h-11"
+                        required
+                      />
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full h-11 text-sm font-semibold" 
+                      disabled={loginLoading}
+                    >
+                      {loginLoading ? 'Entrando...' : 'Entrar'}
+                    </Button>
+                  </form>
 
-            </CardContent>
-          </Card>
+                  <div className="mt-6 pt-4 border-t text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      É corretor e não tem acesso?
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => setAuthMode('register')}
+                    >
+                      Cadastre-se aqui
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <CorretorRegisterForm onBack={() => setAuthMode('login')} />
+          )}
           
           <p className="text-center text-xs text-muted-foreground mt-8">
             © {copyright}
