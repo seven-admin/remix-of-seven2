@@ -215,6 +215,7 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                 {/* Linha da Fase */}
                 <TableRow 
                   className="bg-muted/30 hover:bg-muted/40 cursor-pointer"
+                  onClick={() => toggleFase(fase.id)}
                 >
                   {!readOnly && (
                     <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
@@ -224,7 +225,7 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                       />
                     </TableCell>
                   )}
-                  <TableCell colSpan={readOnly ? 7 : 7} className="py-2" onClick={() => toggleFase(fase.id)}>
+                  <TableCell className="py-2">
                     <div className="flex items-center gap-2 font-medium">
                       {collapsedFases.has(fase.id) ? (
                         <ChevronRight className="h-4 w-4" />
@@ -241,6 +242,12 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                       </Badge>
                     </div>
                   </TableCell>
+                  <TableCell className="py-2"></TableCell>
+                  <TableCell className="py-2"></TableCell>
+                  <TableCell className="py-2"></TableCell>
+                  <TableCell className="py-2"></TableCell>
+                  <TableCell className="py-2"></TableCell>
+                  {!readOnly && <TableCell className="py-2"></TableCell>}
                 </TableRow>
 
                 {/* Itens da Fase */}
