@@ -15,6 +15,10 @@ const TIPO_ICON: Record<string, React.ElementType> = {
   atendimento: Headphones,
 };
 
+// Formatar hora removendo segundos se existirem
+const formatarHora = (hora?: string | null) => 
+  hora ? hora.substring(0, 5) : null;
+
 interface ProximasAtividadesProps {
   gestorId?: string;
   empreendimentoIds?: string[];
@@ -90,6 +94,12 @@ export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtiv
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <Clock className="h-3 w-3" />
                         <span>{dataExibicao}</span>
+                        {atividade.hora_inicio && (
+                          <span className="text-primary font-medium">
+                            às {formatarHora(atividade.hora_inicio)}
+                            {atividade.hora_fim && ` - ${formatarHora(atividade.hora_fim)}`}
+                          </span>
+                        )}
                         {atividade.cliente && (
                           <>
                             <span className="text-muted-foreground/50">•</span>

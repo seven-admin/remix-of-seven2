@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, FileText, Users, Clock } from 'lucide-react';
 import { useClientes } from '@/hooks/useClientes';
@@ -25,6 +26,11 @@ export default function PortalDashboard() {
   const { data: clientes = [] } = useClientes();
   const { data: empreendimentos = [] } = useEmpreendimentos();
 
+  // Aplicar mesmo filtro de PortalEmpreendimentos para consistência
+  const empreendimentosDisponiveis = useMemo(() => 
+    empreendimentos.filter(e => ['lancamento', 'obra'].includes(e.status))
+  , [empreendimentos]);
+
   const solicitacoesPendentes = solicitacoes.filter(s => s.status_aprovacao === 'pendente');
   const solicitacoesRecentes = solicitacoes.slice(0, 5);
 
@@ -38,7 +44,7 @@ export default function PortalDashboard() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{empreendimentos.length}</div>
+            <div className="text-2xl font-bold">{empreendimentosDisponiveis.length}</div>
             <p className="text-xs text-muted-foreground">disponíveis para venda</p>
           </CardContent>
         </Card>

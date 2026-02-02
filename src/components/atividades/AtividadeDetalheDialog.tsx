@@ -171,16 +171,22 @@ export function AtividadeDetalheDialog({ atividade, loading = false, open, onOpe
             <Separator />
 
             {/* Data de Início e Fim */}
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Início:</span>
                 <span>{format(new Date(`${atividade.data_inicio}T00:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                {atividade.hora_inicio && (
+                  <span className="text-sm text-muted-foreground">às {atividade.hora_inicio.substring(0, 5)}</span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Fim:</span>
                 <span>{format(new Date(`${atividade.data_fim}T00:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                {atividade.hora_fim && (
+                  <span className="text-sm text-muted-foreground">às {atividade.hora_fim.substring(0, 5)}</span>
+                )}
               </div>
             </div>
 

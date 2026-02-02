@@ -21,7 +21,7 @@ const TIPO_COLORS: Record<AtividadeTipo, string> = {
   atendimento: 'bg-orange-500',
 };
 
-// Formata intervalo de datas para exibição
+// Formatar intervalo de datas para exibição
 function formatDateRange(dataInicio: string, dataFim: string): string {
   const inicio = parseISO(dataInicio);
   const fim = parseISO(dataFim);
@@ -36,6 +36,11 @@ function formatDateRange(dataInicio: string, dataFim: string): string {
   }
   
   return `${format(inicio, 'dd/MM', { locale: ptBR })} - ${format(fim, 'dd/MM/yyyy', { locale: ptBR })}`;
+}
+
+// Formatar hora removendo segundos se existirem
+function formatarHora(hora?: string | null): string | null {
+  return hora ? hora.substring(0, 5) : null;
 }
 
 interface AtividadeCardProps {
@@ -68,6 +73,11 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
             </p>
             <p className="text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
               {formatDateRange(atividade.data_inicio, atividade.data_fim)}
+              {atividade.hora_inicio && (
+                <span className="ml-1 text-primary font-medium">
+                  {formatarHora(atividade.hora_inicio)}
+                </span>
+              )}
             </p>
           </div>
 
@@ -130,6 +140,12 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
               <Calendar className="h-3 w-3" />
               <span>
                 {formatDateRange(atividade.data_inicio, atividade.data_fim)}
+                {atividade.hora_inicio && (
+                  <span className="ml-1 text-primary font-medium">
+                    às {formatarHora(atividade.hora_inicio)}
+                    {atividade.hora_fim && ` - ${formatarHora(atividade.hora_fim)}`}
+                  </span>
+                )}
               </span>
             </div>
 

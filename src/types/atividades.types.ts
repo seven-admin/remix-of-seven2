@@ -82,6 +82,8 @@ export interface Atividade {
   deadline_date?: string | null;
   data_inicio: string;  // formato: 'YYYY-MM-DD'
   data_fim: string;     // formato: 'YYYY-MM-DD'
+  hora_inicio?: string | null;  // formato: 'HH:mm:ss' ou 'HH:mm'
+  hora_fim?: string | null;     // formato: 'HH:mm:ss' ou 'HH:mm'
   observacoes?: string | null;
   temperatura_cliente?: ClienteTemperatura | null;
   resultado?: string | null;
@@ -103,6 +105,8 @@ export interface AtividadeFormData {
   gestor_id?: string;
   data_inicio: string;  // formato: 'YYYY-MM-DD'
   data_fim: string;     // formato: 'YYYY-MM-DD'
+  hora_inicio?: string;  // formato: 'HH:mm'
+  hora_fim?: string;     // formato: 'HH:mm'
   observacoes?: string;
   temperatura_cliente?: ClienteTemperatura;
   requer_followup?: boolean;

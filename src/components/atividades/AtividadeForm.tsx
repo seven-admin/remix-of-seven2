@@ -61,6 +61,8 @@ const formSchema = z
     empreendimento_id: z.string().optional(),
     data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
     data_fim: z.date({ required_error: 'Data de fim é obrigatória' }),
+    hora_inicio: z.string().optional(),
+    hora_fim: z.string().optional(),
     observacoes: z.string().optional(),
     temperatura_cliente: z.enum(['frio', 'morno', 'quente']).optional(),
     requer_followup: z.boolean().default(false),
@@ -139,6 +141,8 @@ export function AtividadeForm(props: AtividadeFormProps) {
       empreendimento_id: initialData?.empreendimento_id || undefined,
       data_inicio: initialData ? new Date(`${initialData.data_inicio}T00:00:00`) : new Date(),
       data_fim: initialData ? new Date(`${initialData.data_fim}T00:00:00`) : new Date(),
+      hora_inicio: initialData?.hora_inicio?.substring(0, 5) || '',
+      hora_fim: initialData?.hora_fim?.substring(0, 5) || '',
       observacoes: initialData?.observacoes || '',
       temperatura_cliente: initialData?.temperatura_cliente || undefined,
       requer_followup: initialData?.requer_followup || false,
@@ -188,6 +192,8 @@ export function AtividadeForm(props: AtividadeFormProps) {
       ...(initialData ? {} : { gestor_id: user?.id }),
       data_inicio: format(values.data_inicio, 'yyyy-MM-dd'),
       data_fim: format(values.data_fim, 'yyyy-MM-dd'),
+      hora_inicio: values.hora_inicio || undefined,
+      hora_fim: values.hora_fim || undefined,
       observacoes: values.observacoes || undefined,
       temperatura_cliente: values.temperatura_cliente as ClienteTemperatura | undefined,
       requer_followup: values.requer_followup,
@@ -376,7 +382,7 @@ export function AtividadeForm(props: AtividadeFormProps) {
           </Card>
         )}
 
-        {/* Datas: Início e Fim */}
+        {/* Datas e Horários: Início e Fim */}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -456,6 +462,37 @@ export function AtividadeForm(props: AtividadeFormProps) {
                     />
                   </PopoverContent>
                 </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Horários (opcionais) */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="hora_inicio"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Hora de Início (opcional)</FormLabel>
+                <FormControl>
+                  <Input type="time" placeholder="--:--" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="hora_fim"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Hora de Fim (opcional)</FormLabel>
+                <FormControl>
+                  <Input type="time" placeholder="--:--" {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
