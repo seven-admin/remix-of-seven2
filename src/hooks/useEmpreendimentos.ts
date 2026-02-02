@@ -58,6 +58,7 @@ export function useEmpreendimentos(filters?: EmpreendimentoFilters) {
             unidades_reservadas: 0,
             unidades_vendidas: 0,
             unidades_bloqueadas: 0,
+            unidades_negociacao: 0,
             valor_total: 0,
             valor_vendido: 0,
           };
@@ -79,6 +80,9 @@ export function useEmpreendimentos(filters?: EmpreendimentoFilters) {
                 break;
               case 'bloqueada':
                 stats.unidades_bloqueadas++;
+                break;
+              case 'negociacao':
+                stats.unidades_negociacao++;
                 break;
             }
           });
@@ -131,6 +135,7 @@ export function useEmpreendimento(id: string | undefined) {
         unidades_reservadas: 0,
         unidades_vendidas: 0,
         unidades_bloqueadas: 0,
+        unidades_negociacao: 0,
         valor_total: 0,
         valor_vendido: 0,
       };
@@ -152,6 +157,9 @@ export function useEmpreendimento(id: string | undefined) {
             break;
           case 'bloqueada':
             stats.unidades_bloqueadas++;
+            break;
+          case 'negociacao':
+            stats.unidades_negociacao++;
             break;
         }
       });

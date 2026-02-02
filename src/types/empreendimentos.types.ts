@@ -91,6 +91,7 @@ export interface EmpreendimentoWithStats extends Empreendimento {
   unidades_reservadas: number;
   unidades_vendidas: number;
   unidades_bloqueadas: number;
+  unidades_negociacao: number;
   valor_total: number;
   valor_vendido: number;
   capa_url?: string;
