@@ -111,7 +111,8 @@ export default function EmpreendimentoDetalhe() {
     empreendimento.unidades_disponiveis +
     empreendimento.unidades_reservadas +
     empreendimento.unidades_vendidas +
-    empreendimento.unidades_bloqueadas;
+    empreendimento.unidades_bloqueadas +
+    (empreendimento.unidades_negociacao || 0);
 
   const headerActions = (
     <div className="flex items-center gap-2">
