@@ -66,6 +66,8 @@ export type Database = {
           deadline_date: string | null
           empreendimento_id: string | null
           gestor_id: string | null
+          hora_fim: string | null
+          hora_inicio: string | null
           id: string
           imobiliaria_id: string | null
           motivo_cancelamento: string | null
@@ -90,6 +92,8 @@ export type Database = {
           deadline_date?: string | null
           empreendimento_id?: string | null
           gestor_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           imobiliaria_id?: string | null
           motivo_cancelamento?: string | null
@@ -114,6 +118,8 @@ export type Database = {
           deadline_date?: string | null
           empreendimento_id?: string | null
           gestor_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           imobiliaria_id?: string | null
           motivo_cancelamento?: string | null
