@@ -10,9 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useEmpreendimentosSelect } from '@/hooks/useEmpreendimentosSelect';
 import { useUnidades } from '@/hooks/useUnidades';
 import { cn } from '@/lib/utils';
+import { groupUnidadesByBloco } from '@/lib/mapaUtils';
 
 interface UnidadeSelecionada {
   id: string;
@@ -46,6 +52,12 @@ export function UnidadeSelectorCard({
   const unidadesFiltradas = useMemo(() => 
     unidadesDisponiveis.filter(u => u.status === 'disponivel'),
     [unidadesDisponiveis]
+  );
+  
+  // Group units by block with natural sorting
+  const unidadesAgrupadas = useMemo(() => 
+    groupUnidadesByBloco(unidadesFiltradas),
+    [unidadesFiltradas]
   );
   
   const valorTotal = useMemo(() => 
@@ -175,7 +187,7 @@ export function UnidadeSelectorCard({
           </div>
         )}
         
-        {/* Available Units Grid */}
+        {/* Available Units Grid - Grouped by Block */}
         {empreendimentoId && (
           <div className="space-y-2">
             <span className="text-sm font-medium text-muted-foreground">
@@ -195,33 +207,47 @@ export function UnidadeSelectorCard({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-              {unidadesFiltradas.map(unidade => {
-                  const isSelected = unidades.some(u => u.id === unidade.id);
-                  const codigo = unidade.numero || 'S/N';
-                  const valor = unidade.valor || 0;
-                  
-                  return (
-                    <button
-                      key={unidade.id}
-                      type="button"
-                      onClick={() => handleSelectUnidade(unidade)}
-                      className={cn(
-                        "p-2 rounded-lg border text-left transition-all",
-                        "hover:border-primary/50 hover:bg-primary/5",
-                        isSelected && "border-primary bg-primary/10 ring-1 ring-primary"
-                      )}
-                    >
-                      <div className="font-medium text-sm">{codigo}</div>
-                      {unidade.bloco && (
-                        <div className="text-xs text-muted-foreground">{unidade.bloco.nome}</div>
-                      )}
-                      <div className="text-xs font-mono mt-1">
-                        {formatCurrency(valor)}
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {Array.from(unidadesAgrupadas.entries()).map(([blocoNome, unidadesDoBloco]) => (
+                  <Collapsible key={blocoNome} defaultOpen className="border rounded-lg">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-muted/50 transition-colors rounded-t-lg">
+                      <span className="font-medium text-sm">{blocoNome}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {unidadesDoBloco.length} {unidadesDoBloco.length === 1 ? 'unidade' : 'unidades'}
+                      </Badge>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {unidadesDoBloco.map(unidade => {
+                          const isSelected = unidades.some(u => u.id === unidade.id);
+                          const codigo = unidade.numero || 'S/N';
+                          const valor = unidade.valor || 0;
+                          
+                          return (
+                            <button
+                              key={unidade.id}
+                              type="button"
+                              onClick={() => handleSelectUnidade(unidade)}
+                              className={cn(
+                                "p-2 rounded-lg border text-left transition-all",
+                                "hover:border-primary/50 hover:bg-primary/5",
+                                isSelected && "border-primary bg-primary/10 ring-1 ring-primary"
+                              )}
+                            >
+                              <div className="font-medium text-sm">{codigo}</div>
+                              {unidade.andar != null && (
+                                <div className="text-xs text-muted-foreground">{unidade.andar}º andar</div>
+                              )}
+                              <div className="text-xs font-mono mt-1">
+                                {formatCurrency(valor)}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                    </button>
-                  );
-                })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
               </div>
             )}
           </div>
