@@ -28,10 +28,11 @@ import type { PlanejamentoItemWithRelations } from '@/types/planejamento.types';
 interface Props {
   filters: PlanejamentoGlobalFilters;
   onFiltersChange: (filters: PlanejamentoGlobalFilters) => void;
+  limiteSobrecarga?: number;
 }
 
-export function PlanejamentoGlobalEquipe({ filters }: Props) {
-  const { itens, cargaPorResponsavel, isLoading } = usePlanejamentoGlobal(filters);
+export function PlanejamentoGlobalEquipe({ filters, limiteSobrecarga = 5 }: Props) {
+  const { itens, cargaPorResponsavel, isLoading } = usePlanejamentoGlobal(filters, limiteSobrecarga);
   const [selectedResponsavel, setSelectedResponsavel] = useState<string | null>(null);
 
   // Gerar semanas para o header
@@ -59,14 +60,23 @@ export function PlanejamentoGlobalEquipe({ filters }: Props) {
     return <Skeleton className="h-[500px]" />;
   }
 
-  // Função para determinar a cor do calor
+  // Função para determinar a cor do calor (dinâmica baseada no limite)
   const getHeatColor = (count: number) => {
     if (count === 0) return 'bg-muted/20';
-    if (count <= 2) return 'bg-green-500/30';
-    if (count <= 4) return 'bg-yellow-500/40';
-    if (count <= 6) return 'bg-orange-500/50';
-    return 'bg-red-500/60';
+    const ratio = count / limiteSobrecarga;
+    if (ratio <= 0.4) return 'bg-green-500/30';      // 0-40% do limite
+    if (ratio <= 0.8) return 'bg-yellow-500/40';     // 40-80% do limite
+    if (ratio <= 1.2) return 'bg-orange-500/50';     // 80-120% do limite
+    return 'bg-red-500/60';                          // >120% do limite
   };
+
+  // Gerar legenda dinâmica
+  const legendItems = [
+    { color: 'bg-green-500/30', label: `1-${Math.floor(limiteSobrecarga * 0.4)}` },
+    { color: 'bg-yellow-500/40', label: `${Math.floor(limiteSobrecarga * 0.4) + 1}-${Math.floor(limiteSobrecarga * 0.8)}` },
+    { color: 'bg-orange-500/50', label: `${Math.floor(limiteSobrecarga * 0.8) + 1}-${limiteSobrecarga}` },
+    { color: 'bg-red-500/60', label: `${limiteSobrecarga + 1}+` },
+  ];
 
   return (
     <div className="space-y-6">
@@ -125,18 +135,12 @@ export function PlanejamentoGlobalEquipe({ filters }: Props) {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Carga de Trabalho por Semana</CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 bg-green-500/30 rounded" /> 1-2
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 bg-yellow-500/40 rounded" /> 3-4
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 bg-orange-500/50 rounded" /> 5-6
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 bg-red-500/60 rounded" /> 7+
-              </div>
+              {legendItems.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-1">
+                  <div className={`w-4 h-4 ${item.color} rounded`} />
+                  <span>{item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </CardHeader>

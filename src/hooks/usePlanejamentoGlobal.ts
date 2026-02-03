@@ -47,7 +47,7 @@ export interface ConflitoDatas {
   severidade: 'baixa' | 'media' | 'alta';
 }
 
-export function usePlanejamentoGlobal(filters?: PlanejamentoGlobalFilters) {
+export function usePlanejamentoGlobal(filters?: PlanejamentoGlobalFilters, limiteSobrecarga: number = 5) {
   const { data: itens, isLoading } = useQuery({
     queryKey: ['planejamento-global', filters],
     queryFn: async () => {
@@ -204,10 +204,10 @@ export function usePlanejamentoGlobal(filters?: PlanejamentoGlobalFilters) {
         tarefasPorSemana: data.tarefasPorSemana,
         totalTarefas: data.totalTarefas,
         tarefasAtrasadas: data.tarefasAtrasadas,
-        sobrecarga: maxPorSemana > 5
+        sobrecarga: maxPorSemana > limiteSobrecarga
       };
     }).sort((a, b) => b.totalTarefas - a.totalTarefas);
-  }, [itens]);
+  }, [itens, limiteSobrecarga]);
 
   // Detecção de conflitos
   const conflitos = useMemo<ConflitoDatas[]>(() => {
@@ -220,12 +220,12 @@ export function usePlanejamentoGlobal(filters?: PlanejamentoGlobalFilters) {
     cargaPorResponsavel.forEach(resp => {
       if (resp.sobrecarga) {
         const semanasComSobrecarga = Object.entries(resp.tarefasPorSemana)
-          .filter(([_, count]) => count > 5)
+          .filter(([_, count]) => count > limiteSobrecarga)
           .map(([semana]) => semana);
 
         resultado.push({
           tipo: 'sobrecarga_responsavel',
-          descricao: `${resp.nome} tem mais de 5 tarefas em ${semanasComSobrecarga.length} semana(s)`,
+          descricao: `${resp.nome} tem mais de ${limiteSobrecarga} tarefas em ${semanasComSobrecarga.length} semana(s)`,
           itensRelacionados: [resp.id],
           severidade: semanasComSobrecarga.length > 2 ? 'alta' : 'media'
         });
