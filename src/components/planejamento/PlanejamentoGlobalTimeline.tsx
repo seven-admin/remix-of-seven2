@@ -287,51 +287,56 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
                     
                     return (
                       <div key={faseId}>
-                        {/* Linha da fase */}
+                        {/* Linha da fase (cabeçalho) */}
                         <div className="flex bg-muted/5">
                           <div className="w-[280px] shrink-0 p-2 pl-8 border-r flex items-center gap-2">
                             <div 
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: fase?.cor }}
                             />
-                            <span className="text-sm">{fase?.nome || 'Sem fase'}</span>
+                            <span className="text-sm font-medium">{fase?.nome || 'Sem fase'}</span>
                             <span className="text-xs text-muted-foreground ml-auto">
                               ({faseItens.length})
                             </span>
                           </div>
-                          <div className="flex-1 relative h-auto min-h-[40px]">
-                            {/* Barras das tarefas */}
-                            <div className="relative" style={{ height: faseItens.length * 24 + 8 }}>
-                              {faseItens.map((item, idx) => {
-                                const style = getBarStyle(item);
-                                if (!style) return null;
-                                
-                                const isAtrasada = !item.status?.is_final && 
-                                  item.data_fim && 
-                                  parseISO(item.data_fim) < new Date();
+                          <div className="flex-1 h-6" />
+                        </div>
 
-                                return (
+                        {/* Linhas das tarefas */}
+                        {faseItens.map((item) => {
+                          const style = getBarStyle(item);
+                          const isAtrasada = !item.status?.is_final && 
+                            item.data_fim && 
+                            parseISO(item.data_fim) < new Date();
+                          
+                          return (
+                            <div key={item.id} className="flex hover:bg-muted/10">
+                              {/* Título da tarefa na coluna esquerda */}
+                              <div className="w-[280px] shrink-0 p-1 pl-12 border-r flex items-center">
+                                <span className="text-xs truncate" title={item.item}>
+                                  {item.item}
+                                </span>
+                              </div>
+                              {/* Barra no timeline */}
+                              <div className="flex-1 relative h-6">
+                                {style && (
                                   <div
-                                    key={item.id}
                                     className={cn(
-                                      "absolute h-5 rounded text-xs flex items-center px-2 text-white truncate cursor-pointer hover:opacity-80",
+                                      "absolute h-4 top-1 rounded cursor-pointer hover:opacity-80",
                                       isAtrasada && "ring-2 ring-red-500"
                                     )}
                                     style={{
                                       left: style.left,
                                       width: style.width,
-                                      top: idx * 24 + 4,
                                       backgroundColor: fase?.cor || 'hsl(var(--primary))'
                                     }}
-                                    title={`${item.item} (${item.data_inicio} - ${item.data_fim})`}
-                                  >
-                                    {style.width > 60 && item.item}
-                                  </div>
-                                );
-                              })}
+                                    title={`${item.data_inicio} - ${item.data_fim}`}
+                                  />
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
