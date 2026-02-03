@@ -1,51 +1,72 @@
 
-# Plano: Configuracao do Limite de Sobrecarga
 
-## Objetivo
+# Plano: Corrigir Erro de Constraint ao Atualizar Datas
 
-Permitir que o administrador configure o limite de tarefas por semana que define "sobrecarga" de um colaborador. Atualmente o valor esta fixo em **5 tarefas/semana** no codigo, e sera transformado em uma configuracao do sistema.
+## Problema Identificado
+
+A tabela `planejamento_itens` possui uma constraint no banco de dados:
+
+```sql
+CONSTRAINT check_datas CHECK (
+  data_fim IS NULL OR 
+  data_inicio IS NULL OR 
+  data_fim >= data_inicio
+)
+```
+
+Quando o usuario atualiza uma data (inicio ou fim), o codigo atual nao valida se a nova data respeita a regra de que **data_fim deve ser maior ou igual a data_inicio**.
+
+### Cenario de Erro
+
+1. Item tem `data_fim = 2026-02-10`
+2. Usuario define `data_inicio = 2026-02-15`
+3. Resultado: Erro de constraint (`data_inicio > data_fim`)
+
+O mesmo acontece no cenario inverso (definir data_fim anterior a data_inicio existente).
 
 ---
 
 ## Solucao
 
-### 1. Adicionar Configuracao no Banco de Dados
+### 1. Adicionar Validacao no Frontend
 
-Inserir uma nova entrada na tabela `configuracoes_sistema`:
+Modificar a funcao `handleDateChange` em `PlanejamentoPlanilha.tsx` para:
 
-```sql
-INSERT INTO configuracoes_sistema (id, chave, valor, categoria)
-VALUES (
-  gen_random_uuid(),
-  'planejamento_limite_sobrecarga',
-  '5',
-  'planejamento'
-);
+1. Buscar os dados atuais do item (data_inicio e data_fim existentes)
+2. Validar se a nova data respeita a constraint
+3. Se violar, exibir toast de erro e nao enviar ao banco
+
+### 2. Logica de Validacao
+
+```typescript
+const handleDateChange = async (id: string, field: string, date: Date | undefined) => {
+  // Buscar item atual
+  const item = itens?.find(i => i.id === id);
+  if (!item) return;
+
+  const newDateStr = date ? format(date, 'yyyy-MM-dd') : null;
+  
+  // Montar datas para validacao
+  const dataInicio = field === 'data_inicio' ? newDateStr : item.data_inicio;
+  const dataFim = field === 'data_fim' ? newDateStr : item.data_fim;
+  
+  // Validar constraint
+  if (dataInicio && dataFim && dataFim < dataInicio) {
+    toast.error('A data de fim deve ser igual ou posterior a data de inicio');
+    return;
+  }
+
+  // Se valido, enviar ao banco
+  updateItem.mutate({ id, [field]: newDateStr });
+};
 ```
 
-### 2. Atualizar Hook de Planejamento Global
+### 3. Pontos de Alteracao
 
-O hook `usePlanejamentoGlobal.ts` sera modificado para:
-- Receber o limite de sobrecarga como parametro (valor dinamico do banco)
-- Usar esse valor ao inves do `5` hardcoded
-
-Locais de alteracao:
-- Linha 207: `sobrecarga: maxPorSemana > 5` passa a usar o parametro
-- Linhas 223-224: deteccao de conflitos usa o mesmo valor
-
-### 3. Criar Editor de Configuracao
-
-Adicionar uma nova secao na pagina de **Configuracoes do Planejamento** (`PlanejamentoConfiguracoes.tsx`) com:
-- Um card "Configuracoes Gerais"
-- Campo numerico para o limite de sobrecarga
-- Descricao explicativa do que esse valor significa
-- Botao de salvar
-
-### 4. Atualizar Componentes que Usam o Limite
-
-Os componentes que exibem informacoes de sobrecarga precisarao buscar a configuracao:
-- `PlanejamentoGlobalEquipe.tsx` (mapa de calor - legenda e cores)
-- `PlanejamentoGlobalResumo.tsx` (alertas de conflitos)
+O mesmo tratamento deve ser aplicado em:
+- `PlanejamentoPlanilha.tsx` - DatePickerCell
+- `PlanejamentoTimeline.tsx` - Se houver edicao de datas
+- `EditarEmLoteDialog.tsx` - Edicao em lote de datas
 
 ---
 
@@ -53,60 +74,26 @@ Os componentes que exibem informacoes de sobrecarga precisarao buscar a configur
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| **Migracao SQL** | Inserir configuracao `planejamento_limite_sobrecarga` |
-| `src/hooks/usePlanejamentoGlobal.ts` | Aceitar parametro `limiteSobrecarga` |
-| `src/pages/PlanejamentoConfiguracoes.tsx` | Adicionar card de configuracoes gerais |
-| `src/components/planejamento/PlanejamentoGlobal.tsx` | Buscar configuracao e passar para sub-componentes |
-| `src/components/planejamento/PlanejamentoGlobalEquipe.tsx` | Ajustar legenda do mapa de calor |
+| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Adicionar validacao em `handleDateChange` |
+| `src/components/planejamento/EditarEmLoteDialog.tsx` | Verificar se precisa de validacao similar |
 
 ---
 
-## Nova Interface de Configuracao
+## Melhoria Adicional: UX do DatePicker
 
-A pagina de Configuracoes do Planejamento tera um novo card:
+Para melhorar a experiencia, o DatePickerCell pode receber as datas atuais do item e desabilitar datas invalidas no calendario:
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Configuracoes Gerais                                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Limite de Sobrecarga                                       │
-│  ┌─────┐ tarefas por semana                                 │
-│  │  5  │                                                    │
-│  └─────┘                                                    │
-│                                                             │
-│  Funcionarios com mais tarefas que este limite em uma       │
-│  mesma semana serao sinalizados como "sobrecarregados"      │
-│  na visao global.                                           │
-│                                                             │
-│                                    [Salvar Configuracoes]   │
-└─────────────────────────────────────────────────────────────┘
-```
+- Se editando `data_inicio`: desabilitar datas posteriores a `data_fim` existente
+- Se editando `data_fim`: desabilitar datas anteriores a `data_inicio` existente
+
+Isso previne o usuario de selecionar uma data invalida em primeiro lugar.
 
 ---
 
-## Resumo Tecnico
+## Resumo da Implementacao
 
-1. **Banco**: Nova entrada em `configuracoes_sistema` com `chave = 'planejamento_limite_sobrecarga'`
-2. **Hook existente**: `useConfiguracao('planejamento_limite_sobrecarga')` para buscar o valor
-3. **Hook de update**: `useUpdateConfiguracao()` para salvar alteracoes
-4. **Propagacao**: O valor e passado como prop para o hook e componentes que calculam sobrecarga
-5. **Fallback**: Se a configuracao nao existir, usa o valor padrao de 5
+1. Modificar `handleDateChange` para validar antes de enviar
+2. Passar informacoes de limite para o `DatePickerCell`
+3. Usar `disabled` no Calendar para bloquear datas invalidas
+4. Exibir toast de erro caso a validacao falhe
 
----
-
-## Fluxo de Dados
-
-```text
-configuracoes_sistema (DB)
-         ↓
-useConfiguracao('planejamento_limite_sobrecarga')
-         ↓
-PlanejamentoGlobal.tsx (busca e armazena)
-         ↓
-usePlanejamentoGlobal({ limiteSobrecarga: valor })
-         ↓
-cargaPorResponsavel (calcula com limite dinamico)
-         ↓
-PlanejamentoGlobalEquipe.tsx (exibe mapa de calor)
-```
