@@ -1,99 +1,112 @@
 
-
-# Plano: Corrigir Erro de Constraint ao Atualizar Datas
+# Plano: Exibir Título das Tarefas na Timeline Global
 
 ## Problema Identificado
 
-A tabela `planejamento_itens` possui uma constraint no banco de dados:
-
-```sql
-CONSTRAINT check_datas CHECK (
-  data_fim IS NULL OR 
-  data_inicio IS NULL OR 
-  data_fim >= data_inicio
-)
-```
-
-Quando o usuario atualiza uma data (inicio ou fim), o codigo atual nao valida se a nova data respeita a regra de que **data_fim deve ser maior ou igual a data_inicio**.
-
-### Cenario de Erro
-
-1. Item tem `data_fim = 2026-02-10`
-2. Usuario define `data_inicio = 2026-02-15`
-3. Resultado: Erro de constraint (`data_inicio > data_fim`)
-
-O mesmo acontece no cenario inverso (definir data_fim anterior a data_inicio existente).
-
----
-
-## Solucao
-
-### 1. Adicionar Validacao no Frontend
-
-Modificar a funcao `handleDateChange` em `PlanejamentoPlanilha.tsx` para:
-
-1. Buscar os dados atuais do item (data_inicio e data_fim existentes)
-2. Validar se a nova data respeita a constraint
-3. Se violar, exibir toast de erro e nao enviar ao banco
-
-### 2. Logica de Validacao
+Na timeline global (`PlanejamentoGlobalTimeline.tsx`), as tarefas são exibidas apenas como barras coloridas. O título da tarefa (`item.item`) só aparece quando a barra tem largura maior que 60 pixels (linha 328):
 
 ```typescript
-const handleDateChange = async (id: string, field: string, date: Date | undefined) => {
-  // Buscar item atual
-  const item = itens?.find(i => i.id === id);
-  if (!item) return;
-
-  const newDateStr = date ? format(date, 'yyyy-MM-dd') : null;
-  
-  // Montar datas para validacao
-  const dataInicio = field === 'data_inicio' ? newDateStr : item.data_inicio;
-  const dataFim = field === 'data_fim' ? newDateStr : item.data_fim;
-  
-  // Validar constraint
-  if (dataInicio && dataFim && dataFim < dataInicio) {
-    toast.error('A data de fim deve ser igual ou posterior a data de inicio');
-    return;
-  }
-
-  // Se valido, enviar ao banco
-  updateItem.mutate({ id, [field]: newDateStr });
-};
+{style.width > 60 && item.item}
 ```
 
-### 3. Pontos de Alteracao
+Isso causa dois problemas:
+1. Tarefas com duração curta não exibem nenhum texto
+2. Mesmo quando exibido, o texto fica truncado dentro da barra estreita
 
-O mesmo tratamento deve ser aplicado em:
-- `PlanejamentoPlanilha.tsx` - DatePickerCell
-- `PlanejamentoTimeline.tsx` - Se houver edicao de datas
-- `EditarEmLoteDialog.tsx` - Edicao em lote de datas
+## Solução
 
----
+Alterar o layout para exibir o título da tarefa na **coluna da esquerda** (junto com a fase), em vez de dentro da barra. Isso garante que o título seja sempre visível, independente da largura da barra.
 
-## Arquivos a Modificar
+### Nova Estrutura Visual
 
-| Arquivo | Alteracao |
+```text
+Antes:
+┌──────────────────────┬────────────────────────────────┐
+│ 🟢 Fase X (3)        │  [████]  [██████]  [███]       │
+└──────────────────────┴────────────────────────────────┘
+
+Depois:
+┌──────────────────────┬────────────────────────────────┐
+│ 🟢 Fase X            │                                │
+│   └ Tarefa 1         │  [████████████]                │
+│   └ Tarefa 2         │        [██████████]            │
+│   └ Tarefa 3         │              [███████]         │
+└──────────────────────┴────────────────────────────────┘
+```
+
+## Alterações Técnicas
+
+### Arquivo: `src/components/planejamento/PlanejamentoGlobalTimeline.tsx`
+
+1. **Separar linha da fase das linhas de tarefas**: Em vez de renderizar todas as barras dentro de uma única div, criar uma linha separada para cada tarefa
+
+2. **Adicionar coluna com título**: Cada linha de tarefa terá o título na coluna da esquerda com indentação
+
+3. **Manter barra na área do timeline**: A barra colorida continua na área do gráfico, mas agora sincronizada com sua linha
+
+### Código a Modificar (linhas 285-336)
+
+Reestruturar o loop de fases para:
+- Renderizar primeiro a linha de cabeçalho da fase
+- Renderizar uma linha separada para cada tarefa, com:
+  - Coluna esquerda: título da tarefa (com indentação)
+  - Coluna direita: barra no timeline
+
+```typescript
+{/* Linha da fase (cabeçalho) */}
+<div className="flex bg-muted/5">
+  <div className="w-[280px] shrink-0 p-2 pl-8 border-r flex items-center gap-2">
+    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: fase?.cor }} />
+    <span className="text-sm font-medium">{fase?.nome || 'Sem fase'}</span>
+    <span className="text-xs text-muted-foreground ml-auto">({faseItens.length})</span>
+  </div>
+  <div className="flex-1 h-6" />
+</div>
+
+{/* Linhas das tarefas */}
+{faseItens.map((item) => {
+  const style = getBarStyle(item);
+  const isAtrasada = !item.status?.is_final && item.data_fim && parseISO(item.data_fim) < new Date();
+  
+  return (
+    <div key={item.id} className="flex hover:bg-muted/10">
+      {/* Título da tarefa na coluna esquerda */}
+      <div className="w-[280px] shrink-0 p-1 pl-12 border-r">
+        <span className="text-xs truncate block" title={item.item}>
+          {item.item}
+        </span>
+      </div>
+      {/* Barra no timeline */}
+      <div className="flex-1 relative h-6">
+        {style && (
+          <div
+            className={cn(
+              "absolute h-4 top-1 rounded",
+              isAtrasada && "ring-2 ring-red-500"
+            )}
+            style={{
+              left: style.left,
+              width: style.width,
+              backgroundColor: fase?.cor || 'hsl(var(--primary))'
+            }}
+            title={`${item.data_inicio} - ${item.data_fim}`}
+          />
+        )}
+      </div>
+    </div>
+  );
+})}
+```
+
+## Benefícios
+
+1. **Títulos sempre visíveis**: Independente da largura da barra
+2. **Melhor legibilidade**: Texto não fica cortado dentro de barras estreitas
+3. **Alinhamento claro**: Cada linha corresponde a uma única tarefa
+4. **Hover por linha**: Mais fácil de interagir e identificar tarefas
+
+## Resumo
+
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | Adicionar validacao em `handleDateChange` |
-| `src/components/planejamento/EditarEmLoteDialog.tsx` | Verificar se precisa de validacao similar |
-
----
-
-## Melhoria Adicional: UX do DatePicker
-
-Para melhorar a experiencia, o DatePickerCell pode receber as datas atuais do item e desabilitar datas invalidas no calendario:
-
-- Se editando `data_inicio`: desabilitar datas posteriores a `data_fim` existente
-- Se editando `data_fim`: desabilitar datas anteriores a `data_inicio` existente
-
-Isso previne o usuario de selecionar uma data invalida em primeiro lugar.
-
----
-
-## Resumo da Implementacao
-
-1. Modificar `handleDateChange` para validar antes de enviar
-2. Passar informacoes de limite para o `DatePickerCell`
-3. Usar `disabled` no Calendar para bloquear datas invalidas
-4. Exibir toast de erro caso a validacao falhe
-
+| `src/components/planejamento/PlanejamentoGlobalTimeline.tsx` | Reestruturar renderização para exibir cada tarefa em sua própria linha com título na coluna esquerda |
