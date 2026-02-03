@@ -1,152 +1,112 @@
 
-# Plano: Visao Global do Planejamento e Correcao de Layout
+# Plano: Configuracao do Limite de Sobrecarga
 
-## Parte 1: Visao Global do Planejamento (Super Admin)
+## Objetivo
 
-### Objetivo
-Criar uma nova aba "Visao Global" exclusiva para super admins que permite visualizar todos os planejamentos de todos os empreendimentos simultaneamente, identificando:
-- Choques de datas entre tarefas de diferentes empreendimentos
-- Sobrecarga de responsaveis (funcionarios com muitas tarefas no mesmo periodo)
-- Gargalos de equipe e recursos
-- Linha do tempo consolidada de todos os projetos
+Permitir que o administrador configure o limite de tarefas por semana que define "sobrecarga" de um colaborador. Atualmente o valor esta fixo em **5 tarefas/semana** no codigo, e sera transformado em uma configuracao do sistema.
 
-### Estrutura da Interface
+---
+
+## Solucao
+
+### 1. Adicionar Configuracao no Banco de Dados
+
+Inserir uma nova entrada na tabela `configuracoes_sistema`:
+
+```sql
+INSERT INTO configuracoes_sistema (id, chave, valor, categoria)
+VALUES (
+  gen_random_uuid(),
+  'planejamento_limite_sobrecarga',
+  '5',
+  'planejamento'
+);
+```
+
+### 2. Atualizar Hook de Planejamento Global
+
+O hook `usePlanejamentoGlobal.ts` sera modificado para:
+- Receber o limite de sobrecarga como parametro (valor dinamico do banco)
+- Usar esse valor ao inves do `5` hardcoded
+
+Locais de alteracao:
+- Linha 207: `sobrecarga: maxPorSemana > 5` passa a usar o parametro
+- Linhas 223-224: deteccao de conflitos usa o mesmo valor
+
+### 3. Criar Editor de Configuracao
+
+Adicionar uma nova secao na pagina de **Configuracoes do Planejamento** (`PlanejamentoConfiguracoes.tsx`) com:
+- Um card "Configuracoes Gerais"
+- Campo numerico para o limite de sobrecarga
+- Descricao explicativa do que esse valor significa
+- Botao de salvar
+
+### 4. Atualizar Componentes que Usam o Limite
+
+Os componentes que exibem informacoes de sobrecarga precisarao buscar a configuracao:
+- `PlanejamentoGlobalEquipe.tsx` (mapa de calor - legenda e cores)
+- `PlanejamentoGlobalResumo.tsx` (alertas de conflitos)
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| **Migracao SQL** | Inserir configuracao `planejamento_limite_sobrecarga` |
+| `src/hooks/usePlanejamentoGlobal.ts` | Aceitar parametro `limiteSobrecarga` |
+| `src/pages/PlanejamentoConfiguracoes.tsx` | Adicionar card de configuracoes gerais |
+| `src/components/planejamento/PlanejamentoGlobal.tsx` | Buscar configuracao e passar para sub-componentes |
+| `src/components/planejamento/PlanejamentoGlobalEquipe.tsx` | Ajustar legenda do mapa de calor |
+
+---
+
+## Nova Interface de Configuracao
+
+A pagina de Configuracoes do Planejamento tera um novo card:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│  Planejamento                                                          │
-├────────────────────────────────────────────────────────────────────────┤
-│  [Por Empreendimento ▼]     [Global]                                   │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │ NOVA ABA "Visao Global" (super_admin apenas)                    │   │
-│  │                                                                 │   │
-│  │  ┌──────────────────┬──────────────────┬──────────────────┐    │   │
-│  │  │ Resumo           │ Timeline Global  │ Equipe           │    │   │
-│  │  └──────────────────┴──────────────────┴──────────────────┘    │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Configuracoes Gerais                                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Limite de Sobrecarga                                       │
+│  ┌─────┐ tarefas por semana                                 │
+│  │  5  │                                                    │
+│  └─────┘                                                    │
+│                                                             │
+│  Funcionarios com mais tarefas que este limite em uma       │
+│  mesma semana serao sinalizados como "sobrecarregados"      │
+│  na visao global.                                           │
+│                                                             │
+│                                    [Salvar Configuracoes]   │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-### Sub-abas da Visao Global
-
-**1. Resumo Executivo**
-- Cards com metricas consolidadas de todos os empreendimentos
-- Total de tarefas ativas, concluidas, atrasadas
-- Grafico de barras empilhadas: progresso por empreendimento
-- Alertas de conflitos detectados
-
-**2. Timeline Global**
-- Visualizacao Gantt multi-projeto
-- Cada linha representa um empreendimento com suas fases
-- Barras de tarefas agrupadas por projeto
-- Destaque visual para periodos de sobreposicao
-- Filtros por: periodo, fase, status
-
-**3. Carga da Equipe**
-- Tabela de responsaveis com contagem de tarefas por periodo
-- Mapa de calor: funcionario x semana
-- Alertas de sobrecarga (muitas tarefas no mesmo periodo)
-- Detalhamento por clique: quais tarefas de cada funcionario
-
-### Arquivos a Criar/Modificar
-
-| Arquivo | Acao | Descricao |
-|---------|------|-----------|
-| `src/pages/Planejamento.tsx` | Modificar | Adicionar toggle Global/Por Empreendimento para super admin |
-| `src/components/planejamento/PlanejamentoGlobal.tsx` | Criar | Container principal da visao global |
-| `src/components/planejamento/PlanejamentoGlobalResumo.tsx` | Criar | Cards de metricas consolidadas |
-| `src/components/planejamento/PlanejamentoGlobalTimeline.tsx` | Criar | Timeline multi-projeto |
-| `src/components/planejamento/PlanejamentoGlobalEquipe.tsx` | Criar | Analise de carga da equipe |
-| `src/hooks/usePlanejamentoGlobal.ts` | Criar | Hook para buscar todos os itens sem filtro de empreendimento |
-
-### Hook de Dados Globais
-
-```typescript
-// usePlanejamentoGlobal.ts
-export function usePlanejamentoGlobal(filters?: { 
-  data_de?: string; 
-  data_ate?: string;
-  responsavel_id?: string;
-}) {
-  // Busca TODOS os itens de planejamento ativos
-  // Agrupa por empreendimento, responsavel, periodo
-  // Calcula metricas de conflito e sobrecarga
-}
-```
-
-### Logica de Deteccao de Conflitos
-
-1. **Sobreposicao de Fases**: Quando a mesma fase esta ativa em multiplos empreendimentos no mesmo periodo
-2. **Sobrecarga de Responsavel**: Quando um funcionario tem mais de X tarefas nao-finalizadas no mesmo intervalo de 7 dias
-3. **Gargalo de Recursos**: Quando muitas tarefas estao programadas para o mesmo periodo
 
 ---
 
-## Parte 2: Correcao do Layout da Planilha
+## Resumo Tecnico
 
-### Problema Identificado
-
-Na linha de "Adicionar tarefa" (linhas 280-319 do `PlanejamentoPlanilha.tsx`), o botao/input esta sendo renderizado na **primeira celula** (que deveria ser a coluna de checkbox), causando desalinhamento:
-
-```typescript
-// PROBLEMA ATUAL - Linha 280-319
-<TableRow className="hover:bg-muted/20">
-  <TableCell className="py-1">    // <-- Esta na coluna errada!
-    {/* Botao/Input de adicionar tarefa */}
-  </TableCell>
-  <TableCell colSpan={readOnly ? 5 : 6}></TableCell>  // <-- colSpan incorreto
-</TableRow>
-```
-
-A estrutura da tabela exige:
-- Coluna 1: Checkbox (w-[40px]) - quando nao readOnly
-- Coluna 2: Item/Tarefa (w-[280px])
-- Colunas 3-8: Responsaveis, Status, Inicio, Fim, Obs, Acoes
-
-### Solucao
-
-Corrigir a linha para ter a mesma estrutura de celulas que as demais linhas:
-
-```typescript
-// CORRECAO
-<TableRow className="hover:bg-muted/20">
-  <TableCell className="py-1"></TableCell>  // Checkbox vazio
-  <TableCell className="py-1">              // Item/Tarefa
-    {/* Botao/Input de adicionar tarefa */}
-  </TableCell>
-  <TableCell className="py-1"></TableCell>  // Responsaveis
-  <TableCell className="py-1"></TableCell>  // Status
-  <TableCell className="py-1"></TableCell>  // Inicio
-  <TableCell className="py-1"></TableCell>  // Fim
-  <TableCell className="py-1"></TableCell>  // Obs
-  <TableCell className="py-1"></TableCell>  // Acoes (quando !readOnly)
-</TableRow>
-```
-
-### Arquivo a Modificar
-
-| Arquivo | Linha | Alteracao |
-|---------|-------|-----------|
-| `src/components/planejamento/PlanejamentoPlanilha.tsx` | 280-319 | Reestruturar celulas da linha de novo item |
+1. **Banco**: Nova entrada em `configuracoes_sistema` com `chave = 'planejamento_limite_sobrecarga'`
+2. **Hook existente**: `useConfiguracao('planejamento_limite_sobrecarga')` para buscar o valor
+3. **Hook de update**: `useUpdateConfiguracao()` para salvar alteracoes
+4. **Propagacao**: O valor e passado como prop para o hook e componentes que calculam sobrecarga
+5. **Fallback**: Se a configuracao nao existir, usa o valor padrao de 5
 
 ---
 
-## Resumo da Implementacao
+## Fluxo de Dados
 
-### Prioridade 1: Correcao do Layout (Bug Fix)
-- Modificar `PlanejamentoPlanilha.tsx` para corrigir a estrutura de celulas
-
-### Prioridade 2: Visao Global (Nova Feature)
-1. Criar hook `usePlanejamentoGlobal.ts`
-2. Criar componentes de visualizacao global
-3. Modificar pagina principal para incluir toggle global
-4. Testar deteccao de conflitos e sobrecarga
-
-### Estimativa de Arquivos
-- 1 arquivo modificado (bug fix)
-- 5 novos arquivos (feature global)
-- 1 arquivo modificado (pagina principal)
-
-### Permissoes
-- Visao Global: apenas `role === 'super_admin'` pode acessar
-- Dados: consulta sem filtro de empreendimento (RLS ja permite para super_admin via `is_seven_team()`)
+```text
+configuracoes_sistema (DB)
+         ↓
+useConfiguracao('planejamento_limite_sobrecarga')
+         ↓
+PlanejamentoGlobal.tsx (busca e armazena)
+         ↓
+usePlanejamentoGlobal({ limiteSobrecarga: valor })
+         ↓
+cargaPorResponsavel (calcula com limite dinamico)
+         ↓
+PlanejamentoGlobalEquipe.tsx (exibe mapa de calor)
+```
