@@ -5,10 +5,15 @@ import { PlanejamentoGlobalResumo } from './PlanejamentoGlobalResumo';
 import { PlanejamentoGlobalTimeline } from './PlanejamentoGlobalTimeline';
 import { PlanejamentoGlobalEquipe } from './PlanejamentoGlobalEquipe';
 import type { PlanejamentoGlobalFilters } from '@/hooks/usePlanejamentoGlobal';
+import { useConfiguracao } from '@/hooks/useConfiguracoesSistema';
 
 export function PlanejamentoGlobal() {
   const [activeTab, setActiveTab] = useState('resumo');
   const [filters, setFilters] = useState<PlanejamentoGlobalFilters>({});
+  
+  // Buscar configuração do limite de sobrecarga
+  const { data: configSobrecarga } = useConfiguracao('planejamento_limite_sobrecarga');
+  const limiteSobrecarga = configSobrecarga?.valor ? parseInt(configSobrecarga.valor) : 5;
 
   return (
     <div className="space-y-4">
@@ -29,7 +34,11 @@ export function PlanejamentoGlobal() {
         </TabsList>
 
         <TabsContent value="resumo" className="mt-4">
-          <PlanejamentoGlobalResumo filters={filters} onFiltersChange={setFilters} />
+          <PlanejamentoGlobalResumo 
+            filters={filters} 
+            onFiltersChange={setFilters} 
+            limiteSobrecarga={limiteSobrecarga}
+          />
         </TabsContent>
 
         <TabsContent value="timeline" className="mt-4">
@@ -37,7 +46,11 @@ export function PlanejamentoGlobal() {
         </TabsContent>
 
         <TabsContent value="equipe" className="mt-4">
-          <PlanejamentoGlobalEquipe filters={filters} onFiltersChange={setFilters} />
+          <PlanejamentoGlobalEquipe 
+            filters={filters} 
+            onFiltersChange={setFilters}
+            limiteSobrecarga={limiteSobrecarga}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -28,15 +28,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface Props {
   filters: PlanejamentoGlobalFilters;
   onFiltersChange: (filters: PlanejamentoGlobalFilters) => void;
+  limiteSobrecarga?: number;
 }
 
-export function PlanejamentoGlobalResumo({ filters }: Props) {
+export function PlanejamentoGlobalResumo({ filters, limiteSobrecarga = 5 }: Props) {
   const { 
     metricas, 
     progressoPorEmpreendimento, 
     conflitos, 
     isLoading 
-  } = usePlanejamentoGlobal(filters);
+  } = usePlanejamentoGlobal(filters, limiteSobrecarga);
 
   if (isLoading) {
     return (
