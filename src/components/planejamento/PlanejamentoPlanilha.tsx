@@ -279,6 +279,7 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                     {/* Linha para novo item */}
                     {!readOnly && (
                       <TableRow className="hover:bg-muted/20">
+                        <TableCell className="py-1"></TableCell>
                         <TableCell className="py-1">
                           {newItemFaseId === fase.id ? (
                             <Input
@@ -315,7 +316,12 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
                             </Button>
                           )}
                         </TableCell>
-                        <TableCell colSpan={readOnly ? 5 : 6}></TableCell>
+                        <TableCell className="py-1"></TableCell>
+                        <TableCell className="py-1"></TableCell>
+                        <TableCell className="py-1"></TableCell>
+                        <TableCell className="py-1"></TableCell>
+                        <TableCell className="py-1"></TableCell>
+                        <TableCell className="py-1"></TableCell>
                       </TableRow>
                     )}
                   </>
