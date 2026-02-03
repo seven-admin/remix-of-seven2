@@ -75,6 +75,17 @@ export function EditarEmLoteDialog({
       setIsSubmitting(true);
       const itemIds = Array.from(selectedIds);
 
+      // Validar datas se ambas estão sendo definidas
+      if (dataInicioAction === 'definir' && dataFimAction === 'definir' && dataInicioValue && dataFimValue) {
+        const inicioStr = format(dataInicioValue, 'yyyy-MM-dd');
+        const fimStr = format(dataFimValue, 'yyyy-MM-dd');
+        if (fimStr < inicioStr) {
+          toast.error('A data de fim deve ser igual ou posterior à data de início');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Atualizar campos básicos
       const updates: Record<string, any> = {};
       
