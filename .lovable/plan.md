@@ -1,112 +1,91 @@
 
-# Plano: Exibir Título das Tarefas na Timeline Global
+
+# Plano: Corrigir Erro "Invalid time value" no Forecast
 
 ## Problema Identificado
 
-Na timeline global (`PlanejamentoGlobalTimeline.tsx`), as tarefas são exibidas apenas como barras coloridas. O título da tarefa (`item.item`) só aparece quando a barra tem largura maior que 60 pixels (linha 328):
+O componente `AlertasFollowup.tsx` está causando o erro `RangeError: Invalid time value` porque tenta criar um objeto `Date` a partir de valores `null` ou `undefined`.
+
+### Linha problemática (113):
 
 ```typescript
-{style.width > 60 && item.item}
+const dataRef = alerta.tipo_alerta === 'vencida' 
+  ? alerta.data_fim 
+  : alerta.data_followup;
+const atraso = formatDistanceToNow(new Date(`${dataRef}T00:00:00`), { ... });
 ```
 
-Isso causa dois problemas:
-1. Tarefas com duração curta não exibem nenhum texto
-2. Mesmo quando exibido, o texto fica truncado dentro da barra estreita
+Quando `dataRef` é `null`, a expressão `${dataRef}T00:00:00` resulta em `"nullT00:00:00"`, que cria um `Date` inválido.
+
+### Dados que causam o erro (da resposta da API):
+
+```json
+{"data_fim":"2026-01-26", "data_followup":null}
+```
+
+---
 
 ## Solução
 
-Alterar o layout para exibir o título da tarefa na **coluna da esquerda** (junto com a fase), em vez de dentro da barra. Isso garante que o título seja sempre visível, independente da largura da barra.
+Adicionar validações para garantir que datas inválidas não sejam processadas.
 
-### Nova Estrutura Visual
+### Alterações no arquivo `src/components/forecast/AlertasFollowup.tsx`:
 
-```text
-Antes:
-┌──────────────────────┬────────────────────────────────┐
-│ 🟢 Fase X (3)        │  [████]  [██████]  [███]       │
-└──────────────────────┴────────────────────────────────┘
+1. **Filtrar alertas sem data válida** antes de mapear
+2. **Adicionar validação** antes de chamar `formatDistanceToNow`
+3. **Usar helper seguro** para parse de datas
 
-Depois:
-┌──────────────────────┬────────────────────────────────┐
-│ 🟢 Fase X            │                                │
-│   └ Tarefa 1         │  [████████████]                │
-│   └ Tarefa 2         │        [██████████]            │
-│   └ Tarefa 3         │              [███████]         │
-└──────────────────────┴────────────────────────────────┘
-```
-
-## Alterações Técnicas
-
-### Arquivo: `src/components/planejamento/PlanejamentoGlobalTimeline.tsx`
-
-1. **Separar linha da fase das linhas de tarefas**: Em vez de renderizar todas as barras dentro de uma única div, criar uma linha separada para cada tarefa
-
-2. **Adicionar coluna com título**: Cada linha de tarefa terá o título na coluna da esquerda com indentação
-
-3. **Manter barra na área do timeline**: A barra colorida continua na área do gráfico, mas agora sincronizada com sua linha
-
-### Código a Modificar (linhas 285-336)
-
-Reestruturar o loop de fases para:
-- Renderizar primeiro a linha de cabeçalho da fase
-- Renderizar uma linha separada para cada tarefa, com:
-  - Coluna esquerda: título da tarefa (com indentação)
-  - Coluna direita: barra no timeline
+### Código corrigido:
 
 ```typescript
-{/* Linha da fase (cabeçalho) */}
-<div className="flex bg-muted/5">
-  <div className="w-[280px] shrink-0 p-2 pl-8 border-r flex items-center gap-2">
-    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: fase?.cor }} />
-    <span className="text-sm font-medium">{fase?.nome || 'Sem fase'}</span>
-    <span className="text-xs text-muted-foreground ml-auto">({faseItens.length})</span>
-  </div>
-  <div className="flex-1 h-6" />
-</div>
+// Linha 59-66: Filtrar alertas com data válida
+const alertas = [
+  ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
+  ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
+]
+  .filter((a) => {
+    // Garantir que tem data de referência válida
+    const dataRef = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
+    return dataRef != null;
+  })
+  .sort((a, b) => {
+    const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
+    const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
+    return new Date(dataA!).getTime() - new Date(dataB!).getTime();
+  });
 
-{/* Linhas das tarefas */}
-{faseItens.map((item) => {
-  const style = getBarStyle(item);
-  const isAtrasada = !item.status?.is_final && item.data_fim && parseISO(item.data_fim) < new Date();
-  
-  return (
-    <div key={item.id} className="flex hover:bg-muted/10">
-      {/* Título da tarefa na coluna esquerda */}
-      <div className="w-[280px] shrink-0 p-1 pl-12 border-r">
-        <span className="text-xs truncate block" title={item.item}>
-          {item.item}
-        </span>
-      </div>
-      {/* Barra no timeline */}
-      <div className="flex-1 relative h-6">
-        {style && (
-          <div
-            className={cn(
-              "absolute h-4 top-1 rounded",
-              isAtrasada && "ring-2 ring-red-500"
-            )}
-            style={{
-              left: style.left,
-              width: style.width,
-              backgroundColor: fase?.cor || 'hsl(var(--primary))'
-            }}
-            title={`${item.data_inicio} - ${item.data_fim}`}
-          />
-        )}
-      </div>
-    </div>
-  );
-})}
+// Linha 110-116: Adicionar validação antes de formatar
+const dataRef = alerta.tipo_alerta === 'vencida' 
+  ? alerta.data_fim 
+  : alerta.data_followup;
+
+// Parse seguro da data
+const parseLocalDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const atraso = dataRef 
+  ? formatDistanceToNow(parseLocalDate(dataRef), {
+      addSuffix: true,
+      locale: ptBR,
+    })
+  : 'Data não informada';
 ```
 
-## Benefícios
+---
 
-1. **Títulos sempre visíveis**: Independente da largura da barra
-2. **Melhor legibilidade**: Texto não fica cortado dentro de barras estreitas
-3. **Alinhamento claro**: Cada linha corresponde a uma única tarefa
-4. **Hover por linha**: Mais fácil de interagir e identificar tarefas
-
-## Resumo
+## Resumo das Alterações
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planejamento/PlanejamentoGlobalTimeline.tsx` | Reestruturar renderização para exibir cada tarefa em sua própria linha com título na coluna esquerda |
+| `src/components/forecast/AlertasFollowup.tsx` | Adicionar filtro para excluir alertas sem data válida e usar parse seguro de datas |
+
+---
+
+## Benefícios
+
+1. **Previne crash**: O componente não quebra mais com datas nulas
+2. **Parse correto**: Usa componentes locais da data (evita problemas de timezone)
+3. **Robustez**: Filtra dados inválidos antes do processamento
+
