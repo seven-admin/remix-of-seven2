@@ -56,14 +56,26 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
     });
   };
 
+  // Helper para parse seguro de datas locais (evita problemas de timezone)
+  const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const alertas = [
     ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
     ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
-  ].sort((a, b) => {
-    const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
-    const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
-    return new Date(dataA!).getTime() - new Date(dataB!).getTime();
-  });
+  ]
+    .filter((a) => {
+      // Garantir que tem data de referência válida
+      const dataRef = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
+      return dataRef != null;
+    })
+    .sort((a, b) => {
+      const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
+      const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
+      return new Date(dataA!).getTime() - new Date(dataB!).getTime();
+    });
 
   if (isLoading) {
     return (
@@ -110,10 +122,12 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
                 const dataRef = alerta.tipo_alerta === 'vencida' 
                   ? alerta.data_fim 
                   : alerta.data_followup;
-                const atraso = formatDistanceToNow(new Date(`${dataRef}T00:00:00`), {
-                  addSuffix: true,
-                  locale: ptBR,
-                });
+                const atraso = dataRef 
+                  ? formatDistanceToNow(parseLocalDate(dataRef), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })
+                  : 'Data não informada';
 
                 return (
                   <div
