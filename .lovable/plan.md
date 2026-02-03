@@ -1,91 +1,77 @@
 
+Objetivo
+- Eliminar definitivamente o erro “RangeError: Invalid time value” ao acessar `/forecast`.
 
-# Plano: Corrigir Erro "Invalid time value" no Forecast
+Diagnóstico (com base nos logs + código atual)
+- O erro ainda está vindo do componente `AlertasFollowup`.
+- No diff mais recente, nós trocamos `new Date(\`\${dataRef}T00:00:00\`)` por `parseLocalDate(dataRef)`.
+- Porém, os dados de `data_followup` que vêm do Supabase não são “YYYY-MM-DD”; eles vêm como timestamp ISO, por exemplo:
+  - `"2026-01-16T04:00:00+00:00"`
+- A função atual:
+  - `parseLocalDate(dateStr: string)` faz `dateStr.split('-')` e tenta converter o “dia” para Number.
+  - Quando `dateStr` contém `T04:00:00+00:00`, o “day” vira algo como `"16T04:00:00+00:00"`, que resulta em `NaN`.
+  - Isso gera `new Date(year, month - 1, NaN)` => `Invalid Date`.
+  - `formatDistanceToNow(Invalid Date)` lança “Invalid time value”.
 
-## Problema Identificado
+Solução (ajuste robusto de parsing + validação)
+1) Corrigir o helper de data para aceitar:
+   - `YYYY-MM-DD`
+   - ISO timestamp (`YYYY-MM-DDTHH:mm:ss...`)
+   - (e rejeitar qualquer coisa inválida sem quebrar a tela)
 
-O componente `AlertasFollowup.tsx` está causando o erro `RangeError: Invalid time value` porque tenta criar um objeto `Date` a partir de valores `null` ou `undefined`.
+2) Trocar o fluxo para:
+   - Normalizar a string (pegar apenas os primeiros 10 caracteres quando houver “T”).
+   - Validar se ano/mês/dia são números válidos.
+   - Validar se o Date final é válido (getTime não pode ser NaN).
+   - Se inválido, retornar `null` e renderizar um fallback (“Data não informada” / “Data inválida”).
 
-### Linha problemática (113):
+3) Fortalecer o filtro e o sort:
+   - Hoje o filtro apenas verifica `dataRef != null`, mas isso não basta (pode ser string inválida).
+   - Vamos filtrar com base no parse (só entra alerta com data parseável).
+   - E no sort, vamos ordenar usando o Date parseado (evita `new Date(string)` em formato imprevisível).
 
-```typescript
-const dataRef = alerta.tipo_alerta === 'vencida' 
-  ? alerta.data_fim 
-  : alerta.data_followup;
-const atraso = formatDistanceToNow(new Date(`${dataRef}T00:00:00`), { ... });
-```
+Mudanças detalhadas (arquivo)
+Arquivo: `src/components/forecast/AlertasFollowup.tsx`
 
-Quando `dataRef` é `null`, a expressão `${dataRef}T00:00:00` resulta em `"nullT00:00:00"`, que cria um `Date` inválido.
+A) Substituir `parseLocalDate` por uma versão segura
+- Assinatura sugerida:
+  - `const parseLocalDate = (dateStr: string | null | undefined): Date | null => { ... }`
+- Regras:
+  - Se `!dateStr`, retorna `null`
+  - `const normalized = dateStr.includes('T') ? dateStr.slice(0, 10) : dateStr`
+  - Split `normalized` em `YYYY-MM-DD`
+  - Se year/month/day inválidos => `null`
+  - Criar `new Date(year, month-1, day)` e checar `isNaN(d.getTime())` => `null` se inválido
 
-### Dados que causam o erro (da resposta da API):
+B) Atualizar a montagem de `alertas`
+- Em vez de filtrar só por `dataRef != null`, filtrar por `parseLocalDate(dataRef) != null`.
+- Para não recalcular parse várias vezes, opção simples:
+  - No `.map`, anexar `dataRef` e/ou `dataParsed` ao objeto (ex.: `data_ref`, `data_ref_parsed`)
+  - Filtrar por `data_ref_parsed`
+  - Ordenar por `data_ref_parsed.getTime()`
 
-```json
-{"data_fim":"2026-01-26", "data_followup":null}
-```
+C) Atualizar a renderização do “atraso”
+- Usar a data parseada:
+  - se `dataParsed` existir, `formatDistanceToNow(dataParsed, ...)`
+  - senão, fallback (“Data não informada” ou “Data inválida”)
 
----
+Casos de teste (o que validar no browser)
+1) Abrir `/forecast` com dados que tenham `data_followup` no formato ISO (com hora/timezone).
+   - Esperado: não quebrar; mostrar atraso corretamente.
+2) Alertas “vencida” (usa `data_fim` que geralmente é `YYYY-MM-DD`).
+   - Esperado: também OK.
+3) Registros com `data_fim` ou `data_followup` nulos (ou strings vazias).
+   - Esperado: não quebrar; registro pode sumir da lista (se decidirmos filtrar) ou aparecer com “Data não informada”.
+4) Verificar a ordenação dos alertas (mais antigos no topo).
+5) Testar clique nos botões “Nova Atividade / Dispensar / Concluir” para garantir que a lista ainda funciona sem side effects.
 
-## Solução
+Observação importante
+- O log do console que você colou ainda referencia `AlertasFollowup.tsx?...:209`, o que pode ser de build cache, mas como a raiz é a mesma (date-fns recebendo Date inválida), esse ajuste resolve o “último buraco” do parsing.
 
-Adicionar validações para garantir que datas inválidas não sejam processadas.
+Entrega
+- 1 arquivo alterado: `src/components/forecast/AlertasFollowup.tsx`
+- Nenhuma mudança de banco necessária.
 
-### Alterações no arquivo `src/components/forecast/AlertasFollowup.tsx`:
-
-1. **Filtrar alertas sem data válida** antes de mapear
-2. **Adicionar validação** antes de chamar `formatDistanceToNow`
-3. **Usar helper seguro** para parse de datas
-
-### Código corrigido:
-
-```typescript
-// Linha 59-66: Filtrar alertas com data válida
-const alertas = [
-  ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
-  ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
-]
-  .filter((a) => {
-    // Garantir que tem data de referência válida
-    const dataRef = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
-    return dataRef != null;
-  })
-  .sort((a, b) => {
-    const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
-    const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
-    return new Date(dataA!).getTime() - new Date(dataB!).getTime();
-  });
-
-// Linha 110-116: Adicionar validação antes de formatar
-const dataRef = alerta.tipo_alerta === 'vencida' 
-  ? alerta.data_fim 
-  : alerta.data_followup;
-
-// Parse seguro da data
-const parseLocalDate = (dateStr: string) => {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
-
-const atraso = dataRef 
-  ? formatDistanceToNow(parseLocalDate(dataRef), {
-      addSuffix: true,
-      locale: ptBR,
-    })
-  : 'Data não informada';
-```
-
----
-
-## Resumo das Alterações
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/forecast/AlertasFollowup.tsx` | Adicionar filtro para excluir alertas sem data válida e usar parse seguro de datas |
-
----
-
-## Benefícios
-
-1. **Previne crash**: O componente não quebra mais com datas nulas
-2. **Parse correto**: Usa componentes locais da data (evita problemas de timezone)
-3. **Robustez**: Filtra dados inválidos antes do processamento
-
+Risco / impacto
+- Baixo risco: mudanças localizadas, com fallback seguro.
+- Impacto positivo: page `/forecast` não cai mais no ErrorBoundary por datas inconsistentes vindas do banco.
