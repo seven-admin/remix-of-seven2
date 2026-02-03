@@ -9,7 +9,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, ChevronRight, Plus, Trash2, Copy, MessageSquare, CalendarIcon, Loader2, Edit2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
+import { toast } from 'sonner';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { usePlanejamentoItens } from '@/hooks/usePlanejamentoItens';
@@ -145,10 +146,23 @@ export function PlanejamentoPlanilha({ empreendimentoId, readOnly = false }: Pro
   };
 
   const handleDateChange = (id: string, field: string, date: Date | undefined) => {
-    updateItem.mutate({ 
-      id, 
-      [field]: date ? format(date, 'yyyy-MM-dd') : null 
-    });
+    // Buscar item atual para validação
+    const item = itens?.find(i => i.id === id);
+    if (!item) return;
+
+    const newDateStr = date ? format(date, 'yyyy-MM-dd') : null;
+    
+    // Montar datas para validação
+    const dataInicio = field === 'data_inicio' ? newDateStr : item.data_inicio;
+    const dataFim = field === 'data_fim' ? newDateStr : item.data_fim;
+    
+    // Validar constraint: data_fim >= data_inicio
+    if (dataInicio && dataFim && dataFim < dataInicio) {
+      toast.error('A data de fim deve ser igual ou posterior à data de início');
+      return;
+    }
+
+    updateItem.mutate({ id, [field]: newDateStr });
   };
 
   const handleCreateItem = (faseId: string) => {
@@ -545,6 +559,7 @@ function ItemRow({
           value={item.data_inicio}
           onChange={(date) => onDateChange(item.id, 'data_inicio', date)}
           readOnly={readOnly}
+          maxDate={item.data_fim ? parseISO(item.data_fim) : undefined}
         />
       </TableCell>
 
@@ -554,6 +569,7 @@ function ItemRow({
           value={item.data_fim}
           onChange={(date) => onDateChange(item.id, 'data_fim', date)}
           readOnly={readOnly}
+          minDate={item.data_inicio ? parseISO(item.data_inicio) : undefined}
         />
       </TableCell>
 
@@ -632,11 +648,25 @@ interface DatePickerCellProps {
   value: string | null;
   onChange: (date: Date | undefined) => void;
   readOnly: boolean;
+  minDate?: Date;
+  maxDate?: Date;
 }
 
-function DatePickerCell({ value, onChange, readOnly }: DatePickerCellProps) {
+function DatePickerCell({ value, onChange, readOnly, minDate, maxDate }: DatePickerCellProps) {
   const [open, setOpen] = useState(false);
   const date = value ? parseISO(value) : undefined;
+
+  // Função para desabilitar datas fora do range permitido
+  const isDateDisabled = (day: Date) => {
+    const dayStart = startOfDay(day);
+    if (minDate && isBefore(dayStart, startOfDay(minDate))) {
+      return true;
+    }
+    if (maxDate && isAfter(dayStart, startOfDay(maxDate))) {
+      return true;
+    }
+    return false;
+  };
 
   if (readOnly) {
     return (
@@ -667,6 +697,7 @@ function DatePickerCell({ value, onChange, readOnly }: DatePickerCellProps) {
             onChange(d);
             setOpen(false);
           }}
+          disabled={isDateDisabled}
           locale={ptBR}
           className="pointer-events-auto"
         />
