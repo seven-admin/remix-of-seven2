@@ -56,26 +56,37 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
     });
   };
 
-  // Helper para parse seguro de datas locais (evita problemas de timezone)
-  const parseLocalDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+  // Helper robusto para parse de datas (aceita YYYY-MM-DD e ISO timestamps)
+  const parseLocalDate = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr) return null;
+    
+    // Normalizar: se for ISO timestamp, pegar apenas YYYY-MM-DD
+    const normalized = dateStr.includes('T') ? dateStr.slice(0, 10) : dateStr;
+    const parts = normalized.split('-');
+    
+    if (parts.length !== 3) return null;
+    
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+    
+    const date = new Date(year, month - 1, day);
+    return isNaN(date.getTime()) ? null : date;
   };
 
   const alertas = [
     ...(vencidas || []).map((a) => ({ ...a, tipo_alerta: 'vencida' as const })),
     ...(followups || []).map((a) => ({ ...a, tipo_alerta: 'followup' as const })),
   ]
-    .filter((a) => {
-      // Garantir que tem data de referência válida
+    .map((a) => {
       const dataRef = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
-      return dataRef != null;
+      const dataParsed = parseLocalDate(dataRef);
+      return { ...a, _dataRef: dataRef, _dataParsed: dataParsed };
     })
-    .sort((a, b) => {
-      const dataA = a.tipo_alerta === 'vencida' ? a.data_fim : a.data_followup;
-      const dataB = b.tipo_alerta === 'vencida' ? b.data_fim : b.data_followup;
-      return new Date(dataA!).getTime() - new Date(dataB!).getTime();
-    });
+    .filter((a) => a._dataParsed !== null)
+    .sort((a, b) => a._dataParsed!.getTime() - b._dataParsed!.getTime());
 
   if (isLoading) {
     return (
@@ -119,11 +130,8 @@ export function AlertasFollowup({ gestorId, onAtividadeClick }: AlertasFollowupP
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
               {alertas.map((alerta) => {
-                const dataRef = alerta.tipo_alerta === 'vencida' 
-                  ? alerta.data_fim 
-                  : alerta.data_followup;
-                const atraso = dataRef 
-                  ? formatDistanceToNow(parseLocalDate(dataRef), {
+                const atraso = alerta._dataParsed
+                  ? formatDistanceToNow(alerta._dataParsed, {
                       addSuffix: true,
                       locale: ptBR,
                     })
