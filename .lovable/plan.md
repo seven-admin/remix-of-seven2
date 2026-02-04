@@ -1,77 +1,197 @@
 
-Objetivo
-- Eliminar definitivamente o erro “RangeError: Invalid time value” ao acessar `/forecast`.
+# Plano: Melhorar Visualização da Timeline Global
 
-Diagnóstico (com base nos logs + código atual)
-- O erro ainda está vindo do componente `AlertasFollowup`.
-- No diff mais recente, nós trocamos `new Date(\`\${dataRef}T00:00:00\`)` por `parseLocalDate(dataRef)`.
-- Porém, os dados de `data_followup` que vêm do Supabase não são “YYYY-MM-DD”; eles vêm como timestamp ISO, por exemplo:
-  - `"2026-01-16T04:00:00+00:00"`
-- A função atual:
-  - `parseLocalDate(dateStr: string)` faz `dateStr.split('-')` e tenta converter o “dia” para Number.
-  - Quando `dateStr` contém `T04:00:00+00:00`, o “day” vira algo como `"16T04:00:00+00:00"`, que resulta em `NaN`.
-  - Isso gera `new Date(year, month - 1, NaN)` => `Invalid Date`.
-  - `formatDistanceToNow(Invalid Date)` lança “Invalid time value”.
+## Problema Identificado
 
-Solução (ajuste robusto de parsing + validação)
-1) Corrigir o helper de data para aceitar:
-   - `YYYY-MM-DD`
-   - ISO timestamp (`YYYY-MM-DDTHH:mm:ss...`)
-   - (e rejeitar qualquer coisa inválida sem quebrar a tela)
+A Timeline Global (`PlanejamentoGlobalTimeline.tsx`) tem uma visualização muito mais simples comparada à Timeline por Empreendimento (`PlanejamentoTimeline.tsx`):
 
-2) Trocar o fluxo para:
-   - Normalizar a string (pegar apenas os primeiros 10 caracteres quando houver “T”).
-   - Validar se ano/mês/dia são números válidos.
-   - Validar se o Date final é válido (getTime não pode ser NaN).
-   - Se inválido, retornar `null` e renderizar um fallback (“Data não informada” / “Data inválida”).
+| Aspecto | Timeline Empreendimento | Timeline Global |
+|---------|------------------------|-----------------|
+| **Grid vertical** | Linhas de grade em cada coluna | Sem linhas de grade |
+| **Header fixo** | Header com `sticky top-0` funcional | Apenas `sticky` no div, mas sem estrutura adequada |
+| **Destaque de hoje** | Coluna de "hoje" destacada | Sem destaque |
+| **Destaque de fim de semana** | Background diferenciado | Sem diferenciação |
+| **Altura das linhas** | Constantes definidas (`ROW_HEIGHT`, `HEADER_HEIGHT`) | Valores inline variados |
+| **Tooltips** | Tooltip rico com informações completas | Apenas `title` simples |
 
-3) Fortalecer o filtro e o sort:
-   - Hoje o filtro apenas verifica `dataRef != null`, mas isso não basta (pode ser string inválida).
-   - Vamos filtrar com base no parse (só entra alerta com data parseável).
-   - E no sort, vamos ordenar usando o Date parseado (evita `new Date(string)` em formato imprevisível).
+---
 
-Mudanças detalhadas (arquivo)
-Arquivo: `src/components/forecast/AlertasFollowup.tsx`
+## Solução Proposta
 
-A) Substituir `parseLocalDate` por uma versão segura
-- Assinatura sugerida:
-  - `const parseLocalDate = (dateStr: string | null | undefined): Date | null => { ... }`
-- Regras:
-  - Se `!dateStr`, retorna `null`
-  - `const normalized = dateStr.includes('T') ? dateStr.slice(0, 10) : dateStr`
-  - Split `normalized` em `YYYY-MM-DD`
-  - Se year/month/day inválidos => `null`
-  - Criar `new Date(year, month-1, day)` e checar `isNaN(d.getTime())` => `null` se inválido
+Aplicar o mesmo padrão visual da Timeline por Empreendimento na Timeline Global:
 
-B) Atualizar a montagem de `alertas`
-- Em vez de filtrar só por `dataRef != null`, filtrar por `parseLocalDate(dataRef) != null`.
-- Para não recalcular parse várias vezes, opção simples:
-  - No `.map`, anexar `dataRef` e/ou `dataParsed` ao objeto (ex.: `data_ref`, `data_ref_parsed`)
-  - Filtrar por `data_ref_parsed`
-  - Ordenar por `data_ref_parsed.getTime()`
+### 1. Adicionar Grid Vertical
+- Renderizar células de grid em cada linha de tarefa (como na Timeline por Empreendimento)
+- Usar bordas verticais para criar a grade visual
 
-C) Atualizar a renderização do “atraso”
-- Usar a data parseada:
-  - se `dataParsed` existir, `formatDistanceToNow(dataParsed, ...)`
-  - senão, fallback (“Data não informada” ou “Data inválida”)
+### 2. Melhorar Header com Sticky Funcional
+- Separar estrutura em coluna fixa + área scrollável
+- Header das datas realmente fixo no topo durante scroll vertical
 
-Casos de teste (o que validar no browser)
-1) Abrir `/forecast` com dados que tenham `data_followup` no formato ISO (com hora/timezone).
-   - Esperado: não quebrar; mostrar atraso corretamente.
-2) Alertas “vencida” (usa `data_fim` que geralmente é `YYYY-MM-DD`).
-   - Esperado: também OK.
-3) Registros com `data_fim` ou `data_followup` nulos (ou strings vazias).
-   - Esperado: não quebrar; registro pode sumir da lista (se decidirmos filtrar) ou aparecer com “Data não informada”.
-4) Verificar a ordenação dos alertas (mais antigos no topo).
-5) Testar clique nos botões “Nova Atividade / Dispensar / Concluir” para garantir que a lista ainda funciona sem side effects.
+### 3. Adicionar Destaques Visuais
+- Destacar coluna de "hoje" com background diferenciado
+- Marcar fins de semana (quando zoom = dia)
 
-Observação importante
-- O log do console que você colou ainda referencia `AlertasFollowup.tsx?...:209`, o que pode ser de build cache, mas como a raiz é a mesma (date-fns recebendo Date inválida), esse ajuste resolve o “último buraco” do parsing.
+### 4. Padronizar Alturas e Espaçamentos
+- Usar constantes para `ROW_HEIGHT`, `HEADER_HEIGHT`, `FASE_ROW_HEIGHT`
+- Manter consistência visual
 
-Entrega
-- 1 arquivo alterado: `src/components/forecast/AlertasFollowup.tsx`
-- Nenhuma mudança de banco necessária.
+### 5. Adicionar Tooltips Ricos
+- Usar componente `Tooltip` do shadcn/ui
+- Mostrar: tarefa, datas, status, responsável
 
-Risco / impacto
-- Baixo risco: mudanças localizadas, com fallback seguro.
-- Impacto positivo: page `/forecast` não cai mais no ErrorBoundary por datas inconsistentes vindas do banco.
+---
+
+## Alterações Técnicas
+
+### Arquivo: `src/components/planejamento/PlanejamentoGlobalTimeline.tsx`
+
+#### A) Adicionar constantes de altura (topo do arquivo)
+```typescript
+const ROW_HEIGHT = 32;
+const HEADER_HEIGHT = 48;
+const FASE_ROW_HEIGHT = 28;
+const EMP_ROW_HEIGHT = 36;
+```
+
+#### B) Adicionar cálculo de coluna "hoje" e fins de semana
+```typescript
+const columns = useMemo(() => {
+  return timeUnits.map((unit, idx) => {
+    const isToday = zoom === 'dia' 
+      ? format(unit, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+      : zoom === 'semana'
+        ? isWithinInterval(new Date(), { start: unit, end: endOfWeek(unit, { weekStartsOn: 1 }) })
+        : isSameMonth(unit, new Date());
+    const isWeekend = zoom === 'dia' && (unit.getDay() === 0 || unit.getDay() === 6);
+    
+    return {
+      date: unit,
+      isToday,
+      isWeekend,
+      label: zoom === 'dia' ? format(unit, 'dd') : zoom === 'semana' ? format(unit, 'dd/MM') : format(unit, 'MMM yy')
+    };
+  });
+}, [timeUnits, zoom]);
+```
+
+#### C) Reestruturar layout com coluna fixa real
+```typescript
+<div className="relative flex">
+  {/* Coluna fixa de títulos */}
+  <div className="w-[280px] shrink-0 border-r bg-card z-10">
+    {/* Header */}
+    <div className="border-b bg-muted/50 px-3 font-medium text-sm flex items-center"
+         style={{ height: HEADER_HEIGHT }}>
+      Empreendimento / Tarefa
+    </div>
+    
+    {/* Linhas de títulos... */}
+  </div>
+
+  {/* Área scrollável horizontalmente */}
+  <ScrollArea className="flex-1">
+    <div style={{ width: totalWidth }}>
+      {/* Header de datas - sticky */}
+      <div className="flex border-b sticky top-0 bg-muted/50"
+           style={{ height: HEADER_HEIGHT }}>
+        {columns.map((col, idx) => (
+          <div key={idx} 
+               className={cn("border-r text-center", col.isToday && "bg-primary/10")}
+               style={{ width: unitWidth }}>
+            {col.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid com células por linha... */}
+    </div>
+  </ScrollArea>
+</div>
+```
+
+#### D) Renderizar grid em cada linha de tarefa
+```typescript
+{/* Linha de tarefa com grid */}
+<div className="flex relative" style={{ height: ROW_HEIGHT }}>
+  {/* Células do grid */}
+  {columns.map((col, idx) => (
+    <div
+      key={idx}
+      className={cn(
+        "border-r border-b",
+        col.isWeekend && "bg-muted/10",
+        col.isToday && "bg-primary/5"
+      )}
+      style={{ width: unitWidth }}
+    />
+  ))}
+  
+  {/* Barra da tarefa (posição absoluta sobre o grid) */}
+  {style && (
+    <div className="absolute h-5 top-1 rounded ..." 
+         style={{ left: style.left, width: style.width }}>
+    </div>
+  )}
+</div>
+```
+
+#### E) Adicionar Tooltips
+```typescript
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Na barra da tarefa:
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="absolute h-5 ..." style={{ left, width }}>
+        {/* barra */}
+      </div>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p className="font-medium">{item.item}</p>
+      <p className="text-muted-foreground text-xs">
+        {item.data_inicio} - {item.data_fim}
+      </p>
+      <p className="text-xs">{item.status?.nome}</p>
+    </TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+---
+
+## Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/planejamento/PlanejamentoGlobalTimeline.tsx` | Reestruturar layout com grid vertical, header fixo, destaques de hoje/fim de semana, e tooltips |
+
+---
+
+## Resultado Esperado
+
+```
+┌────────────────────────┬────┬────┬────┬────┬────┬────┬────┐
+│ Empreendimento/Tarefa  │ 01 │ 02 │ 03 │ 04 │ 05 │ 06 │ 07 │  ← Header fixo
+├────────────────────────┼────┼────┼────┼────┼────┼────┼────┤
+│ ▼ Residencial Aurora   │    │    │    │    │    │    │    │  ← Empreendimento
+├────────────────────────┼────┼────┼────┼────┼────┼────┼────┤
+│   ● Fase 1 (3)         │    │    │    │    │    │    │    │  ← Fase
+├────────────────────────┼────┼────┼────┼────┼████████│────┤
+│     └ Tarefa A         │    │    │ ██████████████│    │    │  ← Tarefa com grid
+├────────────────────────┼────┼────┼────┼────┼────┼────┼────┤
+│     └ Tarefa B         │    │    │    │    │████│    │    │
+└────────────────────────┴────┴────┴────┴────┴────┴────┴────┘
+                                       ↑
+                              Coluna "hoje" destacada
+```
+
+---
+
+## Benefícios
+
+1. **Legibilidade**: Grid facilita associar barra à data
+2. **Consistência**: Mesmo padrão visual das duas timelines
+3. **Orientação temporal**: Destaque de "hoje" ajuda a se localizar
+4. **Informações**: Tooltips mostram detalhes sem poluir a tela
