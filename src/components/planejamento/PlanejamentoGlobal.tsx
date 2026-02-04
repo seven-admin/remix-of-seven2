@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, CalendarDays, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, Users, Calendar } from 'lucide-react';
 import { PlanejamentoGlobalResumo } from './PlanejamentoGlobalResumo';
 import { PlanejamentoGlobalTimeline } from './PlanejamentoGlobalTimeline';
 import { PlanejamentoGlobalEquipe } from './PlanejamentoGlobalEquipe';
+import { PlanejamentoCalendario } from './PlanejamentoCalendario';
 import type { PlanejamentoGlobalFilters } from '@/hooks/usePlanejamentoGlobal';
 import { useConfiguracao } from '@/hooks/useConfiguracoesSistema';
 
@@ -27,6 +28,10 @@ export function PlanejamentoGlobal() {
             <CalendarDays className="h-4 w-4" />
             Timeline Global
           </TabsTrigger>
+          <TabsTrigger value="calendario" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Calendário
+          </TabsTrigger>
           <TabsTrigger value="equipe" className="gap-2">
             <Users className="h-4 w-4" />
             Carga da Equipe
@@ -43,6 +48,10 @@ export function PlanejamentoGlobal() {
 
         <TabsContent value="timeline" className="mt-4">
           <PlanejamentoGlobalTimeline filters={filters} onFiltersChange={setFilters} />
+        </TabsContent>
+
+        <TabsContent value="calendario" className="mt-4">
+          <PlanejamentoCalendario filters={filters} onFiltersChange={setFilters} />
         </TabsContent>
 
         <TabsContent value="equipe" className="mt-4">

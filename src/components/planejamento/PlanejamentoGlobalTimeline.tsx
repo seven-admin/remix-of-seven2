@@ -1,9 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
 import { 
@@ -55,7 +54,11 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
   
   const [zoom, setZoom] = useState<ZoomLevel>('semana');
   const [collapsedEmpreendimentos, setCollapsedEmpreendimentos] = useState<Set<string>>(new Set());
-  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Refs para sincronizar scroll
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Agrupar itens por empreendimento
   const itensPorEmpreendimento = useMemo(() => {
@@ -259,6 +262,82 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
     );
   };
 
+  // Gerar linhas de dados (para manter sincronizado entre sidebar e timeline)
+  const rows = useMemo(() => {
+    const result: Array<{
+      type: 'empreendimento' | 'fase' | 'tarefa';
+      height: number;
+      empId: string;
+      faseId?: string;
+      item?: PlanejamentoItemWithRelations;
+      nome: string;
+      count?: number;
+      fase?: { cor?: string; nome?: string };
+      isCollapsed?: boolean;
+    }> = [];
+
+    Array.from(itensPorEmpreendimento.entries()).forEach(([empId, { nome, itens: empItens }]) => {
+      const isCollapsed = collapsedEmpreendimentos.has(empId);
+      
+      // Linha do empreendimento
+      result.push({
+        type: 'empreendimento',
+        height: EMP_ROW_HEIGHT,
+        empId,
+        nome,
+        count: empItens.length,
+        isCollapsed
+      });
+
+      if (!isCollapsed) {
+        // Agrupar por fase
+        const itensPorFase = new Map<string, PlanejamentoItemWithRelations[]>();
+        empItens.forEach(item => {
+          const faseId = item.fase_id;
+          if (!itensPorFase.has(faseId)) {
+            itensPorFase.set(faseId, []);
+          }
+          itensPorFase.get(faseId)!.push(item);
+        });
+
+        Array.from(itensPorFase.entries()).forEach(([faseId, faseItens]) => {
+          const fase = fases?.find(f => f.id === faseId);
+          
+          // Linha da fase
+          result.push({
+            type: 'fase',
+            height: FASE_ROW_HEIGHT,
+            empId,
+            faseId,
+            nome: fase?.nome || 'Sem fase',
+            count: faseItens.length,
+            fase: { cor: fase?.cor, nome: fase?.nome }
+          });
+
+          // Linhas das tarefas
+          faseItens.forEach(item => {
+            result.push({
+              type: 'tarefa',
+              height: ROW_HEIGHT,
+              empId,
+              faseId,
+              item,
+              nome: item.item,
+              fase: { cor: fase?.cor }
+            });
+          });
+        });
+      }
+    });
+
+    return result;
+  }, [itensPorEmpreendimento, collapsedEmpreendimentos, fases]);
+
+  // Obter itens para empreendimento colapsado (para barras resumidas)
+  const getCollapsedItems = (empId: string) => {
+    return itensPorEmpreendimento.get(empId)?.itens || [];
+  };
+
   if (isLoading) {
     return <Skeleton className="h-[500px]" />;
   }
@@ -299,113 +378,102 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex border-t" style={{ maxHeight: 600 }}>
-          {/* Coluna fixa de títulos */}
-          <div 
-            className="shrink-0 border-r bg-card z-10 overflow-hidden"
-            style={{ width: SIDEBAR_WIDTH }}
-          >
-            {/* Header da coluna de títulos */}
+        {/* Container principal com scroll vertical unificado */}
+        <div 
+          ref={containerRef}
+          className="border-t overflow-auto"
+          style={{ maxHeight: 600 }}
+        >
+          <div className="flex min-w-max">
+            {/* Coluna fixa de títulos - sticky left */}
             <div 
-              className="border-b bg-muted/50 px-3 font-medium text-sm flex items-center"
-              style={{ height: HEADER_HEIGHT }}
+              ref={sidebarRef}
+              className="shrink-0 sticky left-0 bg-card z-20 border-r"
+              style={{ width: SIDEBAR_WIDTH }}
             >
-              Empreendimento / Tarefa
-            </div>
-            
-            {/* Área scrollável vertical sincronizada */}
-            <div className="overflow-hidden" style={{ height: 'calc(100% - ' + HEADER_HEIGHT + 'px)' }}>
-              <ScrollArea className="h-full">
-                {Array.from(itensPorEmpreendimento.entries()).map(([empId, { nome, itens: empItens }]) => {
-                  const isCollapsed = collapsedEmpreendimentos.has(empId);
-                  
-                  // Agrupar por fase
-                  const itensPorFase = new Map<string, PlanejamentoItemWithRelations[]>();
-                  empItens.forEach(item => {
-                    const faseId = item.fase_id;
-                    if (!itensPorFase.has(faseId)) {
-                      itensPorFase.set(faseId, []);
-                    }
-                    itensPorFase.get(faseId)!.push(item);
-                  });
-
+              {/* Header da coluna de títulos - sticky top */}
+              <div 
+                className="sticky top-0 z-30 border-b bg-muted/50 px-3 font-medium text-sm flex items-center"
+                style={{ height: HEADER_HEIGHT }}
+              >
+                Empreendimento / Tarefa
+              </div>
+              
+              {/* Linhas de títulos */}
+              {rows.map((row, idx) => {
+                if (row.type === 'empreendimento') {
                   return (
-                    <div key={empId}>
-                      {/* Linha do empreendimento */}
-                      <div 
-                        className="flex items-center gap-2 px-2 border-b hover:bg-muted/20 cursor-pointer"
-                        style={{ height: EMP_ROW_HEIGHT }}
-                        onClick={() => toggleEmpreendimento(empId)}
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 shrink-0" />
-                        )}
-                        <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium text-sm truncate flex-1" title={nome}>
-                          {nome}
-                        </span>
-                        <Badge variant="secondary" className="shrink-0">
-                          {empItens.length}
-                        </Badge>
-                      </div>
-
-                      {/* Fases e tarefas quando expandido */}
-                      {!isCollapsed && Array.from(itensPorFase.entries()).map(([faseId, faseItens]) => {
-                        const fase = fases?.find(f => f.id === faseId);
-                        
-                        return (
-                          <div key={faseId}>
-                            {/* Linha da fase */}
-                            <div 
-                              className="flex items-center gap-2 pl-6 pr-2 border-b bg-muted/5"
-                              style={{ height: FASE_ROW_HEIGHT }}
-                            >
-                              <div 
-                                className="w-3 h-3 rounded-full shrink-0" 
-                                style={{ backgroundColor: fase?.cor }}
-                              />
-                              <span className="text-sm font-medium truncate flex-1">
-                                {fase?.nome || 'Sem fase'}
-                              </span>
-                              <span className="text-xs text-muted-foreground shrink-0">
-                                ({faseItens.length})
-                              </span>
-                            </div>
-
-                            {/* Linhas das tarefas */}
-                            {faseItens.map((item) => (
-                              <div 
-                                key={item.id} 
-                                className="flex items-center pl-10 pr-2 border-b hover:bg-muted/10"
-                                style={{ height: ROW_HEIGHT }}
-                              >
-                                <span className="text-xs truncate" title={item.item}>
-                                  {item.item}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
+                    <div 
+                      key={`sidebar-emp-${row.empId}`}
+                      className="flex items-center gap-2 px-2 border-b hover:bg-muted/20 cursor-pointer"
+                      style={{ height: row.height }}
+                      onClick={() => toggleEmpreendimento(row.empId)}
+                    >
+                      {row.isCollapsed ? (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      )}
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-sm truncate flex-1" title={row.nome}>
+                        {row.nome}
+                      </span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {row.count}
+                      </Badge>
                     </div>
                   );
-                })}
-
-                {itensPorEmpreendimento.size === 0 && (
-                  <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
-                    Nenhum item encontrado
+                }
+                
+                if (row.type === 'fase') {
+                  return (
+                    <div 
+                      key={`sidebar-fase-${row.empId}-${row.faseId}`}
+                      className="flex items-center gap-2 pl-6 pr-2 border-b bg-muted/5"
+                      style={{ height: row.height }}
+                    >
+                      <div 
+                        className="w-3 h-3 rounded-full shrink-0" 
+                        style={{ backgroundColor: row.fase?.cor }}
+                      />
+                      <span className="text-sm font-medium truncate flex-1">
+                        {row.nome}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        ({row.count})
+                      </span>
+                    </div>
+                  );
+                }
+                
+                // Tarefa
+                return (
+                  <div 
+                    key={`sidebar-task-${row.item?.id}`}
+                    className="flex items-center pl-10 pr-2 border-b hover:bg-muted/10"
+                    style={{ height: row.height }}
+                  >
+                    <span className="text-xs truncate" title={row.nome}>
+                      {row.nome}
+                    </span>
                   </div>
-                )}
-              </ScrollArea>
-            </div>
-          </div>
+                );
+              })}
 
-          {/* Área scrollável do timeline */}
-          <ScrollArea className="flex-1" ref={scrollRef}>
-            <div style={{ width: totalWidth, minHeight: 400 }}>
-              {/* Header de datas - sticky */}
+              {rows.length === 0 && (
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
+                  Nenhum item encontrado
+                </div>
+              )}
+            </div>
+
+            {/* Área da timeline */}
+            <div 
+              ref={timelineRef}
+              className="flex-1"
+              style={{ width: totalWidth }}
+            >
+              {/* Header de datas - sticky top */}
               <div 
                 className="flex sticky top-0 bg-muted/50 z-10 border-b"
                 style={{ height: HEADER_HEIGHT }}
@@ -426,29 +494,18 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
               </div>
 
               {/* Linhas do grid com barras */}
-              {Array.from(itensPorEmpreendimento.entries()).map(([empId, { itens: empItens }]) => {
-                const isCollapsed = collapsedEmpreendimentos.has(empId);
-                
-                // Agrupar por fase
-                const itensPorFase = new Map<string, PlanejamentoItemWithRelations[]>();
-                empItens.forEach(item => {
-                  const faseId = item.fase_id;
-                  if (!itensPorFase.has(faseId)) {
-                    itensPorFase.set(faseId, []);
-                  }
-                  itensPorFase.get(faseId)!.push(item);
-                });
-
-                return (
-                  <div key={empId}>
-                    {/* Linha do empreendimento - grid cells */}
+              {rows.map((row, idx) => {
+                if (row.type === 'empreendimento') {
+                  const collapsedItems = row.isCollapsed ? getCollapsedItems(row.empId) : [];
+                  return (
                     <div 
+                      key={`timeline-emp-${row.empId}`}
                       className="flex relative"
-                      style={{ height: EMP_ROW_HEIGHT }}
+                      style={{ height: row.height }}
                     >
-                      {renderGridCells(EMP_ROW_HEIGHT)}
+                      {renderGridCells(row.height)}
                       {/* Barras resumidas quando colapsado */}
-                      {isCollapsed && empItens.map(item => {
+                      {row.isCollapsed && collapsedItems.map(item => {
                         const fase = fases?.find(f => f.id === item.fase_id);
                         const style = getBarStyle(item);
                         if (!style) return null;
@@ -465,41 +522,35 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
                         );
                       })}
                     </div>
-
-                    {/* Fases e tarefas quando expandido */}
-                    {!isCollapsed && Array.from(itensPorFase.entries()).map(([faseId, faseItens]) => {
-                      const fase = fases?.find(f => f.id === faseId);
-                      
-                      return (
-                        <div key={faseId}>
-                          {/* Linha da fase - grid cells */}
-                          <div 
-                            className="flex relative"
-                            style={{ height: FASE_ROW_HEIGHT }}
-                          >
-                            {renderGridCells(FASE_ROW_HEIGHT)}
-                          </div>
-
-                          {/* Linhas das tarefas com barras */}
-                          {faseItens.map((item) => (
-                            <div 
-                              key={item.id} 
-                              className="flex relative"
-                              style={{ height: ROW_HEIGHT }}
-                            >
-                              {renderGridCells(ROW_HEIGHT)}
-                              {renderTaskBar(item, fase)}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
+                  );
+                }
+                
+                if (row.type === 'fase') {
+                  return (
+                    <div 
+                      key={`timeline-fase-${row.empId}-${row.faseId}`}
+                      className="flex relative"
+                      style={{ height: row.height }}
+                    >
+                      {renderGridCells(row.height)}
+                    </div>
+                  );
+                }
+                
+                // Tarefa
+                return (
+                  <div 
+                    key={`timeline-task-${row.item?.id}`}
+                    className="flex relative"
+                    style={{ height: row.height }}
+                  >
+                    {renderGridCells(row.height)}
+                    {row.item && renderTaskBar(row.item, row.fase)}
                   </div>
                 );
               })}
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          </div>
         </div>
       </CardContent>
     </Card>
