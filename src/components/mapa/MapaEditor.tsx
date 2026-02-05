@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   Command,
   CommandEmpty,
@@ -17,6 +19,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -77,6 +86,13 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
   const [mousePosition, setMousePosition] = useState<PolygonPoint | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [markerRadius, setMarkerRadius] = useState(15);
+  
+  // Auto-link mode state
+  const [autoLinkMode, setAutoLinkMode] = useState<boolean>(false);
+  const [autoLinkBlocoNome, setAutoLinkBlocoNome] = useState<string | null>(null);
+  
+  // Ref to hold the next auto-link unit (to avoid closure issues in event handlers)
+  const nextAutoLinkUnitRef = useRef<Unidade | null>(null);
   
   // Map Fabric objects to item IDs for drag tracking
   const objectToItemIdRef = useRef<Map<FabricObject, string>>(new Map());
@@ -573,15 +589,25 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
       if (activeTool === 'draw_polygon') {
         setCurrentPoints((prev) => [...prev, { x, y }]);
       } else if (activeTool === 'draw_marker') {
+        // Auto-link: check if we should auto-link to next unit (use ref for current value)
+        const currentNextUnit = nextAutoLinkUnitRef.current;
+        const autoLinkUnitId = (autoLinkMode && currentNextUnit) ? currentNextUnit.id : undefined;
+        
         const newMarker: DrawnItem = {
           id: `marker-${Date.now()}`,
           tipo: 'marker',
           points: [{ x, y }],
           raio: markerRadius,
+          unidadeId: autoLinkUnitId,
         };
         setDrawnItems((prev) => [...prev, newMarker]);
         setSelectedItemId(newMarker.id);
-        toast.success('Marcador criado! Vincule a uma unidade.');
+        
+        if (autoLinkUnitId && currentNextUnit) {
+          toast.success(`Vinculado automaticamente: ${currentNextUnit.numero}`);
+        } else {
+          toast.success('Marcador criado! Vincule a uma unidade.');
+        }
       }
     };
 
@@ -590,7 +616,7 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     return () => {
       fabricCanvas.off('mouse:down', handleClick);
     };
-  }, [fabricCanvas, activeTool, imageScale, imageOffset, markerRadius]);
+  }, [fabricCanvas, activeTool, imageScale, imageOffset, markerRadius, autoLinkMode]);
 
   const handleFinishPolygon = () => {
     if (currentPoints.length < 3) {
@@ -598,17 +624,27 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
       return;
     }
 
+    // Auto-link: check if we should auto-link to next unit
+    const autoLinkUnitId = (autoLinkMode && nextAutoLinkUnit) ? nextAutoLinkUnit.id : undefined;
+
     const newItem: DrawnItem = {
       id: `polygon-${Date.now()}`,
       tipo: 'polygon',
       points: [...currentPoints],
+      unidadeId: autoLinkUnitId,
     };
 
     setDrawnItems((prev) => [...prev, newItem]);
     setCurrentPoints([]);
     setSelectedItemId(newItem.id);
-    setActiveTool('select');
-    toast.success('Polígono criado! Agora vincule a uma unidade.');
+    
+    if (autoLinkUnitId && nextAutoLinkUnit) {
+      // Stay in polygon mode for continuous drawing when auto-linking
+      toast.success(`Vinculado automaticamente: ${nextAutoLinkUnit.numero}`);
+    } else {
+      setActiveTool('select');
+      toast.success('Polígono criado! Agora vincule a uma unidade.');
+    }
   };
 
   const handleDeleteItem = () => {
@@ -751,6 +787,48 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     [unlinkedUnidades]
   );
 
+  // Auto-link: get unique blocos from unlinked unidades
+  const availableBlocos = useMemo(() => {
+    const blocoSet = new Set<string>();
+    unlinkedUnidades.forEach(u => {
+      const nome = u.bloco?.nome || 'Sem bloco';
+      blocoSet.add(nome);
+    });
+    return Array.from(blocoSet).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+  }, [unlinkedUnidades]);
+
+  // Auto-link: count unlinked by bloco
+  const unlinkedCountByBloco = useMemo(() => {
+    const counts = new Map<string, number>();
+    unlinkedUnidades.forEach(u => {
+      const nome = u.bloco?.nome || 'Sem bloco';
+      counts.set(nome, (counts.get(nome) || 0) + 1);
+    });
+    return counts;
+  }, [unlinkedUnidades]);
+
+  // Auto-link: queue of units for selected bloco (ordered by andar + numero)
+  const autoLinkQueue = useMemo(() => {
+    if (!autoLinkMode || !autoLinkBlocoNome) return [];
+    
+    return unlinkedUnidades
+      .filter(u => (u.bloco?.nome || 'Sem bloco') === autoLinkBlocoNome)
+      .sort((a, b) => {
+        const andarA = a.andar ?? -Infinity;
+        const andarB = b.andar ?? -Infinity;
+        if (andarA !== andarB) return andarA - andarB;
+        return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
+      });
+  }, [autoLinkMode, autoLinkBlocoNome, unlinkedUnidades]);
+
+  // Next unit to auto-link
+  const nextAutoLinkUnit = autoLinkQueue[0] || null;
+  
+  // Update ref whenever nextAutoLinkUnit changes
+  useEffect(() => {
+    nextAutoLinkUnitRef.current = nextAutoLinkUnit;
+  }, [nextAutoLinkUnit]);
+
   const selectedItem = drawnItems.find((p) => p.id === selectedItemId);
 
   if (showUpload) {
@@ -825,6 +903,47 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
               />
             </div>
           )}
+
+          {/* Auto-link mode */}
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+            <Switch
+              id="auto-link-mode"
+              checked={autoLinkMode}
+              onCheckedChange={(checked) => {
+                setAutoLinkMode(checked);
+                if (!checked) setAutoLinkBlocoNome(null);
+              }}
+            />
+            <Label htmlFor="auto-link-mode" className="text-sm whitespace-nowrap cursor-pointer">
+              Auto-Vincular
+            </Label>
+
+            {autoLinkMode && (
+              <>
+                <Select 
+                  value={autoLinkBlocoNome || ''} 
+                  onValueChange={(val) => setAutoLinkBlocoNome(val || null)}
+                >
+                  <SelectTrigger className="w-40 h-8">
+                    <SelectValue placeholder="Selecione bloco" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBlocos.map((bloco) => (
+                      <SelectItem key={bloco} value={bloco}>
+                        {bloco} ({unlinkedCountByBloco.get(bloco) || 0})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {nextAutoLinkUnit && (
+                  <Badge variant="outline" className="bg-primary/10 whitespace-nowrap">
+                    Próxima: {nextAutoLinkUnit.numero}
+                  </Badge>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Zoom and pan indicator */}
           <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
@@ -957,9 +1076,31 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
           <strong>Modo Marcador:</strong> Clique no mapa para criar um marcador circular. Depois vincule a uma unidade.
         </div>
       )}
-      {activeTool === 'select' && (
+      {activeTool === 'select' && !autoLinkMode && (
         <div className="p-3 bg-muted/50 border border-border rounded-lg text-sm text-muted-foreground">
           <strong>Dica:</strong> Arraste para mover itens. <kbd className="px-1 bg-muted rounded">Ctrl+D</kbd> duplicar. <kbd className="px-1 bg-muted rounded">Delete</kbd> excluir. <kbd className="px-1 bg-muted rounded">Alt+Arrastar</kbd> mover mapa.
+        </div>
+      )}
+      
+      {/* Auto-link mode active indicator */}
+      {autoLinkMode && nextAutoLinkUnit && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400">
+          <strong>Auto-Vincular Ativo:</strong> O próximo item será vinculado a{' '}
+          <span className="font-bold">{buildUnitLabel(nextAutoLinkUnit, labelFormato)}</span>
+          {' '}({nextAutoLinkUnit.bloco?.nome || 'Sem bloco'})
+          <span className="ml-2 text-xs opacity-75">
+            — Restam {autoLinkQueue.length} unidades
+          </span>
+        </div>
+      )}
+      {autoLinkMode && !nextAutoLinkUnit && autoLinkBlocoNome && (
+        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-400">
+          <strong>Todas vinculadas!</strong> Não há mais unidades sem vínculo em "{autoLinkBlocoNome}".
+        </div>
+      )}
+      {autoLinkMode && !autoLinkBlocoNome && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-400">
+          <strong>Auto-Vincular:</strong> Selecione um bloco/quadra para iniciar a vinculação automática.
         </div>
       )}
 
