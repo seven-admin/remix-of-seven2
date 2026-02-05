@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { usePlanejamentoGlobal, type PlanejamentoGlobalFilters } from '@/hooks/usePlanejamentoGlobal';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PlanejamentoItemWithRelations } from '@/types/planejamento.types';
@@ -139,7 +139,7 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
       {/* Calendário */}
       <div className="lg:col-span-2">
         <Card>
@@ -266,7 +266,7 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
 
       {/* Painel de detalhes do dia */}
       <div className="lg:col-span-1">
-        <Card className="h-full">
+        <Card className="h-full flex flex-col">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
@@ -276,9 +276,9 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
               {itensDoDia.length} tarefa{itensDoDia.length !== 1 ? 's' : ''} ativa{itensDoDia.length !== 1 ? 's' : ''}
             </p>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 flex-1 overflow-hidden">
             {itensDoDia.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex flex-col items-center justify-center h-full text-center">
                 <CalendarDays className="h-12 w-12 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground text-sm">
                   Nenhuma tarefa neste dia
@@ -288,8 +288,8 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
                 </p>
               </div>
             ) : (
-              <ScrollArea className="h-[calc(100vh-480px)] min-h-[300px]">
-                <div className="space-y-3 pr-4">
+              <div className="h-full overflow-y-auto pr-2">
+                <div className="space-y-3">
                   {itensDoDia.map((item) => {
                     const empColor = empColors.get(item.empreendimento?.id || '');
                     const color = empColor?.color || '#6b7280';
@@ -342,7 +342,7 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </CardContent>
         </Card>
