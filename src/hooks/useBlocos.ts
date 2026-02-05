@@ -177,3 +177,42 @@ export function useDeleteBloco() {
     },
   });
 }
+
+// Hook para atualizar contagem de unidades/lotes de cada bloco
+export function useAtualizarContagemBlocos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (empreendimentoId: string) => {
+      // Buscar todos os blocos do empreendimento
+      const { data: blocos, error: blocosError } = await supabase
+        .from('blocos')
+        .select('id')
+        .eq('empreendimento_id', empreendimentoId)
+        .eq('is_active', true);
+
+      if (blocosError) throw blocosError;
+      if (!blocos || blocos.length === 0) return;
+
+      // Para cada bloco, contar unidades e atualizar
+      for (const bloco of blocos) {
+        const { count, error: countError } = await supabase
+          .from('unidades')
+          .select('*', { count: 'exact', head: true })
+          .eq('bloco_id', bloco.id)
+          .eq('is_active', true);
+
+        if (countError) continue;
+
+        await supabase
+          .from('blocos')
+          .update({ unidades_por_andar: count })
+          .eq('id', bloco.id);
+      }
+    },
+    onSuccess: (_, empreendimentoId) => {
+      queryClient.invalidateQueries({ queryKey: ['blocos', empreendimentoId] });
+      queryClient.invalidateQueries({ queryKey: ['blocos-contagem', empreendimentoId] });
+    },
+  });
+}
