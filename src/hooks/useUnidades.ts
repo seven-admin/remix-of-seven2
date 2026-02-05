@@ -301,6 +301,32 @@ export function useUpdateUnidadesMemorial() {
   });
 }
 
+// Atualizar status em lote
+export function useUpdateUnidadesStatusBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, empreendimentoId, status }: { ids: string[]; empreendimentoId: string; status: UnidadeStatus }) => {
+      const { error } = await supabase
+        .from('unidades')
+        .update({ status })
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, { empreendimentoId, ids }) => {
+      queryClient.invalidateQueries({ queryKey: ['unidades', empreendimentoId] });
+      queryClient.invalidateQueries({ queryKey: ['empreendimento', empreendimentoId] });
+      queryClient.invalidateQueries({ queryKey: ['empreendimentos'] });
+      toast.success(`Status de ${ids.length} unidade(s) atualizado com sucesso!`);
+    },
+    onError: (error) => {
+      console.error('Erro ao atualizar status:', error);
+      toast.error('Erro ao atualizar status das unidades');
+    },
+  });
+}
+
 // Excluir unidades em lote
 export function useDeleteUnidadesBatch() {
   const queryClient = useQueryClient();
