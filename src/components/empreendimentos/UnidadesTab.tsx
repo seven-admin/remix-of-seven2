@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -25,6 +25,7 @@ import { UnidadeBulkForm } from './UnidadeBulkForm';
 import { BlocoForm } from './BlocoForm';
 import { ImportarUnidadesDialog } from './ImportarUnidadesDialog';
 import { VendaHistoricaDialog } from './VendaHistoricaDialog';
+import { AlterarStatusLoteDialog } from './AlterarStatusLoteDialog';
 import { cn } from '@/lib/utils';
 import { buildUnitLabel, type LabelFormatElement } from '@/lib/mapaUtils';
 
@@ -43,10 +44,11 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
   const [blocoFormOpen, setBlocoFormOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [vendaHistoricaOpen, setVendaHistoricaOpen] = useState(false);
+  const [statusLoteOpen, setStatusLoteOpen] = useState(false);
   const [selectedUnidade, setSelectedUnidade] = useState<Unidade | null>(null);
   
   // Estado para seleção de unidades
-  const [selectionMode, setSelectionMode] = useState<'venda' | 'delete' | false>(false);
+  const [selectionMode, setSelectionMode] = useState<'venda' | 'delete' | 'status' | false>(false);
   const [selectedUnidadeIds, setSelectedUnidadeIds] = useState<Set<string>>(new Set());
 
   const tiposComMapa = ['loteamento', 'condominio'];
@@ -121,7 +123,7 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
 
   const handleToggleSelection = (unidadeId: string, status: string) => {
     // Para venda histórica: apenas unidades disponíveis
-    // Para exclusão: todas as unidades
+    // Para exclusão e status: todas as unidades
     if (selectionMode === 'venda' && status !== 'disponivel') return;
     
     setSelectedUnidadeIds(prev => {
@@ -139,6 +141,7 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
     if (selectionMode === 'venda') {
       setSelectedUnidadeIds(new Set(unidadesDisponiveis.map(u => u.id)));
     } else {
+      // Para delete e status: selecionar todas
       setSelectedUnidadeIds(new Set(unidades?.map(u => u.id) || []));
     }
   };
@@ -203,6 +206,16 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
                     Registrar Venda ({selectedUnidadeIds.size})
                   </Button>
                 )}
+                {selectionMode === 'status' && (
+                  <Button
+                    size="sm"
+                    onClick={() => setStatusLoteOpen(true)}
+                    disabled={selectedUnidadeIds.size === 0}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Alterar Status ({selectedUnidadeIds.size})
+                  </Button>
+                )}
                 {selectionMode === 'delete' && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -249,6 +262,10 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
                     </Toggle>
                   </div>
                 )}
+                <Button variant="outline" size="sm" onClick={() => setSelectionMode('status')}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Alterar Status
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelectionMode('delete')}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Excluir em Lote
@@ -282,6 +299,8 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
           <div className="mb-4 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
             {selectionMode === 'venda' 
               ? <>Clique nas unidades <strong>disponíveis</strong> (verde) para selecioná-las para registro de venda histórica.</>
+              : selectionMode === 'status'
+              ? <>Clique nas unidades cujo <strong>status</strong> deseja alterar.</>
               : <>Clique nas unidades que deseja <strong>excluir</strong>. Esta ação é permanente.</>
             }
           </div>
@@ -333,8 +352,10 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
                                 selectionMode === 'venda' && isDisponivel && 'cursor-pointer ring-offset-2 hover:ring-2 ring-primary',
                                 selectionMode === 'venda' && !isDisponivel && 'opacity-50 cursor-not-allowed',
                                 selectionMode === 'delete' && 'cursor-pointer ring-offset-2 hover:ring-2 ring-destructive',
+                                selectionMode === 'status' && 'cursor-pointer ring-offset-2 hover:ring-2 ring-primary',
                                 isSelected && selectionMode === 'venda' && 'ring-2 ring-primary ring-offset-2',
                                 isSelected && selectionMode === 'delete' && 'ring-2 ring-destructive ring-offset-2',
+                                isSelected && selectionMode === 'status' && 'ring-2 ring-primary ring-offset-2',
                                 !selectionMode && 'cursor-pointer hover:opacity-80'
                               )}
                               title={`${label} - ${UNIDADE_STATUS_LABELS[unidade.status]}`}
@@ -399,6 +420,14 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
           empreendimentoId={empreendimentoId}
           unidadesSelecionadas={unidadesSelecionadas}
           onSuccess={handleVendaHistoricaSuccess}
+        />
+        <AlterarStatusLoteDialog
+          open={statusLoteOpen}
+          onOpenChange={setStatusLoteOpen}
+          empreendimentoId={empreendimentoId}
+          selectedCount={selectedUnidadeIds.size}
+          selectedIds={Array.from(selectedUnidadeIds)}
+          onSuccess={handleExitSelectionMode}
         />
       </CardContent>
     </Card>
