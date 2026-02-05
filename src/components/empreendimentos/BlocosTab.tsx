@@ -20,9 +20,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Loader2, Building2 } from 'lucide-react';
-import { useBlocosComContagem, useDeleteBloco } from '@/hooks/useBlocos';
+import { Plus, Edit, Trash2, Loader2, Building2, RefreshCw } from 'lucide-react';
+import { useBlocosComContagem, useDeleteBloco, useAtualizarContagemBlocos } from '@/hooks/useBlocos';
 import { BlocoForm } from './BlocoForm';
+import { toast } from 'sonner';
 import type { Bloco, EmpreendimentoTipo } from '@/types/empreendimentos.types';
 
 interface BlocosTabProps {
@@ -38,6 +39,7 @@ export function BlocosTab({ empreendimentoId, tipoEmpreendimento }: BlocosTabPro
 
   const { data: blocos, isLoading } = useBlocosComContagem(empreendimentoId);
   const deleteBloco = useDeleteBloco();
+  const atualizarContagem = useAtualizarContagemBlocos();
 
   const isLoteamento = tipoEmpreendimento === 'loteamento' || tipoEmpreendimento === 'condominio';
   const entityLabel = isLoteamento ? 'Quadra' : 'Bloco';
@@ -72,6 +74,16 @@ export function BlocosTab({ empreendimentoId, tipoEmpreendimento }: BlocosTabPro
     }
   };
 
+  const handleRecalcular = async () => {
+    try {
+      await atualizarContagem.mutateAsync(empreendimentoId);
+      toast.success('Total de lotes atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao recalcular:', error);
+      toast.error('Erro ao recalcular total de lotes');
+    }
+  };
+
   const totalUnidadesCadastradas = blocos?.reduce(
     (sum, b) => sum + (b.total_unidades_cadastradas || 0),
     0
@@ -95,10 +107,24 @@ export function BlocosTab({ empreendimentoId, tipoEmpreendimento }: BlocosTabPro
             <Building2 className="h-5 w-5" />
             {entityLabelPlural}
           </CardTitle>
-          <Button onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nov{isLoteamento ? 'a' : 'o'} {entityLabel}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleRecalcular}
+              disabled={atualizarContagem.isPending}
+            >
+              {atualizarContagem.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Recalcular Totais
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nov{isLoteamento ? 'a' : 'o'} {entityLabel}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {blocos && blocos.length > 0 ? (
