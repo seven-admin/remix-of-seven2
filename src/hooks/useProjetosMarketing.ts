@@ -63,7 +63,8 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
           *,
           cliente:cliente_id(id, full_name, email),
           supervisor:supervisor_id(id, full_name),
-          empreendimento:empreendimento_id(id, nome)
+          empreendimento:empreendimento_id(id, nome),
+          briefing:briefing_id(id, codigo, cliente, tema, objetivo, formato_peca, composicao, head_titulo, sub_complemento, mensagem_chave, tom_comunicacao, estilo_visual, diretrizes_visuais, referencia, importante, observacoes, status)
         `)
         .eq('is_active', true)
         .order('ordem_kanban', { ascending: true });
@@ -109,7 +110,8 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
             *,
             cliente:cliente_id(id, full_name, email),
             supervisor:supervisor_id(id, full_name),
-            empreendimento:empreendimento_id(id, nome)
+            empreendimento:empreendimento_id(id, nome),
+            briefing:briefing_id(id, codigo, cliente, tema, objetivo, formato_peca, composicao, head_titulo, sub_complemento, mensagem_chave, tom_comunicacao, estilo_visual, diretrizes_visuais, referencia, importante, observacoes, status)
           `)
           .eq('id', id)
           .single();
