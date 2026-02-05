@@ -1,116 +1,104 @@
 
-# Plano: Corrigir Acesso da Equipe de Criação ao Planejamento
+# Plano: Preencher Total de Lotes Automaticamente na Importação
 
 ## Problema Identificado
 
-A equipe de criação (perfil `supervisão_de_criação`) e outros membros da equipe Seven **não conseguem visualizar os empreendimentos** no dropdown do módulo de Planejamento.
+Quando a importação de unidades via Excel cria novos blocos/quadras automaticamente, o campo `unidades_por_andar` (que exibe "Total Lotes" na tabela) fica vazio porque:
 
-### Análise Técnica
-
-| Perfil | Empreendimentos Vinculados | Acesso Planejamento |
-|--------|---------------------------|---------------------|
-| Jéssica (Diretor Marketing) | 7 empreendimentos | ✅ Funciona |
-| Jonas (Supervisão Criação) | 0 empreendimentos | ❌ Não vê dropdown |
-| Kalebe (Supervisão Criação) | 0 empreendimentos | ❌ Não vê dropdown |
-| Priscila (Supervisão Criação) | 0 empreendimentos | ❌ Não vê dropdown |
-| Rafael (Supervisão Criação) | 0 empreendimentos | ❌ Não vê dropdown |
-
-### Causa Raiz
-
-A função `user_has_empreendimento_access()` que controla a RLS da tabela `empreendimentos` não reconhece a equipe Seven (exceto admins, gestores e corretores):
-
-```sql
--- Função atual
-SELECT 
-  public.is_admin(_user_id) 
-  OR public.has_role(_user_id, 'gestor_produto')
-  OR public.has_role(_user_id, 'corretor')  -- ← Corretor tem acesso global
-  OR EXISTS (SELECT 1 FROM user_empreendimentos WHERE user_id = _user_id AND ...)
--- ❌ Equipe Seven (marketing, supervisores) não está contemplada
-```
-
-### Fluxo Problemático
-
-```text
-Supervisão de Criação → Acessa /planejamento
-       ↓
-useEmpreendimentosSelect() → SELECT id, nome FROM empreendimentos
-       ↓
-RLS Policy: user_has_empreendimento_access(auth.uid(), id)
-       ↓
-Função retorna FALSE → Nenhum empreendimento visível
-       ↓
-Dropdown vazio → Usuário não consegue usar o módulo
-```
+1. A função `useCreateBlocoSilent` (linha 102-118 de `useBlocos.ts`) só recebe `{ nome: m.valorExcel }` na importação
+2. O `ImportarUnidadesDialog` (linha 332-335) não conta quantas unidades pertencem a cada bloco criado
 
 ## Solução Proposta
 
-Atualizar a função `user_has_empreendimento_access()` para incluir a equipe Seven (funcionários internos), dando acesso de visualização a todos os empreendimentos ativos.
+Após a importação das unidades ser concluída, **atualizar o campo `unidades_por_andar` de cada bloco** com a contagem real de unidades vinculadas a ele.
 
-### Alteração da Função
+### Abordagem: Pós-processamento após importação
 
-```sql
-CREATE OR REPLACE FUNCTION public.user_has_empreendimento_access(_user_id uuid, _empreendimento_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-  SELECT 
-    public.is_admin(_user_id) 
-    OR public.has_role(_user_id, 'gestor_produto')
-    OR public.has_role(_user_id, 'corretor')
-    -- NOVO: Equipe Seven tem acesso de visualização a todos os empreendimentos
-    OR public.is_seven_team(_user_id)
-    OR EXISTS (
-      SELECT 1 FROM public.user_empreendimentos
-      WHERE user_id = _user_id 
-        AND empreendimento_id = _empreendimento_id
-    )
-$function$;
+Após inserir/atualizar as unidades, calcular a contagem de lotes por quadra e atualizar os blocos correspondentes.
+
+## Alterações
+
+### 1. Criar hook para atualizar contagem de lotes
+
+**Arquivo:** `src/hooks/useBlocos.ts`
+
+Adicionar novo hook:
+
+```typescript
+export function useAtualizarContagemBlocos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (empreendimentoId: string) => {
+      // Buscar todos os blocos do empreendimento
+      const { data: blocos, error: blocosError } = await supabase
+        .from('blocos')
+        .select('id')
+        .eq('empreendimento_id', empreendimentoId)
+        .eq('is_active', true);
+
+      if (blocosError) throw blocosError;
+      if (!blocos || blocos.length === 0) return;
+
+      // Para cada bloco, contar unidades e atualizar
+      for (const bloco of blocos) {
+        const { count, error: countError } = await supabase
+          .from('unidades')
+          .select('*', { count: 'exact', head: true })
+          .eq('bloco_id', bloco.id)
+          .eq('is_active', true);
+
+        if (countError) continue;
+
+        await supabase
+          .from('blocos')
+          .update({ unidades_por_andar: count })
+          .eq('id', bloco.id);
+      }
+    },
+    onSuccess: () => {
+      // Invalidar queries de blocos para atualizar a UI
+      queryClient.invalidateQueries({ queryKey: ['blocos'] });
+      queryClient.invalidateQueries({ queryKey: ['blocos-contagem'] });
+    },
+  });
+}
 ```
 
-### Justificativa
+### 2. Chamar atualização após importação
 
-A função `is_seven_team()` já existe e identifica corretamente funcionários internos:
+**Arquivo:** `src/components/empreendimentos/ImportarUnidadesDialog.tsx`
 
-```sql
--- Retorna TRUE para qualquer role que NÃO seja:
--- 'incorporador', 'corretor', 'cliente_externo'
+Na função `handleImport` (após inserir/atualizar unidades com sucesso), adicionar:
+
+```typescript
+// Após o resultado da importação
+await atualizarContagemBlocos.mutateAsync(empreendimentoId);
 ```
-
-Isso significa que perfis como:
-- `supervisão_de_criação` ✅
-- `diretor_de_marketing` ✅  
-- `gestor_produto` ✅
-- Futuros perfis da equipe ✅
-
-Terão acesso de visualização aos empreendimentos, alinhado com a política já existente em `planejamento_itens` que usa `is_seven_team()`.
-
-## Impacto
-
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| Equipe Criação ver empreendimentos | ❌ | ✅ |
-| Política consistente com planejamento_itens | ❌ | ✅ |
-| Incorporadores/Externos com acesso restrito | ✅ | ✅ (mantém) |
-
-## Arquivos/Alterações
-
-| Tipo | Alteração |
-|------|-----------|
-| Database Function | Atualizar `user_has_empreendimento_access()` para incluir `is_seven_team()` |
 
 ## Fluxo Corrigido
 
 ```text
-Supervisão de Criação → Acessa /planejamento
+Importação Excel
        ↓
-useEmpreendimentosSelect() → SELECT id, nome FROM empreendimentos
+Criar blocos novos (se marcado "Criar novo")
        ↓
-RLS Policy: user_has_empreendimento_access(auth.uid(), id)
+Inserir/Atualizar unidades
        ↓
-is_seven_team() = TRUE → Função retorna TRUE
+[NOVO] Calcular contagem de unidades por bloco
        ↓
-Todos os empreendimentos visíveis → ✅ Dropdown populado
+[NOVO] Atualizar campo unidades_por_andar de cada bloco
+       ↓
+Resultado: Total de Lotes preenchido ✅
 ```
+
+## Resumo de Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useBlocos.ts` | Adicionar hook `useAtualizarContagemBlocos()` |
+| `src/components/empreendimentos/ImportarUnidadesDialog.tsx` | Chamar atualização de contagem após importação |
+
+## Benefício Adicional
+
+Esta solução também corrige blocos antigos que estão com o campo vazio, pois a contagem é recalculada com base nas unidades reais cadastradas.
