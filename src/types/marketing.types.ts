@@ -48,8 +48,22 @@ export interface Ticket {
   briefing?: {
     id: string;
     codigo: string;
+    cliente: string;
     tema: string;
-  };
+    objetivo: string | null;
+    formato_peca: string | null;
+    composicao: string | null;
+    head_titulo: string | null;
+    sub_complemento: string | null;
+    mensagem_chave: string | null;
+    tom_comunicacao: string | null;
+    estilo_visual: string | null;
+    diretrizes_visuais: string | null;
+    referencia: string | null;
+    importante: string | null;
+    observacoes: string | null;
+    status: string;
+  } | null;
 }
 
 // Alias para compatibilidade

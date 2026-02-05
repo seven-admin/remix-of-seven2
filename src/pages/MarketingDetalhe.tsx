@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2, Image } from 'lucide-react';
+import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2, Image, FileText, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
@@ -138,24 +138,142 @@ export default function MarketingDetalhe() {
         <div className="lg:col-span-2 space-y-6">
           {/* Descrição e Briefing */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Briefing</CardTitle>
+              {projeto.briefing && (
+                <Link to={`/briefings`}>
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                    <ExternalLink className="h-3 w-3" />
+                    {projeto.briefing.codigo}
+                  </Button>
+                </Link>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
-              {projeto.descricao && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Descrição</p>
-                  <p>{projeto.descricao}</p>
-                </div>
-              )}
-              {projeto.briefing_texto && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Detalhes do Briefing</p>
-                  <p className="whitespace-pre-wrap">{projeto.briefing_texto}</p>
-                </div>
-              )}
-              {!projeto.descricao && !projeto.briefing_texto && (
-                <p className="text-muted-foreground">Nenhum briefing cadastrado.</p>
+              {projeto.briefing ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Cliente</p>
+                      <p className="font-medium">{projeto.briefing.cliente}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Tema</p>
+                      <p className="font-medium">{projeto.briefing.tema}</p>
+                    </div>
+                  </div>
+
+                  {projeto.briefing.objetivo && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Objetivo</p>
+                      <p>{projeto.briefing.objetivo}</p>
+                    </div>
+                  )}
+
+                  {(projeto.briefing.formato_peca || projeto.briefing.composicao) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {projeto.briefing.formato_peca && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Formato da Peça</p>
+                          <p>{projeto.briefing.formato_peca}</p>
+                        </div>
+                      )}
+                      {projeto.briefing.composicao && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Composição</p>
+                          <p>{projeto.briefing.composicao}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(projeto.briefing.head_titulo || projeto.briefing.sub_complemento) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {projeto.briefing.head_titulo && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Head / Título</p>
+                          <p>{projeto.briefing.head_titulo}</p>
+                        </div>
+                      )}
+                      {projeto.briefing.sub_complemento && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Sub / Complemento</p>
+                          <p>{projeto.briefing.sub_complemento}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {projeto.briefing.mensagem_chave && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Mensagem Chave</p>
+                      <p>{projeto.briefing.mensagem_chave}</p>
+                    </div>
+                  )}
+
+                  {(projeto.briefing.tom_comunicacao || projeto.briefing.estilo_visual) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {projeto.briefing.tom_comunicacao && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Tom de Comunicação</p>
+                          <p>{projeto.briefing.tom_comunicacao}</p>
+                        </div>
+                      )}
+                      {projeto.briefing.estilo_visual && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Estilo Visual</p>
+                          <p>{projeto.briefing.estilo_visual}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {projeto.briefing.diretrizes_visuais && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Diretrizes Visuais</p>
+                      <p className="whitespace-pre-wrap">{projeto.briefing.diretrizes_visuais}</p>
+                    </div>
+                  )}
+
+                  {projeto.briefing.referencia && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Referência</p>
+                      <p className="whitespace-pre-wrap">{projeto.briefing.referencia}</p>
+                    </div>
+                  )}
+
+                  {projeto.briefing.importante && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Importante</p>
+                      <p className="whitespace-pre-wrap text-amber-600">{projeto.briefing.importante}</p>
+                    </div>
+                  )}
+
+                  {projeto.briefing.observacoes && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Observações</p>
+                      <p className="whitespace-pre-wrap">{projeto.briefing.observacoes}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {projeto.descricao && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Descrição</p>
+                      <p>{projeto.descricao}</p>
+                    </div>
+                  )}
+                  {projeto.briefing_texto && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Detalhes do Briefing</p>
+                      <p className="whitespace-pre-wrap">{projeto.briefing_texto}</p>
+                    </div>
+                  )}
+                  {!projeto.descricao && !projeto.briefing_texto && (
+                    <p className="text-muted-foreground">Nenhum briefing cadastrado.</p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
