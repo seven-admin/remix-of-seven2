@@ -1,134 +1,90 @@
 
-# Plano: Exibir Dados do Briefing nos Tickets de Marketing
 
-## Problema Identificado
+# Plano: Editar Status de Unidades em Lote
 
-Os dados do briefing cadastrado (cliente, tema, objetivo, formato da peca, tom de comunicacao, estilo visual, etc.) nao aparecem nos tickets de marketing porque as queries nunca fazem JOIN com a tabela `briefings`.
+## Objetivo
 
-### Fluxo Atual (Quebrado)
+Adicionar um novo modo de selecao em lote na aba de Unidades/Lotes para permitir alterar o status de multiplas unidades de uma vez.
 
-```text
-TicketForm cria briefing na tabela "briefings" (com dados ricos)
-       |
-Vincula ao ticket via briefing_id
-       |
-useProjetosMarketing busca ticket SEM join na tabela briefings
-       |
-MarketingDetalhe exibe projeto.briefing_texto (que esta NULL)
-       |
-Resultado: "Nenhum briefing cadastrado" -- dados perdidos
-```
+## Contexto Atual
 
-### Evidencia no Banco de Dados
+A aba de Unidades (`UnidadesTab.tsx`) ja possui dois modos de selecao em lote:
+- **Venda Historica** (`selectionMode === 'venda'`): seleciona unidades disponiveis para registrar vendas passadas
+- **Excluir em Lote** (`selectionMode === 'delete'`): seleciona unidades para exclusao
 
-| Ticket | briefing_id | briefing_texto |
-|--------|-------------|----------------|
-| MKT-00026 | 0a271602... | NULL |
-| MKT-00021 | 86395fcb... | NULL |
-| MKT-00006 | dbcac0ce... | NULL |
+O novo modo seguira o mesmo padrao visual e de interacao.
 
-Os dados existem na tabela `briefings` (ex: cliente="KRAFT", tema="IMAGEM COMPUTADOR"), mas nunca sao consultados.
+## Alteracoes
 
-## Solucao Proposta
+### 1. Criar hook para atualizar status em lote
 
-### 1. Adicionar JOIN com briefings nas queries
+**Arquivo:** `src/hooks/useUnidades.ts`
 
-**Arquivo:** `src/hooks/useProjetosMarketing.ts`
-
-Alterar o SELECT para incluir a tabela `briefings`:
+Adicionar novo hook `useUpdateUnidadesStatusBatch`:
 
 ```typescript
-.select(`
-  *,
-  cliente:cliente_id(id, full_name, email),
-  supervisor:supervisor_id(id, full_name),
-  empreendimento:empreendimento_id(id, nome),
-  briefing:briefing_id(id, codigo, cliente, tema, objetivo, formato_peca, composicao, head_titulo, sub_complemento, mensagem_chave, tom_comunicacao, estilo_visual, diretrizes_visuais, referencia, importante, observacoes, status)
-`)
+export function useUpdateUnidadesStatusBatch() {
+  return useMutation({
+    mutationFn: async ({ ids, empreendimentoId, status }) => {
+      const { error } = await supabase
+        .from('unidades')
+        .update({ status })
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, { empreendimentoId, ids, status }) => {
+      // Invalidar queries relevantes
+      toast.success(`Status de ${ids.length} unidade(s) atualizado!`);
+    },
+  });
+}
 ```
 
-Fazer isso em duas queries:
-- A query de listagem (linha 60-67)
-- A query do `useProjeto` individual (linha 106-113)
+### 2. Criar dialog de selecao de status
 
-**Arquivo:** `src/hooks/useTickets.ts`
+**Novo arquivo:** `src/components/empreendimentos/AlterarStatusLoteDialog.tsx`
 
-Mesma alteracao nas duas queries (linha 58-67 e linha 100-108).
+Dialog simples seguindo o padrao existente (`AcaoEmLoteDialog`):
+- Exibe quantas unidades foram selecionadas
+- Permite selecionar o novo status via Select com todas as opcoes (Disponivel, Reservada, Em Negociacao, Em Contrato, Vendida, Bloqueada)
+- Exibe preview visual com a cor do status selecionado
+- Botao de confirmar com loading state
 
-### 2. Atualizar o tipo Ticket para incluir briefing
+### 3. Adicionar modo de selecao "status" na UnidadesTab
 
-**Arquivo:** `src/types/marketing.types.ts`
+**Arquivo:** `src/components/empreendimentos/UnidadesTab.tsx`
 
-Atualizar a interface `Ticket` para incluir o relacionamento:
+Alteracoes:
+- Expandir `selectionMode` de `'venda' | 'delete' | false` para `'venda' | 'delete' | 'status' | false`
+- Adicionar botao "Alterar Status" na barra de acoes (fora do modo de selecao)
+- No modo `status`: permitir selecionar qualquer unidade (sem restricao por status atual)
+- Exibir barra de acoes com botao "Alterar Status (N)" que abre o dialog
+- Mensagem de instrucao: "Clique nas unidades cujo status deseja alterar."
 
-```typescript
-briefing?: {
-  id: string;
-  codigo: string;
-  cliente: string;
-  tema: string;
-  objetivo: string | null;
-  formato_peca: string | null;
-  composicao: string | null;
-  head_titulo: string | null;
-  sub_complemento: string | null;
-  mensagem_chave: string | null;
-  tom_comunicacao: string | null;
-  estilo_visual: string | null;
-  diretrizes_visuais: string | null;
-  referencia: string | null;
-  importante: string | null;
-  observacoes: string | null;
-  status: string;
-} | null;
-```
-
-### 3. Exibir dados do briefing na pagina de detalhe
-
-**Arquivo:** `src/pages/MarketingDetalhe.tsx`
-
-Substituir a secao de "Briefing" (linhas 140-161) para exibir os dados ricos do briefing vinculado:
-
-- **Cliente do Briefing** e **Tema**
-- **Objetivo**
-- **Formato da Peca** e **Composicao**
-- **Head/Titulo** e **Sub/Complemento**
-- **Mensagem Chave**
-- **Tom de Comunicacao** e **Estilo Visual**
-- **Diretrizes Visuais**
-- **Referencias**
-- **Importante** e **Observacoes**
-
-Manter fallback para `projeto.descricao` e `projeto.briefing_texto` caso o ticket nao tenha briefing vinculado.
-
-## Fluxo Corrigido
+## Fluxo do Usuario
 
 ```text
-TicketForm cria briefing na tabela "briefings"
-       |
-Vincula ao ticket via briefing_id
-       |
-useProjetosMarketing busca ticket COM join: briefing:briefing_id(...)
-       |
-MarketingDetalhe exibe projeto.briefing.tema, .objetivo, etc.
-       |
-Resultado: Dados completos do briefing visiveis no ticket
+1. Clica em "Alterar Status" na barra de acoes
+2. Entra no modo de selecao (visual identico ao de exclusao)
+3. Clica nas unidades desejadas (todas clicaveis, independente do status)
+4. Clica no botao "Alterar Status (N)"
+5. Dialog abre com Select de status
+6. Seleciona novo status e confirma
+7. Unidades sao atualizadas e a interface reflete as mudancas
 ```
 
 ## Resumo de Alteracoes
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/types/marketing.types.ts` | Adicionar tipo `briefing` na interface Ticket |
-| `src/hooks/useProjetosMarketing.ts` | Adicionar join com `briefings` nas 2 queries |
-| `src/hooks/useTickets.ts` | Adicionar join com `briefings` nas 2 queries |
-| `src/pages/MarketingDetalhe.tsx` | Exibir campos do briefing vinculado na secao Briefing |
+| `src/hooks/useUnidades.ts` | Adicionar hook `useUpdateUnidadesStatusBatch` |
+| `src/components/empreendimentos/AlterarStatusLoteDialog.tsx` | Novo dialog para selecao de status |
+| `src/components/empreendimentos/UnidadesTab.tsx` | Adicionar modo de selecao `status` e botao na toolbar |
 
-## Impacto
+## Detalhes Tecnicos
 
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| Dados do briefing visiveis no ticket | Nao | Sim |
-| Campos ricos (tema, objetivo, formato) | Perdidos | Exibidos |
-| Tickets sem briefing | Mostra "Nenhum briefing" | Continua mostrando (fallback mantido) |
-| Performance | 3 joins | 4 joins (impacto minimo) |
+- O tipo `selectionMode` sera expandido para incluir `'status'`
+- O dialog usara os mesmos `UNIDADE_STATUS_LABELS` e `UNIDADE_STATUS_COLORS` ja existentes em `empreendimentos.types.ts`
+- Nenhuma alteracao no banco de dados e necessaria - a coluna `status` ja existe com o enum correto
+- As queries invalidadas apos a atualizacao incluem: `unidades`, `empreendimento` e `empreendimentos` (para atualizar contagens nos cards)
+
