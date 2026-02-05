@@ -1,104 +1,134 @@
 
-# Plano: Preencher Total de Lotes Automaticamente na Importação
+# Plano: Exibir Dados do Briefing nos Tickets de Marketing
 
 ## Problema Identificado
 
-Quando a importação de unidades via Excel cria novos blocos/quadras automaticamente, o campo `unidades_por_andar` (que exibe "Total Lotes" na tabela) fica vazio porque:
+Os dados do briefing cadastrado (cliente, tema, objetivo, formato da peca, tom de comunicacao, estilo visual, etc.) nao aparecem nos tickets de marketing porque as queries nunca fazem JOIN com a tabela `briefings`.
 
-1. A função `useCreateBlocoSilent` (linha 102-118 de `useBlocos.ts`) só recebe `{ nome: m.valorExcel }` na importação
-2. O `ImportarUnidadesDialog` (linha 332-335) não conta quantas unidades pertencem a cada bloco criado
+### Fluxo Atual (Quebrado)
 
-## Solução Proposta
-
-Após a importação das unidades ser concluída, **atualizar o campo `unidades_por_andar` de cada bloco** com a contagem real de unidades vinculadas a ele.
-
-### Abordagem: Pós-processamento após importação
-
-Após inserir/atualizar as unidades, calcular a contagem de lotes por quadra e atualizar os blocos correspondentes.
-
-## Alterações
-
-### 1. Criar hook para atualizar contagem de lotes
-
-**Arquivo:** `src/hooks/useBlocos.ts`
-
-Adicionar novo hook:
-
-```typescript
-export function useAtualizarContagemBlocos() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (empreendimentoId: string) => {
-      // Buscar todos os blocos do empreendimento
-      const { data: blocos, error: blocosError } = await supabase
-        .from('blocos')
-        .select('id')
-        .eq('empreendimento_id', empreendimentoId)
-        .eq('is_active', true);
-
-      if (blocosError) throw blocosError;
-      if (!blocos || blocos.length === 0) return;
-
-      // Para cada bloco, contar unidades e atualizar
-      for (const bloco of blocos) {
-        const { count, error: countError } = await supabase
-          .from('unidades')
-          .select('*', { count: 'exact', head: true })
-          .eq('bloco_id', bloco.id)
-          .eq('is_active', true);
-
-        if (countError) continue;
-
-        await supabase
-          .from('blocos')
-          .update({ unidades_por_andar: count })
-          .eq('id', bloco.id);
-      }
-    },
-    onSuccess: () => {
-      // Invalidar queries de blocos para atualizar a UI
-      queryClient.invalidateQueries({ queryKey: ['blocos'] });
-      queryClient.invalidateQueries({ queryKey: ['blocos-contagem'] });
-    },
-  });
-}
+```text
+TicketForm cria briefing na tabela "briefings" (com dados ricos)
+       |
+Vincula ao ticket via briefing_id
+       |
+useProjetosMarketing busca ticket SEM join na tabela briefings
+       |
+MarketingDetalhe exibe projeto.briefing_texto (que esta NULL)
+       |
+Resultado: "Nenhum briefing cadastrado" -- dados perdidos
 ```
 
-### 2. Chamar atualização após importação
+### Evidencia no Banco de Dados
 
-**Arquivo:** `src/components/empreendimentos/ImportarUnidadesDialog.tsx`
+| Ticket | briefing_id | briefing_texto |
+|--------|-------------|----------------|
+| MKT-00026 | 0a271602... | NULL |
+| MKT-00021 | 86395fcb... | NULL |
+| MKT-00006 | dbcac0ce... | NULL |
 
-Na função `handleImport` (após inserir/atualizar unidades com sucesso), adicionar:
+Os dados existem na tabela `briefings` (ex: cliente="KRAFT", tema="IMAGEM COMPUTADOR"), mas nunca sao consultados.
+
+## Solucao Proposta
+
+### 1. Adicionar JOIN com briefings nas queries
+
+**Arquivo:** `src/hooks/useProjetosMarketing.ts`
+
+Alterar o SELECT para incluir a tabela `briefings`:
 
 ```typescript
-// Após o resultado da importação
-await atualizarContagemBlocos.mutateAsync(empreendimentoId);
+.select(`
+  *,
+  cliente:cliente_id(id, full_name, email),
+  supervisor:supervisor_id(id, full_name),
+  empreendimento:empreendimento_id(id, nome),
+  briefing:briefing_id(id, codigo, cliente, tema, objetivo, formato_peca, composicao, head_titulo, sub_complemento, mensagem_chave, tom_comunicacao, estilo_visual, diretrizes_visuais, referencia, importante, observacoes, status)
+`)
 ```
+
+Fazer isso em duas queries:
+- A query de listagem (linha 60-67)
+- A query do `useProjeto` individual (linha 106-113)
+
+**Arquivo:** `src/hooks/useTickets.ts`
+
+Mesma alteracao nas duas queries (linha 58-67 e linha 100-108).
+
+### 2. Atualizar o tipo Ticket para incluir briefing
+
+**Arquivo:** `src/types/marketing.types.ts`
+
+Atualizar a interface `Ticket` para incluir o relacionamento:
+
+```typescript
+briefing?: {
+  id: string;
+  codigo: string;
+  cliente: string;
+  tema: string;
+  objetivo: string | null;
+  formato_peca: string | null;
+  composicao: string | null;
+  head_titulo: string | null;
+  sub_complemento: string | null;
+  mensagem_chave: string | null;
+  tom_comunicacao: string | null;
+  estilo_visual: string | null;
+  diretrizes_visuais: string | null;
+  referencia: string | null;
+  importante: string | null;
+  observacoes: string | null;
+  status: string;
+} | null;
+```
+
+### 3. Exibir dados do briefing na pagina de detalhe
+
+**Arquivo:** `src/pages/MarketingDetalhe.tsx`
+
+Substituir a secao de "Briefing" (linhas 140-161) para exibir os dados ricos do briefing vinculado:
+
+- **Cliente do Briefing** e **Tema**
+- **Objetivo**
+- **Formato da Peca** e **Composicao**
+- **Head/Titulo** e **Sub/Complemento**
+- **Mensagem Chave**
+- **Tom de Comunicacao** e **Estilo Visual**
+- **Diretrizes Visuais**
+- **Referencias**
+- **Importante** e **Observacoes**
+
+Manter fallback para `projeto.descricao` e `projeto.briefing_texto` caso o ticket nao tenha briefing vinculado.
 
 ## Fluxo Corrigido
 
 ```text
-Importação Excel
-       ↓
-Criar blocos novos (se marcado "Criar novo")
-       ↓
-Inserir/Atualizar unidades
-       ↓
-[NOVO] Calcular contagem de unidades por bloco
-       ↓
-[NOVO] Atualizar campo unidades_por_andar de cada bloco
-       ↓
-Resultado: Total de Lotes preenchido ✅
+TicketForm cria briefing na tabela "briefings"
+       |
+Vincula ao ticket via briefing_id
+       |
+useProjetosMarketing busca ticket COM join: briefing:briefing_id(...)
+       |
+MarketingDetalhe exibe projeto.briefing.tema, .objetivo, etc.
+       |
+Resultado: Dados completos do briefing visiveis no ticket
 ```
 
-## Resumo de Alterações
+## Resumo de Alteracoes
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useBlocos.ts` | Adicionar hook `useAtualizarContagemBlocos()` |
-| `src/components/empreendimentos/ImportarUnidadesDialog.tsx` | Chamar atualização de contagem após importação |
+| `src/types/marketing.types.ts` | Adicionar tipo `briefing` na interface Ticket |
+| `src/hooks/useProjetosMarketing.ts` | Adicionar join com `briefings` nas 2 queries |
+| `src/hooks/useTickets.ts` | Adicionar join com `briefings` nas 2 queries |
+| `src/pages/MarketingDetalhe.tsx` | Exibir campos do briefing vinculado na secao Briefing |
 
-## Benefício Adicional
+## Impacto
 
-Esta solução também corrige blocos antigos que estão com o campo vazio, pois a contagem é recalculada com base nas unidades reais cadastradas.
+| Aspecto | Antes | Depois |
+|---------|-------|--------|
+| Dados do briefing visiveis no ticket | Nao | Sim |
+| Campos ricos (tema, objetivo, formato) | Perdidos | Exibidos |
+| Tickets sem briefing | Mostra "Nenhum briefing" | Continua mostrando (fallback mantido) |
+| Performance | 3 joins | 4 joins (impacto minimo) |
