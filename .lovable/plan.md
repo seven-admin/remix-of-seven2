@@ -1,102 +1,47 @@
 
+# Plano: Corrigir Scroll na Lista de Atividades do Calendário
 
-# Plano: Alinhar Layout do Calendário de Planejamento com Marketing
+## Problema
 
-## Problema Identificado
+O painel de detalhes do dia está crescendo indefinidamente ao invés de mostrar scroll quando há muitas tarefas. Isso acontece porque:
+- `h-full` + `overflow-y-auto` só funciona se o container pai tiver altura fixa definida
+- Com `items-stretch`, ambos os cards crescem juntos, mas não há limite
 
-No calendário de Planejamento (`/planejamento` aba Calendário), os dois cards (calendário à esquerda e detalhes à direita) não estão alinhados na base. Isso ocorre porque:
+## Solução Simples
 
-1. O card do calendário cresce de acordo com seu conteúdo (grid de dias + legenda)
-2. O card de detalhes usa `h-full` mas o `ScrollArea` interno tem altura calculada que pode não corresponder
+Definir uma altura máxima fixa para a área de scroll da lista de atividades, independente do tamanho do calendário. Isso garante que o scroll apareça quando necessário.
 
-## Referência
+## Alteração
 
-O calendário de Marketing (`/marketing/calendario`) resolve isso com:
-- Cards irmãos ambos com `h-full` dentro de um grid com altura implícita
-- O card de detalhes não usa `ScrollArea` com altura fixa
-- Layout mais simples e direto
+**Arquivo:** `src/components/planejamento/PlanejamentoCalendario.tsx`
 
-## Solução
-
-Ajustar o `PlanejamentoCalendario.tsx` para:
-1. Garantir que ambos os cards tenham altura igual usando `flex` ou alinhamento de grid
-2. Substituir `ScrollArea` com altura calculada por `overflow-auto` com altura máxima
-3. Simplificar o layout para seguir o padrão do Marketing
-
-## Alterações Técnicas
-
-### Arquivo: `src/components/planejamento/PlanejamentoCalendario.tsx`
-
-**Mudanças principais:**
-
-1. **Grid wrapper com altura mínima**:
+**De (linha 291):**
 ```tsx
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+<div className="h-full overflow-y-auto pr-2">
 ```
-O `items-stretch` garante que ambas as colunas tenham a mesma altura.
 
-2. **Card do Calendário sem mudanças estruturais** (mantém como está)
-
-3. **Card de Detalhes - altura alinhada**:
+**Para:**
 ```tsx
-<div className="lg:col-span-1">
-  <Card className="h-full flex flex-col">
-    <CardHeader className="pb-3">
-      {/* ... header ... */}
-    </CardHeader>
-    <CardContent className="pt-0 flex-1 overflow-hidden">
-      {itensDoDia.length === 0 ? (
-        {/* ... empty state ... */}
-      ) : (
-        <div className="h-full overflow-y-auto pr-2 space-y-3">
-          {/* ... lista de tarefas ... */}
-        </div>
-      )}
-    </CardContent>
-  </Card>
-</div>
+<div className="max-h-[400px] overflow-y-auto pr-2">
 ```
 
-**Detalhes das mudanças:**
+Isso define um limite de altura de 400px (aproximadamente a altura do grid do calendário) após o qual o scroll aparecerá.
 
-| Local | De | Para |
-|-------|-----|------|
-| Div container | `grid-cols-1 lg:grid-cols-3 gap-6` | `grid-cols-1 lg:grid-cols-3 gap-6 items-stretch` |
-| Card detalhes | `h-full` | `h-full flex flex-col` |
-| CardContent detalhes | `pt-0` | `pt-0 flex-1 overflow-hidden` |
-| ScrollArea | `<ScrollArea className="h-[calc(100vh-480px)]">` | Remover, usar `<div className="h-full overflow-y-auto pr-2">` |
+## Alternativa (mais elegante)
 
-## Visualização do Resultado
+Usar altura calculada para alinhar com o calendário:
 
-```text
-┌─────────────────────────────────────────────────┬──────────────────────────┐
-│              CALENDÁRIO                          │    5 de Fevereiro        │
-│  ┌────┬────┬────┬────┬────┬────┬────┐           │    3 tarefas ativas      │
-│  │ D  │ S  │ T  │ Q  │ Q  │ S  │ S  │           │                          │
-│  ├────┼────┼────┼────┼────┼────┼────┤           │   ┌────────────────────┐ │
-│  │    │    │    │    │ 5  │    │    │           │   │ Projeto Alpha      │ │
-│  │    │    │    │    │ ▬  │    │    │           │   │ Tarefa 1           │ │
-│  │    │    │    │    │    │    │    │           │   │ 01/02 - 10/02      │ │
-│  │    │    │    │    │    │    │    │           │   └────────────────────┘ │
-│  │    │    │    │    │    │    │    │           │   ┌────────────────────┐ │
-│  └────┴────┴────┴────┴────┴────┴────┘           │   │ Projeto Beta       │ │
-│                                                  │   │ Tarefa 2           │ │
-│  [Legenda: cores por empreendimento]            │   └────────────────────┘ │
-├─────────────────────────────────────────────────┴──────────────────────────┤
-│                    ↑ Bases alinhadas ↑                                      │
-└─────────────────────────────────────────────────────────────────────────────┘
+```tsx
+<div className="max-h-[calc(100vh-400px)] min-h-[300px] overflow-y-auto pr-2">
 ```
 
-## Benefícios
+Isso:
+- `max-h-[calc(100vh-400px)]`: altura máxima responsiva
+- `min-h-[300px]`: altura mínima para não ficar muito pequeno
+- `overflow-y-auto`: scroll quando exceder
 
-1. **Alinhamento visual**: Ambos os cards terminam na mesma altura
-2. **Consistência**: Segue o mesmo padrão do calendário de Marketing
-3. **Responsivo**: Continua funcionando bem em mobile (empilhado)
-4. **Scroll suave**: Lista de tarefas com scroll interno quando necessário
-
-## Resumo de Arquivos
+## Resumo
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planejamento/PlanejamentoCalendario.tsx` | Ajustar grid com `items-stretch`, Card com `flex flex-col`, remover ScrollArea por div com overflow |
-
+| `src/components/planejamento/PlanejamentoCalendario.tsx` | Linha 291: trocar `h-full` por `max-h-[400px]` ou `max-h-[calc(100vh-400px)] min-h-[300px]` |
