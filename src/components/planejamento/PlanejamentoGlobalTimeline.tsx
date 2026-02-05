@@ -30,6 +30,7 @@ import type { PlanejamentoItemWithRelations } from '@/types/planejamento.types';
 // Constantes de altura
 const ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 44;
+const MONTH_HEADER_HEIGHT = 24;
 const FASE_ROW_HEIGHT = 28;
 const EMP_ROW_HEIGHT = 36;
 const SIDEBAR_WIDTH = 280;
@@ -153,6 +154,43 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
 
   const unitWidth = zoom === 'dia' ? 30 : zoom === 'semana' ? 80 : 120;
   const totalWidth = columns.length * unitWidth;
+
+  // Calcular grupos de meses para header (apenas no zoom dia)
+  const monthGroups = useMemo(() => {
+    if (zoom !== 'dia') return [];
+    
+    const groups: { month: string; width: number; label: string }[] = [];
+    let currentMonth = '';
+    let currentWidth = 0;
+    
+    columns.forEach((col) => {
+      const monthKey = format(col.date, 'yyyy-MM');
+      if (monthKey !== currentMonth) {
+        if (currentMonth) {
+          groups.push({ 
+            month: currentMonth, 
+            width: currentWidth,
+            label: format(parseISO(currentMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
+          });
+        }
+        currentMonth = monthKey;
+        currentWidth = unitWidth;
+      } else {
+        currentWidth += unitWidth;
+      }
+    });
+    
+    // Adiciona último grupo
+    if (currentMonth) {
+      groups.push({ 
+        month: currentMonth, 
+        width: currentWidth,
+        label: format(parseISO(currentMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
+      });
+    }
+    
+    return groups;
+  }, [columns, zoom, unitWidth]);
 
   const toggleEmpreendimento = (id: string) => {
     setCollapsedEmpreendimentos(prev => {
@@ -393,8 +431,8 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
             >
               {/* Header da coluna de títulos - sticky top */}
               <div 
-                className="sticky top-0 z-30 border-b bg-muted/50 px-3 font-medium text-sm flex items-center"
-                style={{ height: HEADER_HEIGHT }}
+                className="sticky top-0 z-30 border-b bg-muted/50 px-3 font-medium text-sm flex items-end pb-2"
+                style={{ height: zoom === 'dia' ? HEADER_HEIGHT + MONTH_HEADER_HEIGHT : HEADER_HEIGHT }}
               >
                 Empreendimento / Tarefa
               </div>
@@ -474,23 +512,38 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
               style={{ width: totalWidth }}
             >
               {/* Header de datas - sticky top */}
-              <div 
-                className="flex sticky top-0 bg-muted/50 z-10 border-b"
-                style={{ height: HEADER_HEIGHT }}
-              >
-                {columns.map((col, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "shrink-0 border-r text-center text-xs flex items-center justify-center",
-                      col.isToday && "bg-primary/20 font-semibold",
-                      col.isWeekend && !col.isToday && "bg-muted/30"
-                    )}
-                    style={{ width: unitWidth }}
-                  >
-                    {col.label}
+              <div className="sticky top-0 bg-muted/50 z-10">
+                {/* Linha de meses (apenas no zoom dia) */}
+                {zoom === 'dia' && monthGroups.length > 0 && (
+                  <div className="flex border-b" style={{ height: MONTH_HEADER_HEIGHT }}>
+                    {monthGroups.map((group) => (
+                      <div
+                        key={group.month}
+                        className="shrink-0 border-r text-center text-xs font-medium flex items-center justify-center capitalize bg-muted/80"
+                        style={{ width: group.width }}
+                      >
+                        {group.label}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                
+                {/* Linha de dias/semanas/meses */}
+                <div className="flex border-b" style={{ height: HEADER_HEIGHT }}>
+                  {columns.map((col, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "shrink-0 border-r text-center text-xs flex items-center justify-center",
+                        col.isToday && "bg-primary/20 font-semibold",
+                        col.isWeekend && !col.isToday && "bg-muted/30"
+                      )}
+                      style={{ width: unitWidth }}
+                    >
+                      {col.label}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Linhas do grid com barras */}

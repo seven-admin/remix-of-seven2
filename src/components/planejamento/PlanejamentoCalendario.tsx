@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Building2, CalendarDays } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -17,11 +17,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { usePlanejamentoGlobal, type PlanejamentoGlobalFilters } from '@/hooks/usePlanejamentoGlobal';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PlanejamentoItemWithRelations } from '@/types/planejamento.types';
@@ -105,6 +101,12 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
     return map;
   }, [itens, currentMonth]);
 
+  // Tarefas do dia selecionado
+  const itensDoDia = useMemo(() => {
+    const key = format(selectedDate, 'yyyy-MM-dd');
+    return itensPorDia.get(key) || [];
+  }, [selectedDate, itensPorDia]);
+
   // Gerar dias do mês
   const days = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -137,201 +139,214 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold capitalize">
-            {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleToday}>
-              Hoje
-            </Button>
-            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
-        {/* Week days header */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {weekDays.map((day) => (
-            <div
-              key={day}
-              className="text-center text-xs font-medium text-muted-foreground py-2"
-            >
-              {day}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Calendário */}
+      <div className="lg:col-span-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold capitalize">
+                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleToday}>
+                  Hoje
+                </Button>
+                <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          ))}
-        </div>
+          </CardHeader>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-1">
-          {/* Espaços vazios antes do primeiro dia */}
-          {Array.from({ length: startingDayOfWeek }).map((_, index) => (
-            <div key={`empty-${index}`} className="h-28" />
-          ))}
+          <CardContent>
+            {/* Week days header */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {weekDays.map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-xs font-medium text-muted-foreground py-2"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
 
-          {/* Dias do mês */}
-          {days.map((day) => {
-            const key = format(day, 'yyyy-MM-dd');
-            const dayItems = itensPorDia.get(key) || [];
-            const isSelected = isSameDay(day, selectedDate);
-            const isTodayDate = isToday(day);
-            const hasItems = dayItems.length > 0;
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {/* Espaços vazios antes do primeiro dia */}
+              {Array.from({ length: startingDayOfWeek }).map((_, index) => (
+                <div key={`empty-${index}`} className="h-24" />
+              ))}
 
-            const cellContent = (
-              <button
-                onClick={() => setSelectedDate(day)}
-                className={cn(
-                  'h-28 w-full p-1 text-left rounded-lg border transition-colors relative',
-                  'hover:bg-accent hover:border-primary/50',
-                  isSelected && 'border-primary bg-accent'
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span
+              {/* Dias do mês */}
+              {days.map((day) => {
+                const key = format(day, 'yyyy-MM-dd');
+                const dayItems = itensPorDia.get(key) || [];
+                const isSelected = isSameDay(day, selectedDate);
+                const isTodayDate = isToday(day);
+                const hasItems = dayItems.length > 0;
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedDate(day)}
                     className={cn(
-                      'text-sm font-medium h-6 w-6 flex items-center justify-center rounded-full',
-                      isTodayDate && 'bg-primary text-primary-foreground'
+                      'h-24 w-full p-1 text-left rounded-lg border transition-colors relative',
+                      'hover:bg-accent hover:border-primary/50',
+                      isSelected && 'border-primary ring-2 ring-primary/20 bg-accent'
                     )}
                   >
-                    {format(day, 'd')}
-                  </span>
-                  {hasItems && (
-                    <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                      {dayItems.length}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Preview das tarefas */}
-                <div className="mt-1 space-y-0.5 overflow-hidden">
-                  {dayItems.slice(0, 3).map((item) => {
-                    const empColor = empColors.get(item.empreendimento?.id || '');
-                    const color = empColor?.color || '#6b7280';
-                    return (
-                      <div
-                        key={item.id}
-                        className="text-xs truncate px-1 py-0.5 rounded"
-                        style={{
-                          backgroundColor: hexToRgba(color, 0.2),
-                          color: color,
-                        }}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={cn(
+                          'text-sm font-medium h-6 w-6 flex items-center justify-center rounded-full',
+                          isTodayDate && 'bg-primary text-primary-foreground'
+                        )}
                       >
-                        {item.item}
-                      </div>
-                    );
-                  })}
-                  {dayItems.length > 3 && (
-                    <div className="text-xs text-muted-foreground px-1">
-                      +{dayItems.length - 3} mais
+                        {format(day, 'd')}
+                      </span>
+                      {hasItems && (
+                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                          {dayItems.length}
+                        </Badge>
+                      )}
                     </div>
-                  )}
-                </div>
-              </button>
-            );
 
-            // Se tem itens, envolve com HoverCard
-            if (hasItems) {
-              return (
-                <HoverCard key={key} openDelay={200} closeDelay={100}>
-                  <HoverCardTrigger asChild>
-                    {cellContent}
-                  </HoverCardTrigger>
-                  <HoverCardContent 
-                    className="w-80 p-0" 
-                    side="right" 
-                    align="start"
-                    sideOffset={5}
-                  >
-                    <div className="p-3 border-b bg-muted/50">
-                      <p className="font-semibold text-sm">
-                        {format(day, "d 'de' MMMM", { locale: ptBR })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {dayItems.length} tarefa{dayItems.length > 1 ? 's' : ''} ativa{dayItems.length > 1 ? 's' : ''}
-                      </p>
-                    </div>
-                    <div className="p-2 max-h-[250px] overflow-y-auto">
-                      {dayItems.map((item) => {
+                    {/* Preview das tarefas */}
+                    <div className="mt-1 space-y-0.5 overflow-hidden">
+                      {dayItems.slice(0, 2).map((item) => {
                         const empColor = empColors.get(item.empreendimento?.id || '');
                         const color = empColor?.color || '#6b7280';
-                        const isAtrasada = !item.status?.is_final && 
-                          item.data_fim && 
-                          parseISO(item.data_fim) < new Date();
-                        
                         return (
-                          <div 
+                          <div
                             key={item.id}
-                            className="p-2 rounded-md mb-1.5 last:mb-0"
+                            className="text-xs truncate px-1 py-0.5 rounded"
                             style={{
-                              backgroundColor: hexToRgba(color, 0.1),
-                              borderLeft: `3px solid ${color}`
+                              backgroundColor: hexToRgba(color, 0.2),
+                              color: color,
                             }}
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Building2 className="h-3 w-3" />
-                                  {item.empreendimento?.nome}
-                                </p>
-                                <p className="text-sm font-medium truncate">
-                                  {item.item}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {item.data_inicio && format(parseISO(item.data_inicio), 'dd/MM', { locale: ptBR })}
-                                  {' - '}
-                                  {item.data_fim && format(parseISO(item.data_fim), 'dd/MM', { locale: ptBR })}
-                                </p>
-                              </div>
-                              <div className="flex flex-col gap-1 items-end shrink-0">
-                                {item.status && (
-                                  <Badge variant="secondary" className="text-[10px]">
-                                    {item.status.nome}
-                                  </Badge>
-                                )}
-                                {isAtrasada && (
-                                  <Badge variant="destructive" className="text-[10px]">
-                                    Atrasada
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
+                            {item.item}
                           </div>
                         );
                       })}
+                      {dayItems.length > 2 && (
+                        <div className="text-xs text-muted-foreground px-1">
+                          +{dayItems.length - 2} mais
+                        </div>
+                      )}
                     </div>
-                  </HoverCardContent>
-                </HoverCard>
-              );
-            }
+                  </button>
+                );
+              })}
+            </div>
 
-            return <div key={key}>{cellContent}</div>;
-          })}
-        </div>
-
-        {/* Legenda de empreendimentos */}
-        {empColors.size > 0 && (
-          <div className="flex flex-wrap items-center gap-3 pt-4 mt-4 border-t text-xs">
-            <span className="text-muted-foreground font-medium">Empreendimentos:</span>
-            {Array.from(empColors.entries()).map(([id, { color, nome }]) => (
-              <div key={id} className="flex items-center gap-1.5">
-                <div 
-                  className="h-3 w-3 rounded-sm"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="text-muted-foreground">{nome}</span>
+            {/* Legenda de empreendimentos */}
+            {empColors.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 pt-4 mt-4 border-t text-xs">
+                <span className="text-muted-foreground font-medium">Empreendimentos:</span>
+                {Array.from(empColors.entries()).map(([id, { color, nome }]) => (
+                  <div key={id} className="flex items-center gap-1.5">
+                    <div 
+                      className="h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-muted-foreground">{nome}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Painel de detalhes do dia */}
+      <div className="lg:col-span-1">
+        <Card className="h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {itensDoDia.length} tarefa{itensDoDia.length !== 1 ? 's' : ''} ativa{itensDoDia.length !== 1 ? 's' : ''}
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {itensDoDia.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CalendarDays className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground text-sm">
+                  Nenhuma tarefa neste dia
+                </p>
+                <p className="text-muted-foreground/60 text-xs mt-1">
+                  Selecione outro dia no calendário
+                </p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[calc(100vh-480px)] min-h-[300px]">
+                <div className="space-y-3 pr-4">
+                  {itensDoDia.map((item) => {
+                    const empColor = empColors.get(item.empreendimento?.id || '');
+                    const color = empColor?.color || '#6b7280';
+                    const isAtrasada = !item.status?.is_final && 
+                      item.data_fim && parseISO(item.data_fim) < new Date();
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-lg border bg-card transition-colors hover:bg-muted/30"
+                        style={{
+                          borderLeftWidth: 4,
+                          borderLeftColor: color
+                        }}
+                      >
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                          <Building2 className="h-3 w-3" />
+                          {item.empreendimento?.nome}
+                        </p>
+                        <p className="font-medium text-sm">{item.item}</p>
+                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                          <span>
+                            {item.data_inicio && format(parseISO(item.data_inicio), 'dd/MM')} 
+                            {' - '}
+                            {item.data_fim && format(parseISO(item.data_fim), 'dd/MM')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {item.status && (
+                            <Badge variant="secondary" className="text-xs">
+                              {item.status.nome}
+                            </Badge>
+                          )}
+                          {isAtrasada && (
+                            <Badge variant="destructive" className="text-xs">
+                              Atrasada
+                            </Badge>
+                          )}
+                          {item.fase && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs"
+                              style={{ borderColor: item.fase.cor, color: item.fase.cor }}
+                            >
+                              {item.fase.nome}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
