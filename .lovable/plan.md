@@ -1,244 +1,179 @@
 
+# Plano: Vinculação Automática de Polígonos/Marcadores no Mapa
 
-# Plano: Melhorias na Timeline Global e Calendário
+## Problema Atual
 
-## Resumo das Alterações
+Ao editar o mapa e criar múltiplos polígonos ou marcadores, o processo de vinculação é manual e repetitivo:
+1. Criar item → 2. Clicar "Vincular" → 3. Buscar unidade → 4. Selecionar
 
-1. **Timeline Global**: Adicionar linha de meses acima dos dias
-2. **Calendário de Planejamento**: Adicionar painel lateral de detalhamento do dia selecionado
+Para um loteamento com 50+ lotes, isso é extremamente trabalhoso.
 
----
+## Solução Proposta
 
-## Alteração 1: Meses acima dos dias na Timeline Global
-
-### Problema
-No modo de zoom "Dia", o header só mostra números (01, 02, 03...) sem indicar a qual mês pertencem, dificultando a orientação temporal quando há muitas colunas.
-
-### Solução
-Adicionar uma linha extra no header (acima dos dias) mostrando os meses. Cada mês ocupará o espaço correspondente às suas colunas.
-
-### Visualização
+Adicionar um **modo de Auto-Vincular** que permite:
+1. Selecionar um filtro (Bloco/Quadra ou Andar)
+2. Escolher o grupo específico (ex: "Quadra A")
+3. Os próximos itens criados serão vinculados automaticamente às unidades desse grupo, **na ordem de criação**
 
 ```text
-┌────────────────────────┬──────────────────────────┬───────────────────────────┐
-│ Empreendimento/Tarefa  │      Janeiro 2026        │      Fevereiro 2026       │  ← NOVO: Meses
-├────────────────────────┼──┬──┬──┬──┬──┬──┬──┬──┬──┼──┬──┬──┬──┬──┬──┬──┬──┬──┤
-│                        │27│28│29│30│31│01│02│03│04│05│06│07│08│09│10│11│12│13│  ← Dias
-├────────────────────────┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┤
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  [Selecionar] [Polígono] [Marcador]  │  Auto-Vincular: [Quadra A ▾] [✓ On]  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Implementação em `PlanejamentoGlobalTimeline.tsx`
+## Fluxo do Usuário
 
-**A) Calcular grupos de meses:**
+1. **Ativar Auto-Vincular**: Seleciona uma Quadra/Bloco no dropdown
+2. **Sistema mostra**: "Próxima unidade: Lote 01 (Quadra A)"
+3. **Usuário desenha**: Polígono ou marcador no mapa
+4. **Auto-vínculo**: Sistema vincula automaticamente ao Lote 01
+5. **Avança fila**: Sistema mostra "Próxima: Lote 02 (Quadra A)"
+6. **Repete** até terminar as unidades do grupo
+
+## Detalhes Técnicos
+
+### Novo Estado no MapaEditor
+
 ```typescript
-const monthGroups = useMemo(() => {
-  if (zoom !== 'dia') return [];
+// Modo de auto-vinculação
+const [autoLinkMode, setAutoLinkMode] = useState<boolean>(false);
+const [autoLinkBlocoId, setAutoLinkBlocoId] = useState<string | null>(null);
+
+// Fila de unidades para vincular (ordenada por andar + número)
+const autoLinkQueue = useMemo(() => {
+  if (!autoLinkMode || !autoLinkBlocoId) return [];
   
-  const groups: { month: string; width: number; label: string }[] = [];
-  let currentMonth = '';
-  let currentWidth = 0;
-  
-  columns.forEach((col) => {
-    const monthKey = format(col.date, 'yyyy-MM');
-    if (monthKey !== currentMonth) {
-      if (currentMonth) {
-        groups.push({ 
-          month: currentMonth, 
-          width: currentWidth,
-          label: format(parseISO(currentMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
-        });
-      }
-      currentMonth = monthKey;
-      currentWidth = unitWidth;
-    } else {
-      currentWidth += unitWidth;
-    }
-  });
-  
-  // Adiciona último grupo
-  if (currentMonth) {
-    groups.push({ 
-      month: currentMonth, 
-      width: currentWidth,
-      label: format(parseISO(currentMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
+  const blocoNome = autoLinkBlocoId; // Pode ser ID ou nome
+  return unlinkedUnidades
+    .filter(u => u.bloco?.nome === blocoNome)
+    .sort((a, b) => {
+      const andarA = a.andar ?? -Infinity;
+      const andarB = b.andar ?? -Infinity;
+      if (andarA !== andarB) return andarA - andarB;
+      return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
     });
-  }
-  
-  return groups;
-}, [columns, zoom, unitWidth]);
+}, [autoLinkMode, autoLinkBlocoId, unlinkedUnidades]);
+
+// Próxima unidade a vincular
+const nextAutoLinkUnit = autoLinkQueue[0] || null;
 ```
 
-**B) Atualizar constantes de altura:**
+### Modificar Criação de Itens
+
+Quando um polígono/marcador é criado e `autoLinkMode` está ativo:
+
 ```typescript
-const MONTH_HEADER_HEIGHT = 24; // Nova constante
-const HEADER_HEIGHT = 44;       // Mantém
+// Em handleFinishPolygon e no handler de draw_marker
+if (autoLinkMode && nextAutoLinkUnit) {
+  const newItem: DrawnItem = {
+    id: `polygon-${Date.now()}`,
+    tipo: 'polygon',
+    points: [...currentPoints],
+    unidadeId: nextAutoLinkUnit.id, // JÁ VINCULA AUTOMATICAMENTE
+  };
+  setDrawnItems((prev) => [...prev, newItem]);
+  toast.success(`Vinculado automaticamente: ${nextAutoLinkUnit.numero}`);
+} else {
+  // Comportamento atual
+}
 ```
 
-**C) Adicionar header de meses no JSX:**
+### UI do Auto-Vincular
+
 ```tsx
-{/* Header de datas - sticky top */}
-<div className="sticky top-0 bg-muted/50 z-10">
-  {/* Linha de meses (apenas no zoom dia) */}
-  {zoom === 'dia' && monthGroups.length > 0 && (
-    <div className="flex border-b" style={{ height: MONTH_HEADER_HEIGHT }}>
-      {monthGroups.map((group, idx) => (
-        <div
-          key={group.month}
-          className="shrink-0 border-r text-center text-xs font-medium flex items-center justify-center capitalize bg-muted/80"
-          style={{ width: group.width }}
-        >
-          {group.label}
-        </div>
-      ))}
-    </div>
+{/* Seção de Auto-Vincular na toolbar */}
+<div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+  <Switch
+    checked={autoLinkMode}
+    onCheckedChange={(checked) => {
+      setAutoLinkMode(checked);
+      if (!checked) setAutoLinkBlocoId(null);
+    }}
+  />
+  <Label className="text-sm">Auto-Vincular</Label>
+  
+  {autoLinkMode && (
+    <>
+      <Select value={autoLinkBlocoId || ''} onValueChange={setAutoLinkBlocoId}>
+        <SelectTrigger className="w-40 h-8">
+          <SelectValue placeholder="Selecione quadra" />
+        </SelectTrigger>
+        <SelectContent>
+          {blocos.map((bloco) => (
+            <SelectItem key={bloco} value={bloco}>
+              {bloco} ({unlinkedByBloco.get(bloco)?.length || 0})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      
+      {nextAutoLinkUnit && (
+        <Badge variant="outline" className="bg-primary/10">
+          Próxima: {nextAutoLinkUnit.numero}
+        </Badge>
+      )}
+    </>
   )}
-  
-  {/* Linha de dias/semanas/meses */}
-  <div className="flex border-b" style={{ height: HEADER_HEIGHT }}>
-    {/* ... colunas existentes ... */}
-  </div>
 </div>
 ```
 
-**D) Ajustar sidebar para alinhar com novo header:**
+### Indicador Visual no Canvas
+
+Quando auto-link está ativo, mostrar destaque visual da próxima unidade a ser vinculada:
+
 ```tsx
-{/* Header da sidebar - deve ter mesma altura que header do timeline */}
-<div 
-  className="sticky top-0 z-30 border-b bg-muted/50 px-3 font-medium text-sm flex items-end pb-2"
-  style={{ height: zoom === 'dia' ? HEADER_HEIGHT + MONTH_HEADER_HEIGHT : HEADER_HEIGHT }}
->
-  Empreendimento / Tarefa
-</div>
-```
-
----
-
-## Alteração 2: Painel de Detalhes no Calendário
-
-### Problema
-Atualmente o calendário só mostra HoverCard ao passar o mouse. O usuário quer clicar num dia e ver os detalhes numa área fixa (como no calendário de eventos).
-
-### Solução
-Reestruturar `PlanejamentoCalendario.tsx` para ter:
-- Layout de 2 colunas (calendário + detalhes)
-- Ao clicar num dia, o painel lateral mostra as tarefas daquele dia
-- Cores por empreendimento mantidas
-
-### Visualização
-
-```text
-┌────────────────────────────────────────────────┬──────────────────────────┐
-│             CALENDÁRIO                          │    5 de Fevereiro        │
-│  ┌────┬────┬────┬────┬────┬────┬────┐          │                          │
-│  │ D  │ S  │ T  │ Q  │ Q  │ S  │ S  │          │   ▬ Residencial Aurora   │
-│  ├────┼────┼────┼────┼────┼────┼────┤          │   └ Tarefa XYZ           │
-│  │    │    │    │    │ [5]│    │    │          │     Início: 01/02        │
-│  │    │    │    │    │ ▬▬ │    │    │  ←click  │     Fim: 10/02           │
-│  │    │    │    │    │    │    │    │          │     Status: Em andamento │
-│  └────┴────┴────┴────┴────┴────┴────┘          │                          │
-│                                                 │   ▬ Comercial Centro     │
-│  [Legenda: cores por empreendimento]           │   └ Outra tarefa         │
-│                                                 │     ...                  │
-└────────────────────────────────────────────────┴──────────────────────────┘
-```
-
-### Implementação em `PlanejamentoCalendario.tsx`
-
-**A) Calcular tarefas do dia selecionado:**
-```typescript
-const itensDoDia = useMemo(() => {
-  const key = format(selectedDate, 'yyyy-MM-dd');
-  return itensPorDia.get(key) || [];
-}, [selectedDate, itensPorDia]);
-```
-
-**B) Layout de duas colunas:**
-```tsx
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  {/* Calendário */}
-  <div className="lg:col-span-2">
-    <Card>
-      {/* ... card do calendário existente ... */}
-    </Card>
+{autoLinkMode && nextAutoLinkUnit && (
+  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400">
+    <strong>Auto-Vincular Ativo:</strong> O próximo item será vinculado a{' '}
+    <span className="font-bold">{buildUnitLabel(nextAutoLinkUnit, labelFormato)}</span>
+    {' '}({nextAutoLinkUnit.bloco?.nome || 'Sem bloco'})
+    <span className="ml-2 text-xs opacity-75">
+      Restam {autoLinkQueue.length} unidades
+    </span>
   </div>
-
-  {/* Painel de detalhes do dia */}
-  <div className="lg:col-span-1">
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
-          {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {itensDoDia.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-8">
-            Nenhuma tarefa neste dia
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {itensDoDia.map((item) => {
-              const empColor = empColors.get(item.empreendimento?.id || '');
-              const color = empColor?.color || '#6b7280';
-              const isAtrasada = !item.status?.is_final && 
-                item.data_fim && parseISO(item.data_fim) < new Date();
-              
-              return (
-                <div
-                  key={item.id}
-                  className="p-3 rounded-lg border transition-colors"
-                  style={{
-                    borderLeftWidth: 4,
-                    borderLeftColor: color
-                  }}
-                >
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {item.empreendimento?.nome}
-                  </p>
-                  <p className="font-medium">{item.item}</p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <span>{format(parseISO(item.data_inicio!), 'dd/MM')} - {format(parseISO(item.data_fim!), 'dd/MM')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    {item.status && (
-                      <Badge variant="secondary" className="text-xs">
-                        {item.status.nome}
-                      </Badge>
-                    )}
-                    {isAtrasada && (
-                      <Badge variant="destructive" className="text-xs">
-                        Atrasada
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  </div>
-</div>
+)}
 ```
-
----
 
 ## Resumo de Arquivos
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planejamento/PlanejamentoGlobalTimeline.tsx` | Adicionar linha de meses acima dos dias + ajustar alinhamento da sidebar |
-| `src/components/planejamento/PlanejamentoCalendario.tsx` | Layout 2 colunas com painel de detalhes do dia selecionado |
+| `src/components/mapa/MapaEditor.tsx` | Adicionar modo auto-vincular com seleção de quadra/bloco, fila automática e vinculação na criação |
 
----
+## Fluxo Visual
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TOOLBAR                                                                    │
+│  [Selecionar] [Polígono] [Marcador]                                        │
+│                                                                             │
+│  ┌─ Auto-Vincular ─────────────────────────────────────────────────────────┐│
+│  │  [✓ On]  Quadra: [Quadra A ▾]  │  Próxima: Lote 01  │  Restam: 12       ││
+│  └──────────────────────────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─ INFO BAR ───────────────────────────────────────────────────────────────┐
+│  │  Auto-Vincular Ativo: O próximo item será vinculado a Q.A|2Q|01          │
+│  │  (Quadra A) - Restam 12 unidades                                         │
+│  └──────────────────────────────────────────────────────────────────────────┘
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────────┐
+│  │                                                                          │
+│  │                         [ MAPA / CANVAS ]                                │
+│  │                                                                          │
+│  │      Usuário desenha marcadores/polígonos em sequência                   │
+│  │      Sistema vincula automaticamente: 01, 02, 03, 04...                  │
+│  │                                                                          │
+│  └──────────────────────────────────────────────────────────────────────────┘
+│                                                                             │
+│  Polígonos: 5  Marcadores: 8  Vinculados: 13  Unidades sem vínculo: 37     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Benefícios
 
-1. **Orientação temporal**: Meses acima dos dias facilitam identificar períodos
-2. **Visibilidade persistente**: Painel lateral mantém detalhes visíveis (sem precisar hover)
-3. **Consistência**: Mesmo padrão do calendário de eventos
-4. **Cores mantidas**: Identificação visual por empreendimento continua funcionando
-
+1. **Produtividade**: Vincular 50 lotes de uma quadra leva segundos, não minutos
+2. **Ordem garantida**: Unidades são vinculadas na ordem natural (andar + número)
+3. **Feedback visual**: Usuário sempre sabe qual será a próxima unidade
+4. **Flexível**: Pode alternar entre quadras/blocos a qualquer momento
+5. **Não-destrutivo**: Modo manual continua funcionando normalmente
