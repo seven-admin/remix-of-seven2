@@ -382,7 +382,7 @@ export function PlanejamentoGlobalTimeline({ filters, onFiltersChange }: Props) 
         <div 
           ref={containerRef}
           className="border-t overflow-auto"
-          style={{ maxHeight: 600 }}
+          style={{ height: 'calc(100vh - 320px)', minHeight: 400 }}
         >
           <div className="flex min-w-max">
             {/* Coluna fixa de títulos - sticky left */}
