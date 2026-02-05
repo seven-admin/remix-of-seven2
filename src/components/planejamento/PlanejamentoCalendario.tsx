@@ -288,7 +288,7 @@ export function PlanejamentoCalendario({ filters, onFiltersChange }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="h-full overflow-y-auto pr-2">
+              <div className="max-h-[400px] overflow-y-auto pr-2">
                 <div className="space-y-3">
                   {itensDoDia.map((item) => {
                     const empColor = empColors.get(item.empreendimento?.id || '');
