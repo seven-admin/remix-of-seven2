@@ -31,7 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Loader2, ArrowRight, Plus, Link2 } from 'lucide-react';
-import { useBlocos, useCreateBlocoSilent } from '@/hooks/useBlocos';
+import { useBlocos, useCreateBlocoSilent, useAtualizarContagemBlocos } from '@/hooks/useBlocos';
 import { useTipologias, useCreateTipologiaSilent } from '@/hooks/useTipologias';
 import { useCreateUnidadesBulk, useUnidades, useUpdateUnidadesBulk } from '@/hooks/useUnidades';
 import { useQueryClient } from '@tanstack/react-query';
@@ -172,6 +172,7 @@ export function ImportarUnidadesDialog({
   const updateBulk = useUpdateUnidadesBulk();
   const createBlocoSilent = useCreateBlocoSilent();
   const createTipologiaSilent = useCreateTipologiaSilent();
+  const atualizarContagemBlocos = useAtualizarContagemBlocos();
 
   const isLoteamento = tipoEmpreendimento === 'loteamento' || tipoEmpreendimento === 'condominio';
   const agrupamentoLabel = isLoteamento ? 'Quadra' : 'Bloco';
@@ -585,6 +586,9 @@ export function ImportarUnidadesDialog({
         });
         atualizadosCount = linhasAtualizar.length;
       }
+
+      // Atualizar contagem de lotes/unidades por bloco
+      await atualizarContagemBlocos.mutateAsync(empreendimentoId);
 
       setResultado({ 
         sucesso: sucessoCount, 
