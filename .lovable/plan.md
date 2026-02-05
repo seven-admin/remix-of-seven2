@@ -1,179 +1,102 @@
 
-# Plano: Vinculação Automática de Polígonos/Marcadores no Mapa
 
-## Problema Atual
+# Plano: Alinhar Layout do Calendário de Planejamento com Marketing
 
-Ao editar o mapa e criar múltiplos polígonos ou marcadores, o processo de vinculação é manual e repetitivo:
-1. Criar item → 2. Clicar "Vincular" → 3. Buscar unidade → 4. Selecionar
+## Problema Identificado
 
-Para um loteamento com 50+ lotes, isso é extremamente trabalhoso.
+No calendário de Planejamento (`/planejamento` aba Calendário), os dois cards (calendário à esquerda e detalhes à direita) não estão alinhados na base. Isso ocorre porque:
 
-## Solução Proposta
+1. O card do calendário cresce de acordo com seu conteúdo (grid de dias + legenda)
+2. O card de detalhes usa `h-full` mas o `ScrollArea` interno tem altura calculada que pode não corresponder
 
-Adicionar um **modo de Auto-Vincular** que permite:
-1. Selecionar um filtro (Bloco/Quadra ou Andar)
-2. Escolher o grupo específico (ex: "Quadra A")
-3. Os próximos itens criados serão vinculados automaticamente às unidades desse grupo, **na ordem de criação**
+## Referência
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  [Selecionar] [Polígono] [Marcador]  │  Auto-Vincular: [Quadra A ▾] [✓ On]  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+O calendário de Marketing (`/marketing/calendario`) resolve isso com:
+- Cards irmãos ambos com `h-full` dentro de um grid com altura implícita
+- O card de detalhes não usa `ScrollArea` com altura fixa
+- Layout mais simples e direto
 
-## Fluxo do Usuário
+## Solução
 
-1. **Ativar Auto-Vincular**: Seleciona uma Quadra/Bloco no dropdown
-2. **Sistema mostra**: "Próxima unidade: Lote 01 (Quadra A)"
-3. **Usuário desenha**: Polígono ou marcador no mapa
-4. **Auto-vínculo**: Sistema vincula automaticamente ao Lote 01
-5. **Avança fila**: Sistema mostra "Próxima: Lote 02 (Quadra A)"
-6. **Repete** até terminar as unidades do grupo
+Ajustar o `PlanejamentoCalendario.tsx` para:
+1. Garantir que ambos os cards tenham altura igual usando `flex` ou alinhamento de grid
+2. Substituir `ScrollArea` com altura calculada por `overflow-auto` com altura máxima
+3. Simplificar o layout para seguir o padrão do Marketing
 
-## Detalhes Técnicos
+## Alterações Técnicas
 
-### Novo Estado no MapaEditor
+### Arquivo: `src/components/planejamento/PlanejamentoCalendario.tsx`
 
-```typescript
-// Modo de auto-vinculação
-const [autoLinkMode, setAutoLinkMode] = useState<boolean>(false);
-const [autoLinkBlocoId, setAutoLinkBlocoId] = useState<string | null>(null);
+**Mudanças principais:**
 
-// Fila de unidades para vincular (ordenada por andar + número)
-const autoLinkQueue = useMemo(() => {
-  if (!autoLinkMode || !autoLinkBlocoId) return [];
-  
-  const blocoNome = autoLinkBlocoId; // Pode ser ID ou nome
-  return unlinkedUnidades
-    .filter(u => u.bloco?.nome === blocoNome)
-    .sort((a, b) => {
-      const andarA = a.andar ?? -Infinity;
-      const andarB = b.andar ?? -Infinity;
-      if (andarA !== andarB) return andarA - andarB;
-      return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
-    });
-}, [autoLinkMode, autoLinkBlocoId, unlinkedUnidades]);
-
-// Próxima unidade a vincular
-const nextAutoLinkUnit = autoLinkQueue[0] || null;
-```
-
-### Modificar Criação de Itens
-
-Quando um polígono/marcador é criado e `autoLinkMode` está ativo:
-
-```typescript
-// Em handleFinishPolygon e no handler de draw_marker
-if (autoLinkMode && nextAutoLinkUnit) {
-  const newItem: DrawnItem = {
-    id: `polygon-${Date.now()}`,
-    tipo: 'polygon',
-    points: [...currentPoints],
-    unidadeId: nextAutoLinkUnit.id, // JÁ VINCULA AUTOMATICAMENTE
-  };
-  setDrawnItems((prev) => [...prev, newItem]);
-  toast.success(`Vinculado automaticamente: ${nextAutoLinkUnit.numero}`);
-} else {
-  // Comportamento atual
-}
-```
-
-### UI do Auto-Vincular
-
+1. **Grid wrapper com altura mínima**:
 ```tsx
-{/* Seção de Auto-Vincular na toolbar */}
-<div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
-  <Switch
-    checked={autoLinkMode}
-    onCheckedChange={(checked) => {
-      setAutoLinkMode(checked);
-      if (!checked) setAutoLinkBlocoId(null);
-    }}
-  />
-  <Label className="text-sm">Auto-Vincular</Label>
-  
-  {autoLinkMode && (
-    <>
-      <Select value={autoLinkBlocoId || ''} onValueChange={setAutoLinkBlocoId}>
-        <SelectTrigger className="w-40 h-8">
-          <SelectValue placeholder="Selecione quadra" />
-        </SelectTrigger>
-        <SelectContent>
-          {blocos.map((bloco) => (
-            <SelectItem key={bloco} value={bloco}>
-              {bloco} ({unlinkedByBloco.get(bloco)?.length || 0})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      {nextAutoLinkUnit && (
-        <Badge variant="outline" className="bg-primary/10">
-          Próxima: {nextAutoLinkUnit.numero}
-        </Badge>
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+```
+O `items-stretch` garante que ambas as colunas tenham a mesma altura.
+
+2. **Card do Calendário sem mudanças estruturais** (mantém como está)
+
+3. **Card de Detalhes - altura alinhada**:
+```tsx
+<div className="lg:col-span-1">
+  <Card className="h-full flex flex-col">
+    <CardHeader className="pb-3">
+      {/* ... header ... */}
+    </CardHeader>
+    <CardContent className="pt-0 flex-1 overflow-hidden">
+      {itensDoDia.length === 0 ? (
+        {/* ... empty state ... */}
+      ) : (
+        <div className="h-full overflow-y-auto pr-2 space-y-3">
+          {/* ... lista de tarefas ... */}
+        </div>
       )}
-    </>
-  )}
+    </CardContent>
+  </Card>
 </div>
 ```
 
-### Indicador Visual no Canvas
+**Detalhes das mudanças:**
 
-Quando auto-link está ativo, mostrar destaque visual da próxima unidade a ser vinculada:
+| Local | De | Para |
+|-------|-----|------|
+| Div container | `grid-cols-1 lg:grid-cols-3 gap-6` | `grid-cols-1 lg:grid-cols-3 gap-6 items-stretch` |
+| Card detalhes | `h-full` | `h-full flex flex-col` |
+| CardContent detalhes | `pt-0` | `pt-0 flex-1 overflow-hidden` |
+| ScrollArea | `<ScrollArea className="h-[calc(100vh-480px)]">` | Remover, usar `<div className="h-full overflow-y-auto pr-2">` |
 
-```tsx
-{autoLinkMode && nextAutoLinkUnit && (
-  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400">
-    <strong>Auto-Vincular Ativo:</strong> O próximo item será vinculado a{' '}
-    <span className="font-bold">{buildUnitLabel(nextAutoLinkUnit, labelFormato)}</span>
-    {' '}({nextAutoLinkUnit.bloco?.nome || 'Sem bloco'})
-    <span className="ml-2 text-xs opacity-75">
-      Restam {autoLinkQueue.length} unidades
-    </span>
-  </div>
-)}
-```
-
-## Resumo de Arquivos
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/mapa/MapaEditor.tsx` | Adicionar modo auto-vincular com seleção de quadra/bloco, fila automática e vinculação na criação |
-
-## Fluxo Visual
+## Visualização do Resultado
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  TOOLBAR                                                                    │
-│  [Selecionar] [Polígono] [Marcador]                                        │
-│                                                                             │
-│  ┌─ Auto-Vincular ─────────────────────────────────────────────────────────┐│
-│  │  [✓ On]  Quadra: [Quadra A ▾]  │  Próxima: Lote 01  │  Restam: 12       ││
-│  └──────────────────────────────────────────────────────────────────────────┘│
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─ INFO BAR ───────────────────────────────────────────────────────────────┐
-│  │  Auto-Vincular Ativo: O próximo item será vinculado a Q.A|2Q|01          │
-│  │  (Quadra A) - Restam 12 unidades                                         │
-│  └──────────────────────────────────────────────────────────────────────────┘
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────────┐
-│  │                                                                          │
-│  │                         [ MAPA / CANVAS ]                                │
-│  │                                                                          │
-│  │      Usuário desenha marcadores/polígonos em sequência                   │
-│  │      Sistema vincula automaticamente: 01, 02, 03, 04...                  │
-│  │                                                                          │
-│  └──────────────────────────────────────────────────────────────────────────┘
-│                                                                             │
-│  Polígonos: 5  Marcadores: 8  Vinculados: 13  Unidades sem vínculo: 37     │
+┌─────────────────────────────────────────────────┬──────────────────────────┐
+│              CALENDÁRIO                          │    5 de Fevereiro        │
+│  ┌────┬────┬────┬────┬────┬────┬────┐           │    3 tarefas ativas      │
+│  │ D  │ S  │ T  │ Q  │ Q  │ S  │ S  │           │                          │
+│  ├────┼────┼────┼────┼────┼────┼────┤           │   ┌────────────────────┐ │
+│  │    │    │    │    │ 5  │    │    │           │   │ Projeto Alpha      │ │
+│  │    │    │    │    │ ▬  │    │    │           │   │ Tarefa 1           │ │
+│  │    │    │    │    │    │    │    │           │   │ 01/02 - 10/02      │ │
+│  │    │    │    │    │    │    │    │           │   └────────────────────┘ │
+│  │    │    │    │    │    │    │    │           │   ┌────────────────────┐ │
+│  └────┴────┴────┴────┴────┴────┴────┘           │   │ Projeto Beta       │ │
+│                                                  │   │ Tarefa 2           │ │
+│  [Legenda: cores por empreendimento]            │   └────────────────────┘ │
+├─────────────────────────────────────────────────┴──────────────────────────┤
+│                    ↑ Bases alinhadas ↑                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Benefícios
 
-1. **Produtividade**: Vincular 50 lotes de uma quadra leva segundos, não minutos
-2. **Ordem garantida**: Unidades são vinculadas na ordem natural (andar + número)
-3. **Feedback visual**: Usuário sempre sabe qual será a próxima unidade
-4. **Flexível**: Pode alternar entre quadras/blocos a qualquer momento
-5. **Não-destrutivo**: Modo manual continua funcionando normalmente
+1. **Alinhamento visual**: Ambos os cards terminam na mesma altura
+2. **Consistência**: Segue o mesmo padrão do calendário de Marketing
+3. **Responsivo**: Continua funcionando bem em mobile (empilhado)
+4. **Scroll suave**: Lista de tarefas com scroll interno quando necessário
+
+## Resumo de Arquivos
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/planejamento/PlanejamentoCalendario.tsx` | Ajustar grid com `items-stretch`, Card com `flex flex-col`, remover ScrollArea por div com overflow |
+
