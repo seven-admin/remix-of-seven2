@@ -242,6 +242,7 @@ export function useGerarProposta() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['negociacao', result.id] });
       invalidateDashboards(queryClient);
       toast.success(`Proposta ${result.numero_proposta} gerada com sucesso!`);
@@ -266,6 +267,7 @@ export function useEnviarProposta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
       toast.success('Proposta enviada com sucesso!');
@@ -293,6 +295,7 @@ export function useAceitarProposta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       invalidateDashboards(queryClient);
       toast.success('Proposta aceita!');
     },
@@ -319,6 +322,7 @@ export function useRecusarProposta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
       toast.success('Proposta recusada');
@@ -510,6 +514,7 @@ export function useConverterPropostaEmContrato() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['contratos-paginated'] });
@@ -548,6 +553,7 @@ export function useExcluirProposta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       invalidateDashboards(queryClient);
       toast.success('Proposta excluída com sucesso!');
     },
@@ -682,6 +688,7 @@ export function useCreateNegociacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       queryClient.invalidateQueries({ queryKey: ['negociacao-condicoes-pagamento'] });
@@ -841,6 +848,7 @@ export function useMoverNegociacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
       toast.success('Negociação movida com sucesso!');
@@ -865,6 +873,7 @@ export function useReordenarNegociacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
     }
   });
 }
@@ -926,6 +935,7 @@ export function useUpdateNegociacao() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['negociacao', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
@@ -964,6 +974,7 @@ export function useDeleteNegociacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['negociacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['negociacoes-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       invalidateDashboards(queryClient);
       toast.success('Ficha removida com sucesso!');

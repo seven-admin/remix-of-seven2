@@ -167,10 +167,11 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
-      toast.success('Ticket criado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Atividade de produção criada com sucesso!');
     },
     onError: (error: Error) => {
-      toast.error('Erro ao criar ticket: ' + error.message);
+      toast.error('Erro ao criar atividade de produção: ' + error.message);
     }
   });
 
@@ -191,7 +192,8 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
-      toast.success('Ticket atualizado!');
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Atividade de produção atualizada!');
     },
     onError: (error: Error) => {
       toast.error('Erro ao atualizar: ' + error.message);
@@ -297,11 +299,11 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
       toast.error('Erro ao mover ticket: ' + error.message);
     },
     onSuccess: () => {
-      // Invalidar sem refetch imediato - optimistic update já atualizou UI
-      queryClient.invalidateQueries({ 
-        queryKey: ['projetos-marketing'],
-        refetchType: 'none'
-      });
+      // Refetch após optimistic update para sincronizar com o banco
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+        queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      }, 300);
     }
   });
 
@@ -317,7 +319,8 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
-      toast.success('Ticket arquivado!');
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Atividade de produção arquivada!');
     }
   });
 
@@ -333,10 +336,11 @@ export function useProjetosMarketing(filters?: ProjetoFilters) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
       queryClient.invalidateQueries({ queryKey: ['projeto-marketing'] });
-      toast.success('Ticket excluído!');
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Atividade de produção excluída!');
     },
     onError: (error: Error) => {
-      toast.error('Erro ao excluir ticket: ' + error.message);
+      toast.error('Erro ao excluir atividade de produção: ' + error.message);
     }
   });
 

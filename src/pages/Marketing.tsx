@@ -134,8 +134,8 @@ export default function Marketing() {
 
   return (
     <MainLayout 
-      title="Tickets de Produção"
-      subtitle="Gerencie tickets de criação e marketing"
+      title="Atividades de Produção"
+      subtitle="Gerencie atividades de criação e marketing"
     >
       {/* Seletor de Mês e Toggle de Concluídos */}
       <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
@@ -223,7 +223,7 @@ export default function Marketing() {
 
         <Button onClick={() => setShowForm(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Novo Ticket
+          Nova Atividade
         </Button>
       </div>
 
@@ -305,7 +305,7 @@ export default function Marketing() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Novo Ticket</DialogTitle>
+            <DialogTitle>Nova Atividade de Produção</DialogTitle>
           </DialogHeader>
           <TicketForm onSuccess={() => setShowForm(false)} />
         </DialogContent>

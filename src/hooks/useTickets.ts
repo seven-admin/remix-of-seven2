@@ -148,10 +148,11 @@ export function useTickets(filters?: TicketFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket criado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      toast.success('Atividade de produção criada com sucesso!');
     },
     onError: (error: Error) => {
-      toast.error('Erro ao criar ticket: ' + error.message);
+      toast.error('Erro ao criar atividade de produção: ' + error.message);
     }
   });
 
@@ -172,7 +173,8 @@ export function useTickets(filters?: TicketFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket atualizado!');
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      toast.success('Atividade de produção atualizada!');
     },
     onError: (error: Error) => {
       toast.error('Erro ao atualizar: ' + error.message);
@@ -262,12 +264,13 @@ export function useTickets(filters?: TicketFilters) {
           queryClient.setQueryData(queryKey, data);
         });
       }
-      toast.error('Erro ao mover ticket: ' + error.message);
+      toast.error('Erro ao mover atividade de produção: ' + error.message);
     },
     onSuccess: () => {
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      }, 500);
+        queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      }, 300);
     }
   });
 
@@ -283,7 +286,8 @@ export function useTickets(filters?: TicketFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket arquivado!');
+      queryClient.invalidateQueries({ queryKey: ['projetos-marketing'] });
+      toast.success('Atividade de produção arquivada!');
     }
   });
 
