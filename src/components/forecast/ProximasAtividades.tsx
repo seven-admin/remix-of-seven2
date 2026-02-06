@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProximasAtividades } from '@/hooks/useForecast';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const TIPO_ICON: Record<string, React.ElementType> = {
@@ -26,6 +27,7 @@ interface ProximasAtividadesProps {
 
 export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtividadesProps) {
   const { data: atividades, isLoading } = useProximasAtividades(10, gestorId, empreendimentoIds);
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -78,9 +80,10 @@ export function ProximasAtividades({ gestorId, empreendimentoIds }: ProximasAtiv
                   <div
                     key={atividade.id}
                     className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-accent/50',
+                      'flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-accent/50 cursor-pointer',
                       isToday && 'bg-primary/5 border border-primary/10'
                     )}
+                    onClick={() => navigate(`/atividades`)}
                   >
                     <div className={cn(
                       'h-10 w-10 rounded-full flex items-center justify-center shrink-0',

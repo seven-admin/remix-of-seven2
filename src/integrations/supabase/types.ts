@@ -419,6 +419,7 @@ export type Database = {
           objetivo: string | null
           observacoes: string | null
           referencia: string | null
+          referencia_imagem_url: string | null
           status: Database["public"]["Enums"]["briefing_status"]
           sub_complemento: string | null
           tema: string
@@ -446,6 +447,7 @@ export type Database = {
           objetivo?: string | null
           observacoes?: string | null
           referencia?: string | null
+          referencia_imagem_url?: string | null
           status?: Database["public"]["Enums"]["briefing_status"]
           sub_complemento?: string | null
           tema: string
@@ -473,6 +475,7 @@ export type Database = {
           objetivo?: string | null
           observacoes?: string | null
           referencia?: string | null
+          referencia_imagem_url?: string | null
           status?: Database["public"]["Enums"]["briefing_status"]
           sub_complemento?: string | null
           tema?: string

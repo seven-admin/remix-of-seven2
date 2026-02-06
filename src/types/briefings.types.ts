@@ -18,6 +18,7 @@ export interface Briefing {
   estilo_visual?: string | null;
   diretrizes_visuais?: string | null;
   referencia?: string | null;
+  referencia_imagem_url?: string | null;
   importante?: string | null;
   observacoes?: string | null;
   status: BriefingStatus;
@@ -112,6 +113,7 @@ export interface BriefingFormData {
   estilo_visual?: string;
   diretrizes_visuais?: string;
   referencia?: string;
+  referencia_imagem_url?: string;
   importante?: string;
   observacoes?: string;
 }
