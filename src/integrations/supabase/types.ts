@@ -3094,8 +3094,12 @@ export type Database = {
           created_at: string
           empreendimento_id: string | null
           id: string
+          meta_atendimentos: number
+          meta_propostas: number
+          meta_treinamentos: number
           meta_unidades: number
           meta_valor: number
+          meta_visitas: number
           updated_at: string
         }
         Insert: {
@@ -3104,8 +3108,12 @@ export type Database = {
           created_at?: string
           empreendimento_id?: string | null
           id?: string
+          meta_atendimentos?: number
+          meta_propostas?: number
+          meta_treinamentos?: number
           meta_unidades?: number
           meta_valor?: number
+          meta_visitas?: number
           updated_at?: string
         }
         Update: {
@@ -3114,8 +3122,12 @@ export type Database = {
           created_at?: string
           empreendimento_id?: string | null
           id?: string
+          meta_atendimentos?: number
+          meta_propostas?: number
+          meta_treinamentos?: number
           meta_unidades?: number
           meta_valor?: number
+          meta_visitas?: number
           updated_at?: string
         }
         Relationships: [

@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ export const NegociacaoCard = memo(function NegociacaoCard({
   onRecusarProposta,
   onSolicitarReserva
 }: NegociacaoCardProps) {
+  const navigate = useNavigate();
   const validacao = useValidacaoFichaProposta(negociacao);
   
   const formatCurrencyCompact = (value?: number) => {
@@ -145,7 +147,7 @@ export const NegociacaoCard = memo(function NegociacaoCard({
                 <ArrowRight className="h-4 w-4 mr-2" />
                 Mover
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEditar(negociacao)}>
+              <DropdownMenuItem onClick={() => navigate(`/negociacoes/editar/${negociacao.id}`)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </DropdownMenuItem>

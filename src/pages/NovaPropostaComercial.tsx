@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,8 @@ import { ResponsaveisCard } from '@/components/propostas/ResponsaveisCard';
 import { ResumoPropostaCards } from '@/components/propostas/ResumoPropostaCards';
 import { ApresentacaoDialog } from '@/components/propostas/ApresentacaoDialog';
 import { LocalCondicoesPagamentoEditor, LocalCondicao } from '@/components/negociacoes/LocalCondicoesPagamentoEditor';
-import { useCreateNegociacao } from '@/hooks/useNegociacoes';
+import { useCreateNegociacao, useUpdateNegociacao, useNegociacao } from '@/hooks/useNegociacoes';
+import { useNegociacaoCondicoesPagamento } from '@/hooks/useNegociacaoCondicoesPagamento';
 import { useEtapasPadraoAtivas } from '@/hooks/useFunis';
 import { toast } from 'sonner';
 import { toCents, fromCents } from '@/lib/formatters';
@@ -24,8 +25,16 @@ interface UnidadeSelecionada {
 
 export default function NovaPropostaComercial() {
   const navigate = useNavigate();
+  const { id: editId } = useParams<{ id: string }>();
+  const isEditMode = !!editId;
+  
   const createNegociacao = useCreateNegociacao();
+  const updateNegociacao = useUpdateNegociacao();
   const { data: etapas = [] } = useEtapasPadraoAtivas();
+  
+  // Load existing data in edit mode
+  const { data: negociacaoExistente, isLoading: loadingNegociacao } = useNegociacao(editId);
+  const { data: condicoesExistentes = [] } = useNegociacaoCondicoesPagamento(editId);
   
   // Form state
   const [clienteId, setClienteId] = useState<string | null>(null);
@@ -37,6 +46,54 @@ export default function NovaPropostaComercial() {
   const [imobiliariaId, setImobiliariaId] = useState<string | null>(null);
   const [condicoes, setCondicoes] = useState<LocalCondicao[]>([]);
   const [apresentacaoOpen, setApresentacaoOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  
+  // Populate form when editing existing negotiation
+  useEffect(() => {
+    if (isEditMode && negociacaoExistente && !dataLoaded) {
+      setClienteId(negociacaoExistente.cliente_id || null);
+      setClienteNome(negociacaoExistente.cliente?.nome || '');
+      setEmpreendimentoId(negociacaoExistente.empreendimento_id || null);
+      setEmpreendimentoNome(negociacaoExistente.empreendimento?.nome || '');
+      setCorretorId(negociacaoExistente.corretor_id || null);
+      setImobiliariaId(negociacaoExistente.imobiliaria_id || null);
+      
+      // Map unidades
+      if (negociacaoExistente.unidades?.length) {
+        setUnidades(negociacaoExistente.unidades.map((nu: any) => ({
+          id: nu.unidade_id,
+          codigo: nu.unidade?.numero || '',
+          bloco: nu.unidade?.bloco?.nome || '',
+          valor: nu.valor_unidade || nu.unidade?.valor || 0,
+        })));
+      }
+      
+      setDataLoaded(true);
+    }
+  }, [isEditMode, negociacaoExistente, dataLoaded]);
+
+  // Populate conditions when editing
+  useEffect(() => {
+    if (isEditMode && condicoesExistentes.length > 0 && dataLoaded && condicoes.length === 0) {
+      setCondicoes(condicoesExistentes.map((c: any, index: number) => ({
+        _localId: `existing-${index}-${Date.now()}`,
+        tipo_parcela_codigo: c.tipo_parcela_codigo,
+        quantidade: c.quantidade,
+        valor: c.valor,
+        valor_tipo: c.valor_tipo || 'fixo',
+        forma_quitacao: c.forma_quitacao || 'dinheiro',
+        forma_pagamento: c.forma_pagamento || 'boleto',
+        intervalo_dias: c.intervalo_dias || 30,
+        com_correcao: c.com_correcao || false,
+        indice_correcao: c.indice_correcao || 'INCC',
+        parcelas_sem_correcao: c.parcelas_sem_correcao || 0,
+        descricao: c.descricao,
+        observacao_texto: c.observacao_texto,
+        data_vencimento: c.data_vencimento,
+        evento_vencimento: c.evento_vencimento,
+      })));
+    }
+  }, [isEditMode, condicoesExistentes, dataLoaded, condicoes.length]);
   
   // Derived values
   const valorTotal = useMemo(() => 
@@ -93,34 +150,92 @@ export default function NovaPropostaComercial() {
       return;
     }
     
-    // Find initial stage
-    const etapaInicial = etapas.find(e => e.is_inicial) || etapas[0];
-    
-    if (!etapaInicial) {
-      toast.error('Configure as etapas do funil antes de criar propostas');
-      return;
-    }
-    
     try {
-      await createNegociacao.mutateAsync({
-        cliente_id: clienteId,
-        empreendimento_id: empreendimentoId,
-        corretor_id: corretorId || undefined,
-        imobiliaria_id: imobiliariaId || undefined,
-        funil_etapa_id: etapaInicial.id,
-        valor_negociacao: valorTotal,
-        unidade_ids: unidades.map(u => u.id),
-        condicoes_pagamento: condicoes.map((c, index) => ({
-          ...c,
-          ordem: index,
-        })),
-      });
-      
-      navigate('/negociacoes');
+      if (isEditMode && editId) {
+        // Update existing negotiation
+        await updateNegociacao.mutateAsync({
+          id: editId,
+          data: {
+            cliente_id: clienteId,
+            empreendimento_id: empreendimentoId,
+            corretor_id: corretorId || undefined,
+            imobiliaria_id: imobiliariaId || undefined,
+            valor_negociacao: valorTotal,
+            unidade_ids: unidades.map(u => u.id),
+          },
+        });
+        
+        // Update payment conditions: delete old, insert new
+        const db = (await import('@/integrations/supabase/client')).supabase as any;
+        await db.from('negociacao_condicoes_pagamento')
+          .delete()
+          .eq('negociacao_id', editId);
+        
+        if (condicoes.length > 0) {
+          const condicoesData = condicoes.map((c, index) => ({
+            negociacao_id: editId,
+            ordem: index,
+            tipo_parcela_codigo: c.tipo_parcela_codigo,
+            quantidade: c.quantidade,
+            valor: c.valor,
+            valor_tipo: c.valor_tipo || 'fixo',
+            forma_quitacao: c.forma_quitacao || 'dinheiro',
+            forma_pagamento: c.forma_pagamento || 'boleto',
+            intervalo_dias: c.intervalo_dias || 30,
+            com_correcao: c.com_correcao || false,
+            indice_correcao: c.indice_correcao || 'INCC',
+            parcelas_sem_correcao: c.parcelas_sem_correcao || 0,
+            descricao: c.descricao,
+            observacao_texto: c.observacao_texto,
+            data_vencimento: c.data_vencimento,
+            evento_vencimento: c.evento_vencimento,
+          }));
+          await db.from('negociacao_condicoes_pagamento').insert(condicoesData);
+        }
+        
+        toast.success('Proposta atualizada com sucesso!');
+        navigate('/negociacoes');
+      } else {
+        // Create new negotiation
+        const etapaInicial = etapas.find(e => e.is_inicial) || etapas[0];
+        
+        if (!etapaInicial) {
+          toast.error('Configure as etapas do funil antes de criar propostas');
+          return;
+        }
+        
+        await createNegociacao.mutateAsync({
+          cliente_id: clienteId,
+          empreendimento_id: empreendimentoId,
+          corretor_id: corretorId || undefined,
+          imobiliaria_id: imobiliariaId || undefined,
+          funil_etapa_id: etapaInicial.id,
+          valor_negociacao: valorTotal,
+          unidade_ids: unidades.map(u => u.id),
+          condicoes_pagamento: condicoes.map((c, index) => ({
+            ...c,
+            ordem: index,
+          })),
+        });
+        
+        navigate('/negociacoes');
+      }
     } catch (error) {
-      console.error('Erro ao criar proposta:', error);
+      console.error('Erro ao salvar proposta:', error);
     }
   };
+
+  const isPending = createNegociacao.isPending || updateNegociacao.isPending;
+  
+  if (isEditMode && loadingNegociacao) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout>
@@ -132,8 +247,14 @@ export default function NovaPropostaComercial() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Nova Proposta Comercial</h1>
-            <p className="text-sm text-muted-foreground">Configure a proposta visualmente</p>
+            <h1 className="text-2xl font-bold">
+              {isEditMode ? 'Editar Proposta Comercial' : 'Nova Proposta Comercial'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isEditMode 
+                ? `Editando ${negociacaoExistente?.codigo || ''}`
+                : 'Configure a proposta visualmente'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -149,13 +270,13 @@ export default function NovaPropostaComercial() {
             <FileText className="h-4 w-4 mr-2" />
             Gerar PDF
           </Button>
-          <Button onClick={handleSave} disabled={!canSave || createNegociacao.isPending}>
-            {createNegociacao.isPending ? (
+          <Button onClick={handleSave} disabled={!canSave || isPending}>
+            {isPending ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-            Salvar Proposta
+            {isEditMode ? 'Atualizar Proposta' : 'Salvar Proposta'}
           </Button>
         </div>
       </div>
@@ -180,7 +301,7 @@ export default function NovaPropostaComercial() {
             onEmpreendimentoChange={(id, nome) => {
               setEmpreendimentoId(id);
               setEmpreendimentoNome(nome || '');
-              setUnidades([]); // Reset units when changing empreendimento
+              if (!isEditMode) setUnidades([]);
             }}
             onUnidadesChange={setUnidades}
           />

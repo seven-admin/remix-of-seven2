@@ -9,6 +9,10 @@ export interface MetaComercial {
   corretor_id: string | null;
   meta_valor: number;
   meta_unidades: number;
+  meta_visitas: number;
+  meta_atendimentos: number;
+  meta_treinamentos: number;
+  meta_propostas: number;
   created_at: string;
   updated_at: string;
 }
@@ -235,6 +239,10 @@ export function useCreateMeta() {
       corretor_id?: string | null;
       meta_valor: number;
       meta_unidades: number;
+      meta_visitas?: number;
+      meta_atendimentos?: number;
+      meta_treinamentos?: number;
+      meta_propostas?: number;
     }) => {
       const { data: result, error } = await supabase
         .from('metas_comerciais' as any)
@@ -244,6 +252,10 @@ export function useCreateMeta() {
           corretor_id: data.corretor_id || null,
           meta_valor: data.meta_valor,
           meta_unidades: data.meta_unidades,
+          meta_visitas: data.meta_visitas || 0,
+          meta_atendimentos: data.meta_atendimentos || 0,
+          meta_treinamentos: data.meta_treinamentos || 0,
+          meta_propostas: data.meta_propostas || 0,
         }, {
           onConflict: 'competencia,empreendimento_id,corretor_id',
         })
@@ -421,6 +433,10 @@ export function useCopiarMetas() {
             corretor_id: meta.corretor_id,
             meta_valor: meta.meta_valor,
             meta_unidades: meta.meta_unidades,
+            meta_visitas: meta.meta_visitas || 0,
+            meta_atendimentos: meta.meta_atendimentos || 0,
+            meta_treinamentos: meta.meta_treinamentos || 0,
+            meta_propostas: meta.meta_propostas || 0,
           }, {
             onConflict: 'competencia,empreendimento_id,corretor_id',
           });
