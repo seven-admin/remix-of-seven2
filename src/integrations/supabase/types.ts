@@ -3542,10 +3542,13 @@ export type Database = {
           created_by: string | null
           dados_filiacao_ok: boolean | null
           data_aceite: string | null
+          data_contrato_gerado: string | null
           data_conversao: string | null
           data_emissao_proposta: string | null
           data_fechamento: string | null
           data_previsao_fechamento: string | null
+          data_primeiro_atendimento: string | null
+          data_proposta_gerada: string | null
           data_validade_proposta: string | null
           desconto_percentual: number | null
           desconto_valor: number | null
@@ -3595,10 +3598,13 @@ export type Database = {
           created_by?: string | null
           dados_filiacao_ok?: boolean | null
           data_aceite?: string | null
+          data_contrato_gerado?: string | null
           data_conversao?: string | null
           data_emissao_proposta?: string | null
           data_fechamento?: string | null
           data_previsao_fechamento?: string | null
+          data_primeiro_atendimento?: string | null
+          data_proposta_gerada?: string | null
           data_validade_proposta?: string | null
           desconto_percentual?: number | null
           desconto_valor?: number | null
@@ -3648,10 +3654,13 @@ export type Database = {
           created_by?: string | null
           dados_filiacao_ok?: boolean | null
           data_aceite?: string | null
+          data_contrato_gerado?: string | null
           data_conversao?: string | null
           data_emissao_proposta?: string | null
           data_fechamento?: string | null
           data_previsao_fechamento?: string | null
+          data_primeiro_atendimento?: string | null
+          data_proposta_gerada?: string | null
           data_validade_proposta?: string | null
           desconto_percentual?: number | null
           desconto_valor?: number | null
@@ -3764,6 +3773,50 @@ export type Database = {
           {
             foreignKeyName: "negociacoes_validacao_comercial_por_fkey"
             columns: ["validacao_comercial_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificacoes: {
+        Row: {
+          created_at: string
+          id: string
+          lida: boolean
+          mensagem: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo?: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4170,6 +4223,42 @@ export type Database = {
           },
           {
             foreignKeyName: "projeto_historico_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_responsaveis: {
+        Row: {
+          created_at: string
+          id: string
+          projeto_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          projeto_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          projeto_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_responsaveis_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos_marketing"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_responsaveis_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

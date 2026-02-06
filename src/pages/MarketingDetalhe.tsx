@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,10 +18,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2, Image, FileText, ExternalLink } from 'lucide-react';
+import { Calendar, User, Building2, MessageSquare, History, CheckSquare, Pencil, Trash2, Image, FileText, ExternalLink, Users, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjetosMarketing } from '@/hooks/useProjetosMarketing';
+import { useProjetoResponsaveis } from '@/hooks/useProjetoResponsaveis';
 import { CATEGORIA_LABELS, STATUS_LABELS, STATUS_COLORS, PRIORIDADE_LABELS, PRIORIDADE_COLORS } from '@/types/marketing.types';
 import { ProjetoTarefas } from '@/components/marketing/ProjetoTarefas';
 import { ProjetoComentarios } from '@/components/marketing/ProjetoComentarios';
@@ -33,6 +35,7 @@ export default function MarketingDetalhe() {
   const navigate = useNavigate();
   const { useProjeto, deleteProjeto } = useProjetosMarketing();
   const { data: projeto, isLoading } = useProjeto(id || '');
+  const { responsaveis, removeResponsavel } = useProjetoResponsaveis(id);
   const [editOpen, setEditOpen] = useState(false);
 
   const handleDelete = async () => {
@@ -352,6 +355,50 @@ export default function MarketingDetalhe() {
                     <p className="font-medium">{projeto.empreendimento.nome}</p>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Responsáveis */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Responsáveis
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {projeto.supervisor && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-[10px]">
+                      {projeto.supervisor.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{projeto.supervisor.full_name}</p>
+                    <p className="text-[10px] text-muted-foreground">Principal</p>
+                  </div>
+                </div>
+              )}
+              {responsaveis.map(r => (
+                <div key={r.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/30 group">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-[10px]">
+                      {r.user?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <p className="text-xs font-medium truncate flex-1">{r.user?.full_name}</p>
+                  <button 
+                    onClick={() => removeResponsavel.mutate(r.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                  </button>
+                </div>
+              ))}
+              {!projeto.supervisor && responsaveis.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum responsável atribuído.</p>
               )}
             </CardContent>
           </Card>

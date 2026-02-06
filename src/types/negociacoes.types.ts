@@ -126,6 +126,11 @@ export interface Negociacao {
   ordem_kanban: number;
   unidades?: NegociacaoUnidade[];
   
+  // ====== Campos de Rastreamento de Tempo ======
+  data_primeiro_atendimento?: string | null;
+  data_proposta_gerada?: string | null;
+  data_contrato_gerado?: string | null;
+  
   // ====== Campos de Validação da Ficha ======
   ficha_completa?: boolean;
   documentos_anexados?: boolean;

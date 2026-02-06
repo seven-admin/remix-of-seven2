@@ -167,6 +167,22 @@ export function useCreateAtividade() {
       const payload = normalizeAtividadeForSave(formData);
       const { data, error } = await supabase.from('atividades').insert(payload).select().single();
       if (error) throw error;
+
+      // Criar notificação para o gestor atribuído (se diferente do criador)
+      if (data.gestor_id) {
+        const { data: currentUser } = await supabase.auth.getUser();
+        if (currentUser?.user?.id && currentUser.user.id !== data.gestor_id) {
+          await supabase.from('notificacoes').insert({
+            user_id: data.gestor_id,
+            tipo: 'atividade_atribuida',
+            titulo: 'Nova atividade atribuída',
+            mensagem: `A atividade "${data.titulo}" foi atribuída a você.`,
+            referencia_id: data.id,
+            referencia_tipo: 'atividade',
+          }).then(() => {});
+        }
+      }
+
       return data;
     },
     onSuccess: () => {

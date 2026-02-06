@@ -17,6 +17,7 @@ export interface DashboardExecutivoData {
     porEtapa: { etapa: string; quantidade: number; valor: number }[];
     taxaConversao: number;
     novasHoje: number;
+    tempoMedioFechamento: number; // em dias
   };
   financeiro: {
     receitasMes: number;
@@ -153,7 +154,7 @@ export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoI
       // ============ NEGOCIAÇÕES ============
       let negociacoesQuery = supabase
         .from('negociacoes')
-        .select('id, etapa, valor_negociacao, funil_etapa_id, created_at')
+        .select('id, etapa, valor_negociacao, funil_etapa_id, created_at, data_fechamento')
         .eq('is_active', true);
 
       if (empreendimentoIds && empreendimentoIds.length > 0) {
@@ -178,6 +179,18 @@ export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoI
       const taxaConversao = negociacoes?.length 
         ? (negociacoesGanhas.length / negociacoes.length) * 100 
         : 0;
+
+      // Calcular tempo médio de fechamento
+      let tempoMedioFechamento = 0;
+      const negociacoesComFechamento = negociacoes?.filter(n => n.data_fechamento) || [];
+      if (negociacoesComFechamento.length > 0) {
+        const totalDias = negociacoesComFechamento.reduce((acc, n) => {
+          const created = new Date(n.created_at).getTime();
+          const fechado = new Date(n.data_fechamento!).getTime();
+          return acc + Math.max(0, (fechado - created) / (1000 * 60 * 60 * 24));
+        }, 0);
+        tempoMedioFechamento = Math.round(totalDias / negociacoesComFechamento.length);
+      }
 
       const hojeStr = format(hoje, 'yyyy-MM-dd');
       const novasHoje = negociacoes?.filter(n => 
@@ -454,7 +467,8 @@ export function useDashboardExecutivo(empreendimentoId?: string, empreendimentoI
           total: negociacoesAtivas.length,
           porEtapa,
           taxaConversao,
-          novasHoje
+          novasHoje,
+          tempoMedioFechamento
         },
         financeiro: {
           receitasMes,

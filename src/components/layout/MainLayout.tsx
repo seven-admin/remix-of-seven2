@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { PageHeader } from './PageHeader';
 import { AceitarTermosDialog } from '@/components/auth/AceitarTermosDialog';
+import { NotificacaoBell } from './NotificacaoBell';
 import { useVerificarAceite } from '@/hooks/useTermosAceite';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -37,7 +38,12 @@ export function MainLayout({ children, title, subtitle, actions, badge, backTo, 
           <PageHeader 
             title={title} 
             subtitle={subtitle} 
-            actions={actions}
+            actions={
+              <div className="flex items-center gap-2">
+                {actions}
+                {isAuthenticated && <NotificacaoBell />}
+              </div>
+            }
             badge={badge}
             backTo={backTo}
             backLabel={backLabel}
