@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useTVLayoutConfig } from '@/hooks/useTVLayoutConfig';
 import { TVLayoutConfigDialog } from '@/components/tv-layout';
-import { DollarSign, TrendingUp, Home, Users, FileText, Wallet, Target, Megaphone, Monitor, X, Settings } from 'lucide-react';
+import { DollarSign, TrendingUp, Home, Users, FileText, Wallet, Target, Megaphone, Monitor, X, Settings, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CORES_DASHBOARD } from '@/lib/chartColors';
@@ -100,7 +100,7 @@ export default function DashboardExecutivo() {
     { title: 'Vendas do Mês', value: formatCurrency(data?.vendas.vendasMesAtual || 0), subtitle: `${data?.vendas.unidadesVendidas || 0} unidades`, icon: TrendingUp },
     { title: 'Unidades Disponíveis', value: data?.unidades.disponiveis || 0, subtitle: formatCurrency(data?.unidades.vgvDisponivel || 0), icon: Home },
     { title: 'Taxa de Conversão', value: `${(data?.negociacoes.taxaConversao || 0).toFixed(1)}%`, subtitle: `${data?.negociacoes.total || 0} ativas`, icon: Target },
-    { title: 'Receita do Mês', value: formatCurrency(data?.financeiro.receitasMes || 0), subtitle: `Saldo: ${formatCurrency(data?.financeiro.saldoMes || 0)}`, icon: Wallet },
+    { title: 'Tempo Médio Fechamento', value: `${data?.negociacoes.tempoMedioFechamento || 0}d`, subtitle: 'dias até fechar', icon: Clock },
     { title: 'Comissões Pendentes', value: formatCurrency(data?.comissoes.totalPendente || 0), subtitle: `Pago: ${formatCurrency(data?.comissoes.totalPago || 0)}`, icon: Users },
     { title: 'Tickets Marketing', value: data?.marketing.ticketsEmAndamento || 0, subtitle: `${data?.marketing.briefingsPendentes || 0} briefings`, icon: Megaphone },
     { title: 'Clientes Ativos', value: data?.crm.clientesAtivos || 0, subtitle: `${data?.crm.leadsQuentes || 0} quentes`, icon: FileText },

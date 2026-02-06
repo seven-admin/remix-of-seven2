@@ -228,7 +228,8 @@ export function useGerarProposta() {
         desconto_percentual: data.desconto_percentual,
         desconto_valor: data.desconto_valor,
         condicao_pagamento: data.condicao_pagamento,
-        simulacao_dados: data.simulacao_dados
+        simulacao_dados: data.simulacao_dados,
+        data_proposta_gerada: new Date().toISOString()
       };
 
       const { error } = await db
@@ -504,7 +505,8 @@ export function useConverterPropostaEmContrato() {
         .update({ 
           status_proposta: 'convertida',
           data_conversao: new Date().toISOString().split('T')[0],
-          contrato_id: contrato.id
+          contrato_id: contrato.id,
+          data_contrato_gerado: new Date().toISOString()
         })
         .eq('id', id);
 
@@ -622,7 +624,8 @@ export function useCreateNegociacao() {
           condicao_pagamento: negociacaoData.condicao_pagamento,
           observacoes: negociacaoData.observacoes,
           data_previsao_fechamento: negociacaoData.data_previsao_fechamento,
-          ordem_kanban: novaOrdem
+          ordem_kanban: novaOrdem,
+          data_primeiro_atendimento: new Date().toISOString()
         })
         .select()
         .single();
