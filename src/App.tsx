@@ -173,6 +173,11 @@ const App = () => (
                 <NovaPropostaComercial />
               </ProtectedRoute>
             } />
+            <Route path="/negociacoes/editar/:id" element={
+              <ProtectedRoute moduleName="negociacoes">
+                <NovaPropostaComercial />
+              </ProtectedRoute>
+            } />
             {/* Redirect old /propostas to /negociacoes */}
             <Route path="/propostas" element={<Navigate to="/negociacoes" replace />} />
             <Route path="/solicitacoes" element={

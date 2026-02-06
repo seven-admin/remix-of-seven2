@@ -60,6 +60,10 @@ const MetasComerciais = () => {
   const [editingMeta, setEditingMeta] = useState<MetaComercialComEmpreendimento | null>(null);
   const [metaValor, setMetaValor] = useState<number>(0);
   const [metaUnidades, setMetaUnidades] = useState('');
+  const [metaVisitas, setMetaVisitas] = useState('');
+  const [metaAtendimentos, setMetaAtendimentos] = useState('');
+  const [metaTreinamentos, setMetaTreinamentos] = useState('');
+  const [metaPropostas, setMetaPropostas] = useState('');
   const [metaMes, setMetaMes] = useState(format(new Date(), 'MM'));
   const [metaAno, setMetaAno] = useState(currentYear.toString());
   const [metaEscopo, setMetaEscopo] = useState<'geral' | 'empreendimento'>('geral');
@@ -115,10 +119,21 @@ const MetasComerciais = () => {
     setCompetencia(prev => addMonths(prev, 1));
   };
 
+  const resetMetaFields = () => {
+    setMetaVisitas('');
+    setMetaAtendimentos('');
+    setMetaTreinamentos('');
+    setMetaPropostas('');
+  };
+
   const handleOpenEditMeta = () => {
     setEditingMeta(null);
     setMetaValor(meta?.meta_valor || 0);
     setMetaUnidades(meta?.meta_unidades?.toString() || '');
+    setMetaVisitas((meta as any)?.meta_visitas?.toString() || '');
+    setMetaAtendimentos((meta as any)?.meta_atendimentos?.toString() || '');
+    setMetaTreinamentos((meta as any)?.meta_treinamentos?.toString() || '');
+    setMetaPropostas((meta as any)?.meta_propostas?.toString() || '');
     setMetaMes(format(competencia, 'MM'));
     setMetaAno(format(competencia, 'yyyy'));
     setMetaEscopo(empreendimentoId ? 'empreendimento' : 'geral');
@@ -130,6 +145,7 @@ const MetasComerciais = () => {
     setEditingMeta(null);
     setMetaValor(0);
     setMetaUnidades('');
+    resetMetaFields();
     setMetaMes(format(new Date(), 'MM'));
     setMetaAno(currentYear.toString());
     setMetaEscopo('geral');
@@ -141,6 +157,10 @@ const MetasComerciais = () => {
     setEditingMeta(metaItem);
     setMetaValor(metaItem.meta_valor || 0);
     setMetaUnidades(metaItem.meta_unidades?.toString() || '');
+    setMetaVisitas((metaItem as any).meta_visitas?.toString() || '');
+    setMetaAtendimentos((metaItem as any).meta_atendimentos?.toString() || '');
+    setMetaTreinamentos((metaItem as any).meta_treinamentos?.toString() || '');
+    setMetaPropostas((metaItem as any).meta_propostas?.toString() || '');
     const competenciaDate = new Date(metaItem.competencia);
     setMetaMes(format(competenciaDate, 'MM'));
     setMetaAno(format(competenciaDate, 'yyyy'));
@@ -158,6 +178,10 @@ const MetasComerciais = () => {
         corretor_id: null,
         meta_valor: metaValor || 0,
         meta_unidades: parseInt(metaUnidades) || 0,
+        meta_visitas: parseInt(metaVisitas) || 0,
+        meta_atendimentos: parseInt(metaAtendimentos) || 0,
+        meta_treinamentos: parseInt(metaTreinamentos) || 0,
+        meta_propostas: parseInt(metaPropostas) || 0,
       });
       toast.success('Meta salva com sucesso!');
       setShowEditMeta(false);
@@ -556,6 +580,10 @@ const MetasComerciais = () => {
                       <TableHead>Escopo</TableHead>
                       <TableHead className="text-right">Meta Valor</TableHead>
                       <TableHead className="text-right">Meta Unidades</TableHead>
+                      <TableHead className="text-right">Visitas</TableHead>
+                      <TableHead className="text-right">Atend.</TableHead>
+                      <TableHead className="text-right">Trein.</TableHead>
+                      <TableHead className="text-right">Propostas</TableHead>
                       {isAdmin() && <TableHead className="w-[100px]">Ações</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -576,7 +604,19 @@ const MetasComerciais = () => {
                           {formatarMoeda(metaItem.meta_valor || 0)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {metaItem.meta_unidades || 0} unidades
+                          {metaItem.meta_unidades || 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(metaItem as any).meta_visitas || 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(metaItem as any).meta_atendimentos || 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(metaItem as any).meta_treinamentos || 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(metaItem as any).meta_propostas || 0}
                         </TableCell>
                         {isAdmin() && (
                           <TableCell>
@@ -715,6 +755,50 @@ const MetasComerciais = () => {
                 onChange={(e) => setMetaUnidades(e.target.value)}
                 placeholder="Ex: 20"
               />
+            </div>
+
+            {/* Novas metas de atividades */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="metaVisitas">Meta de Visitas</Label>
+                <Input
+                  id="metaVisitas"
+                  type="number"
+                  value={metaVisitas}
+                  onChange={(e) => setMetaVisitas(e.target.value)}
+                  placeholder="Ex: 30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="metaAtendimentos">Meta de Atendimentos</Label>
+                <Input
+                  id="metaAtendimentos"
+                  type="number"
+                  value={metaAtendimentos}
+                  onChange={(e) => setMetaAtendimentos(e.target.value)}
+                  placeholder="Ex: 50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="metaTreinamentos">Meta de Treinamentos</Label>
+                <Input
+                  id="metaTreinamentos"
+                  type="number"
+                  value={metaTreinamentos}
+                  onChange={(e) => setMetaTreinamentos(e.target.value)}
+                  placeholder="Ex: 4"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="metaPropostas">Meta de Propostas</Label>
+                <Input
+                  id="metaPropostas"
+                  type="number"
+                  value={metaPropostas}
+                  onChange={(e) => setMetaPropostas(e.target.value)}
+                  placeholder="Ex: 15"
+                />
+              </div>
             </div>
           </div>
 
