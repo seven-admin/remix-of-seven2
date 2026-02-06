@@ -1,90 +1,106 @@
 
 
-# Plano: Editar Status de Unidades em Lote
+# Plano: Exclusao em Lote de Marcadores + Otimizacao do Salvamento do Mapa
 
-## Objetivo
+## Problema 1: Sem opcao de excluir marcadores em lote
 
-Adicionar um novo modo de selecao em lote na aba de Unidades/Lotes para permitir alterar o status de multiplas unidades de uma vez.
+Atualmente so e possivel excluir marcadores um por um (selecionar + Delete). Para empreendimentos com dezenas ou centenas de marcadores, isso e inviavel.
 
-## Contexto Atual
+## Problema 2: Salvamento lento do mapa
 
-A aba de Unidades (`UnidadesTab.tsx`) ja possui dois modos de selecao em lote:
-- **Venda Historica** (`selectionMode === 'venda'`): seleciona unidades disponiveis para registrar vendas passadas
-- **Excluir em Lote** (`selectionMode === 'delete'`): seleciona unidades para exclusao
+Ao salvar, o sistema faz chamadas individuais ao banco para **cada marcador**:
 
-O novo modo seguira o mesmo padrao visual e de interacao.
+```text
+Marcador 1 -> UPDATE unidades SET polygon_coords = ... (+ toast + 3 invalidacoes)
+Marcador 2 -> UPDATE unidades SET polygon_coords = ... (+ toast + 3 invalidacoes)
+Marcador 3 -> UPDATE unidades SET polygon_coords = ... (+ toast + 3 invalidacoes)
+...
+Marcador 200 -> UPDATE unidades SET polygon_coords = ... (+ toast + 3 invalidacoes)
+```
 
-## Alteracoes
+200 marcadores = 200 chamadas sequenciais + 200 toasts + 600 invalidacoes de cache.
 
-### 1. Criar hook para atualizar status em lote
+Alem disso, ao editar **um unico marcador** e salvar, o sistema salva **todos** os marcadores novamente, nao apenas o que mudou.
 
-**Arquivo:** `src/hooks/useUnidades.ts`
+---
 
-Adicionar novo hook `useUpdateUnidadesStatusBatch`:
+## Solucao
 
-```typescript
-export function useUpdateUnidadesStatusBatch() {
-  return useMutation({
-    mutationFn: async ({ ids, empreendimentoId, status }) => {
-      const { error } = await supabase
-        .from('unidades')
-        .update({ status })
-        .in('id', ids);
-      if (error) throw error;
-    },
-    onSuccess: (_, { empreendimentoId, ids, status }) => {
-      // Invalidar queries relevantes
-      toast.success(`Status de ${ids.length} unidade(s) atualizado!`);
-    },
-  });
+### 1. Botao "Excluir Todos" no editor de mapa
+
+**Arquivo:** `src/components/mapa/MapaEditor.tsx`
+
+Adicionar um botao "Limpar Todos" na toolbar do editor com dialog de confirmacao:
+- Opcoes: "Todos os Itens", "Apenas Marcadores", "Apenas Poligonos"
+- Dialog AlertDialog para confirmacao antes de limpar
+- Limpa os itens do estado local (drawnItems) - so e persistido ao salvar
+
+### 2. Otimizar salvamento - usar chamadas diretas em lote
+
+**Arquivo:** `src/components/mapa/MapaEditor.tsx`
+
+Reescrever a funcao `handleSave` para:
+
+**a) Detectar apenas o que mudou (diff):**
+- Comparar `drawnItems` atual com os dados originais carregados das `unidades`
+- Salvar apenas itens que realmente foram alterados (movidos, vinculados, criados, removidos)
+
+**b) Usar chamadas diretas ao Supabase (sem o hook mutateAsync):**
+- Evita toasts individuais e invalidacoes por item
+- Uma unica chamada para limpar marcadores removidos via `.in('id', idsParaLimpar)`
+- Chamadas paralelas via `Promise.all` para os itens alterados
+- Um unico toast e invalidacao ao final
+
+**Antes (lento):**
+```text
+for (item of drawnItems) {
+  await updateUnidade.mutateAsync(item)  // sequencial, 1 por 1
 }
 ```
 
-### 2. Criar dialog de selecao de status
-
-**Novo arquivo:** `src/components/empreendimentos/AlterarStatusLoteDialog.tsx`
-
-Dialog simples seguindo o padrao existente (`AcaoEmLoteDialog`):
-- Exibe quantas unidades foram selecionadas
-- Permite selecionar o novo status via Select com todas as opcoes (Disponivel, Reservada, Em Negociacao, Em Contrato, Vendida, Bloqueada)
-- Exibe preview visual com a cor do status selecionado
-- Botao de confirmar com loading state
-
-### 3. Adicionar modo de selecao "status" na UnidadesTab
-
-**Arquivo:** `src/components/empreendimentos/UnidadesTab.tsx`
-
-Alteracoes:
-- Expandir `selectionMode` de `'venda' | 'delete' | false` para `'venda' | 'delete' | 'status' | false`
-- Adicionar botao "Alterar Status" na barra de acoes (fora do modo de selecao)
-- No modo `status`: permitir selecionar qualquer unidade (sem restricao por status atual)
-- Exibir barra de acoes com botao "Alterar Status (N)" que abre o dialog
-- Mensagem de instrucao: "Clique nas unidades cujo status deseja alterar."
-
-## Fluxo do Usuario
-
+**Depois (rapido):**
 ```text
-1. Clica em "Alterar Status" na barra de acoes
-2. Entra no modo de selecao (visual identico ao de exclusao)
-3. Clica nas unidades desejadas (todas clicaveis, independente do status)
-4. Clica no botao "Alterar Status (N)"
-5. Dialog abre com Select de status
-6. Seleciona novo status e confirma
-7. Unidades sao atualizadas e a interface reflete as mudancas
+// 1. Limpar removidos em uma unica chamada
+await supabase.from('unidades')
+  .update({ polygon_coords: null })
+  .in('id', idsRemovidos)
+
+// 2. Salvar alterados em paralelo
+await Promise.all(
+  itensAlterados.map(item => 
+    supabase.from('unidades')
+      .update({ polygon_coords: coords })
+      .eq('id', item.unidadeId)
+  )
+)
+
+// 3. Invalidar cache uma unica vez
+queryClient.invalidateQueries(...)
 ```
+
+### 3. Armazenar estado inicial para comparacao (diff)
+
+**Arquivo:** `src/components/mapa/MapaEditor.tsx`
+
+Adicionar um `useRef` com o snapshot inicial dos itens carregados. Ao salvar, comparar o estado atual com o inicial para identificar apenas as mudancas.
+
+---
 
 ## Resumo de Alteracoes
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useUnidades.ts` | Adicionar hook `useUpdateUnidadesStatusBatch` |
-| `src/components/empreendimentos/AlterarStatusLoteDialog.tsx` | Novo dialog para selecao de status |
-| `src/components/empreendimentos/UnidadesTab.tsx` | Adicionar modo de selecao `status` e botao na toolbar |
+| `src/components/mapa/MapaEditor.tsx` | Adicionar botao "Limpar Todos" com opcoes e confirmacao |
+| `src/components/mapa/MapaEditor.tsx` | Reescrever `handleSave` com diff + batch + paralelo |
 
-## Detalhes Tecnicos
+Nenhum arquivo novo precisa ser criado. Nenhuma alteracao no banco de dados.
 
-- O tipo `selectionMode` sera expandido para incluir `'status'`
-- O dialog usara os mesmos `UNIDADE_STATUS_LABELS` e `UNIDADE_STATUS_COLORS` ja existentes em `empreendimentos.types.ts`
-- Nenhuma alteracao no banco de dados e necessaria - a coluna `status` ja existe com o enum correto
-- As queries invalidadas apos a atualizacao incluem: `unidades`, `empreendimento` e `empreendimentos` (para atualizar contagens nos cards)
+## Impacto Estimado
+
+| Cenario (200 marcadores) | Antes | Depois |
+|---------------------------|-------|--------|
+| Salvar apos editar 1 marcador | ~200 chamadas (~30s) | ~1 chamada (~0.3s) |
+| Salvar sem nenhuma alteracao | ~200 chamadas (~30s) | 0 chamadas (instantaneo) |
+| Salvar apos criar 5 novos | ~200 chamadas (~30s) | ~5 chamadas (~1.5s) |
+| Limpar todos marcadores | Manual, 1 por 1 | 1 clique + confirmar |
 
