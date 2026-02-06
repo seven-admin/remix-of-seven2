@@ -298,9 +298,9 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
       left: center.x * scale + offsetX - raio,
       top: center.y * scale + offsetY - raio,
       radius: raio,
-      fill: getPolygonColorWithOpacity(unidade.status, 0.5),
-      stroke: getPolygonColor(unidade.status),
-      strokeWidth: 2,
+      fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+      stroke: 'transparent',
+      strokeWidth: 0,
       selectable: false,
       hoverCursor: 'pointer',
     });
@@ -342,16 +342,14 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
 
     marker.on('mouseover', () => {
       marker.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.8),
-        strokeWidth: 3,
+        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       });
       canvas.renderAll();
     });
 
     marker.on('mouseout', () => {
       marker.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.5),
-        strokeWidth: 2,
+        fill: getPolygonColorWithOpacity(unidade.status, 0.7),
       });
       canvas.renderAll();
     });
@@ -374,9 +372,9 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
     }));
 
     const polygon = new Polygon(scaledPoints, {
-      fill: getPolygonColorWithOpacity(unidade.status, 0.5),
-      stroke: getPolygonColor(unidade.status),
-      strokeWidth: 2,
+      fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+      stroke: 'transparent',
+      strokeWidth: 0,
       selectable: false,
       hoverCursor: 'pointer',
     });
@@ -425,16 +423,14 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
     // Hover effects
     polygon.on('mouseover', () => {
       polygon.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.8),
-        strokeWidth: 3,
+        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       });
       canvas.renderAll();
     });
 
     polygon.on('mouseout', () => {
       polygon.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.5),
-        strokeWidth: 2,
+        fill: getPolygonColorWithOpacity(unidade.status, 0.7),
       });
       canvas.renderAll();
     });
