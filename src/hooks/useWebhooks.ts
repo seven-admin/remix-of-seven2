@@ -31,7 +31,7 @@ export const WEBHOOK_EVENTS = [
   { value: 'reserva_criada', label: 'Reserva Criada' },
   { value: 'lead_convertido', label: 'Lead Convertido' },
   { value: 'briefing_triado', label: 'Briefing Triado' },
-  // Tickets de Produção - status changes
+  // Atividades de Produção - status changes
   { value: 'ticket_aguardando_analise', label: 'Ticket - Aguardando Análise' },
   { value: 'ticket_em_producao', label: 'Ticket - Em Produção' },
   { value: 'ticket_revisao', label: 'Ticket - Revisão' },

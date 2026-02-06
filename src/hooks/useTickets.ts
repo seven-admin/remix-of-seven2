@@ -68,7 +68,7 @@ export function useTickets(filters?: TicketFilters) {
         .order('ordem_kanban', { ascending: true });
 
       if (filters?.categoria) {
-        query = query.eq('categoria', filters.categoria);
+        query = query.eq('categoria', filters.categoria as any);
       }
       if (filters?.status) {
         query = query.eq('status', toDBStatus(filters.status));
@@ -133,8 +133,8 @@ export function useTickets(filters?: TicketFilters) {
       briefing_texto?: string;
       data_previsao?: string;
     }) => {
-      const { data: result, error } = await supabase
-        .from('projetos_marketing')
+      const { data: result, error } = await (supabase
+        .from('projetos_marketing') as any)
         .insert({
           ...data,
           codigo: '',

@@ -737,7 +737,7 @@ export default function Relatorios() {
           )}
         </TabsContent>
 
-        {/* Marketing - Tickets de Produção */}
+        {/* Marketing - Atividades de Produção */}
         <TabsContent value="marketing" className="space-y-6">
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -748,7 +748,7 @@ export default function Relatorios() {
                     <Palette className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total de Tickets</p>
+                    <p className="text-sm text-muted-foreground">Total de Atividades</p>
                     {loadingTickets ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
@@ -765,7 +765,7 @@ export default function Relatorios() {
                     <Building2 className="h-6 w-6 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Tickets Internos</p>
+                    <p className="text-sm text-muted-foreground">Atividades Internas</p>
                     {loadingTickets ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
@@ -787,7 +787,7 @@ export default function Relatorios() {
                     <Users className="h-6 w-6 text-green-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Tickets Externos</p>
+                    <p className="text-sm text-muted-foreground">Atividades Externas</p>
                     {loadingTickets ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
