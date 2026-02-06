@@ -5494,6 +5494,7 @@ export type Database = {
         | "video_animacao"
         | "evento"
         | "pedido_orcamento"
+        | "criacao_campanha"
       comissao_status: "pendente" | "parcialmente_pago" | "pago" | "cancelado"
       contrato_status:
         | "em_geracao"
@@ -5731,6 +5732,7 @@ export const Constants = {
         "video_animacao",
         "evento",
         "pedido_orcamento",
+        "criacao_campanha",
       ],
       comissao_status: ["pendente", "parcialmente_pago", "pago", "cancelado"],
       contrato_status: [

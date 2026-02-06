@@ -91,6 +91,7 @@ const CATEGORIA_LABELS_MAP: Record<CategoriaTicket, string> = {
   'video_animacao': 'Vídeo/Animação',
   'evento': 'Evento',
   'pedido_orcamento': 'Orçamento',
+  'criacao_campanha': 'Criação de Campanha',
 };
 
 interface Filters {
@@ -145,7 +146,7 @@ export function useDashboardMarketing(filters?: Filters) {
         .eq('is_active', true);
       
       if (filters?.categoria) {
-        query = query.eq('categoria', filters.categoria);
+        query = query.eq('categoria', filters.categoria as any);
       }
       
       if (filters?.tipo === 'interno') {
@@ -291,6 +292,7 @@ export function useDashboardMarketing(filters?: Filters) {
         'video_animacao': { total: 0, interno: 0, externo: 0 },
         'evento': { total: 0, interno: 0, externo: 0 },
         'pedido_orcamento': { total: 0, interno: 0, externo: 0 },
+        'criacao_campanha': { total: 0, interno: 0, externo: 0 },
       };
       
       allTickets.forEach(t => {

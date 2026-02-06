@@ -86,7 +86,7 @@ export default function MarketingCalendario() {
         <div className="flex justify-end">
           <Button onClick={() => navigate('/marketing')}>
             <Plus className="h-4 w-4 mr-2" />
-            Novo Ticket
+            Nova Atividade
           </Button>
         </div>
 
