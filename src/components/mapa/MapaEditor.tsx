@@ -454,9 +454,9 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
           radius: raio,
           fill: isSelected
             ? getPolygonColorWithOpacity(status, 0.8)
-            : getPolygonColorWithOpacity(status, 0.5),
-          stroke: isSelected ? '#ffffff' : getPolygonColor(status),
-          strokeWidth: isSelected ? 3 : 2,
+            : getPolygonColorWithOpacity(status, 0.7),
+          stroke: isSelected ? '#ffffff' : 'transparent',
+          strokeWidth: isSelected ? 3 : 0,
           selectable: activeTool === 'select',
           hasControls: false,
           hasBorders: isSelected,
@@ -512,9 +512,9 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
         const polygon = new Polygon(scaledPoints, {
           fill: isSelected
             ? getPolygonColorWithOpacity(status, 0.8)
-            : getPolygonColorWithOpacity(status, 0.5),
-          stroke: isSelected ? '#ffffff' : getPolygonColor(status),
-          strokeWidth: isSelected ? 3 : 2,
+            : getPolygonColorWithOpacity(status, 0.7),
+          stroke: isSelected ? '#ffffff' : 'transparent',
+          strokeWidth: isSelected ? 3 : 0,
           selectable: activeTool === 'select',
           hasControls: false,
           hasBorders: isSelected,
