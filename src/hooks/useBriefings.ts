@@ -77,6 +77,7 @@ export function useCreateBriefing() {
         estilo_visual: data.estilo_visual || null,
         diretrizes_visuais: data.diretrizes_visuais || null,
         referencia: data.referencia || null,
+        referencia_imagem_url: data.referencia_imagem_url || null,
         importante: data.importante || null,
         observacoes: data.observacoes || null,
         criado_por: userData.user.id,

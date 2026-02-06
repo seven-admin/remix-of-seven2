@@ -34,6 +34,7 @@ import {
   type Briefing,
 } from '@/types/briefings.types';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Link2, ImageIcon } from 'lucide-react';
 
 const formSchema = z.object({
   cliente: z.string().min(1, 'Cliente é obrigatório'),
@@ -49,6 +50,7 @@ const formSchema = z.object({
   estilo_visual: z.string().optional(),
   diretrizes_visuais: z.string().optional(),
   referencia: z.string().optional(),
+  referencia_imagem_url: z.string().optional(),
   importante: z.string().optional(),
   observacoes: z.string().optional(),
 });
@@ -85,6 +87,7 @@ export function BriefingForm({ open, onOpenChange, briefing }: BriefingFormProps
       estilo_visual: briefing?.estilo_visual || '',
       diretrizes_visuais: briefing?.diretrizes_visuais || '',
       referencia: briefing?.referencia || '',
+      referencia_imagem_url: briefing?.referencia_imagem_url || '',
       importante: briefing?.importante || '',
       observacoes: briefing?.observacoes || '',
     },
@@ -110,6 +113,7 @@ export function BriefingForm({ open, onOpenChange, briefing }: BriefingFormProps
         estilo_visual: values.estilo_visual,
         diretrizes_visuais: values.diretrizes_visuais,
         referencia: values.referencia,
+        referencia_imagem_url: values.referencia_imagem_url,
         importante: values.importante,
         observacoes: values.observacoes,
       }, {
@@ -376,11 +380,33 @@ export function BriefingForm({ open, onOpenChange, briefing }: BriefingFormProps
                   name="referencia"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Referência</FormLabel>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Link2 className="h-3.5 w-3.5" />
+                        Referência (texto/URL)
+                      </FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Links ou descrição de referências visuais"
                           className="min-h-[80px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="referencia_imagem_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        URL da Imagem de Referência
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="https://exemplo.com/imagem.jpg"
                           {...field} 
                         />
                       </FormControl>

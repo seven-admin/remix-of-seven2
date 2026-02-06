@@ -23,6 +23,7 @@ import { PendenciasTab } from '@/components/atividades/PendenciasTab';
 import { AgendaCalendario } from '@/components/agenda/AgendaCalendario';
 import { AgendaDia } from '@/components/agenda/AgendaDia';
 import { useAtividade, useAtividades, useAtividadesStatusResumo, useDeleteAtividade, useCancelarAtividade, useCreateAtividade, useUpdateAtividade, useAgendaMensal, useAgendaDia, useAtividadesHoje, useAtividadesVencidas, useConcluirAtividadesEmLote, useCreateAtividadesParaGestores } from '@/hooks/useAtividades';
+import { useSuperAdminIds } from '@/hooks/useSuperAdminIds';
 import { useGestoresProduto } from '@/hooks/useGestores';
 import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
 import { useClientes } from '@/hooks/useClientes';
@@ -30,6 +31,8 @@ import type { AtividadeFormSubmitData } from '@/components/atividades/AtividadeF
 import type { Atividade, AtividadeFilters, AtividadeTipo, AtividadeStatus } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_STATUS_LABELS } from '@/types/atividades.types';
 import { cn } from '@/lib/utils';
+import { Shield } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const TIPO_ICONS: Record<AtividadeTipo, typeof Phone> = {
   ligacao: Phone,
@@ -84,6 +87,7 @@ export default function Atividades() {
   const { data: gestores } = useGestoresProduto();
   const { data: empreendimentos } = useEmpreendimentos();
   const { data: clientes } = useClientes();
+  const { data: superAdminIds } = useSuperAdminIds();
   const createAtividade = useCreateAtividade();
   const createAtividadesParaGestores = useCreateAtividadesParaGestores();
   const updateAtividade = useUpdateAtividade();
@@ -625,6 +629,7 @@ export default function Atividades() {
                           const isVencida = atividade.status === 'pendente' && new Date(atividade.data_fim) < new Date();
                           const atrasada = isAtrasada(atividade);
                           const isSelected = selectedIds.has(atividade.id);
+                          const isSACreated = !!(atividade.created_by && superAdminIds?.has(atividade.created_by));
                           return (
                             <TableRow
                               key={atividade.id}
@@ -637,7 +642,8 @@ export default function Atividades() {
                               className={cn(
                                 'cursor-pointer',
                                 isVencida && 'bg-destructive/5',
-                                isSelected && 'bg-primary/5'
+                                isSelected && 'bg-primary/5',
+                                isSACreated && 'bg-amber-500/5 border-l-2 border-l-amber-500'
                               )}
                             >
                               <TableCell>
@@ -655,7 +661,19 @@ export default function Atividades() {
                                   {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="font-normal">{atividade.titulo}</TableCell>
+                              <TableCell className="font-normal">
+                                <div className="flex items-center gap-1.5">
+                                  {atividade.titulo}
+                                  {isSACreated && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Criada por Super Admin</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell>{atividade.cliente?.nome || '-'}</TableCell>
                               <TableCell className="hidden lg:table-cell">{atividade.corretor?.nome_completo || '-'}</TableCell>
                               <TableCell className="hidden lg:table-cell">{atividade.gestor?.full_name || '-'}</TableCell>

@@ -1,8 +1,9 @@
-import { Phone, Users, MapPin, MessageSquare, Clock, Building2, Calendar } from 'lucide-react';
+import { Phone, Users, MapPin, MessageSquare, Clock, Building2, Calendar, Shield } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Atividade, AtividadeTipo } from '@/types/atividades.types';
 import { ATIVIDADE_TIPO_LABELS, ATIVIDADE_STATUS_COLORS } from '@/types/atividades.types';
 import { CLIENTE_TEMPERATURA_COLORS } from '@/types/clientes.types';
@@ -47,9 +48,10 @@ interface AtividadeCardProps {
   atividade: Atividade;
   compact?: boolean;
   onClick?: () => void;
+  isSuperAdminCreated?: boolean;
 }
 
-export function AtividadeCard({ atividade, compact = false, onClick }: AtividadeCardProps) {
+export function AtividadeCard({ atividade, compact = false, onClick, isSuperAdminCreated = false }: AtividadeCardProps) {
   const Icon = TIPO_ICONS[atividade.tipo];
   const isVencida = atividade.status === 'pendente' && new Date(atividade.data_fim) < new Date();
 
@@ -110,7 +112,8 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
       className={cn(
         'p-4 rounded-lg border bg-card cursor-pointer transition-all',
         'hover:shadow-md hover:border-primary/30',
-        isVencida && 'border-destructive/50 bg-destructive/5'
+        isVencida && 'border-destructive/50 bg-destructive/5',
+        isSuperAdminCreated && 'border-amber-500/50 ring-1 ring-amber-500/20'
       )}
     >
       <div className="flex items-start gap-3">
@@ -121,7 +124,17 @@ export function AtividadeCard({ atividade, compact = false, onClick }: Atividade
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h4 className="font-medium text-sm">{atividade.titulo}</h4>
+              <div className="flex items-center gap-1.5">
+                <h4 className="font-medium text-sm">{atividade.titulo}</h4>
+                {isSuperAdminCreated && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent>Criada por Super Admin</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {ATIVIDADE_TIPO_LABELS[atividade.tipo]}
               </p>

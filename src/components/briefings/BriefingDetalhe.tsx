@@ -130,13 +130,25 @@ export function BriefingDetalhe({
           </Card>
 
           {/* Informações Adicionais */}
-          {(briefing.referencia || briefing.importante || briefing.observacoes) && (
+          {(briefing.referencia || briefing.referencia_imagem_url || briefing.importante || briefing.observacoes) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Informações Adicionais</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <InfoRow label="Referência" value={briefing.referencia} />
+                {briefing.referencia_imagem_url && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Imagem de Referência</p>
+                    <a href={briefing.referencia_imagem_url} target="_blank" rel="noopener noreferrer">
+                      <img 
+                        src={briefing.referencia_imagem_url} 
+                        alt="Referência visual" 
+                        className="max-w-full max-h-64 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                      />
+                    </a>
+                  </div>
+                )}
                 <InfoRow label="Importante" value={briefing.importante} />
                 <InfoRow label="Observações" value={briefing.observacoes} />
               </CardContent>
