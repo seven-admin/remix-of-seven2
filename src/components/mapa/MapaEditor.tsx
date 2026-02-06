@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Canvas as FabricCanvas, Polygon, Circle, FabricText, FabricImage, Shadow, Line, FabricObject } from 'fabric';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,10 +34,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { MapaLegenda } from './MapaLegenda';
 import { MapaUpload } from './MapaUpload';
 import { useUpdateMapa, type MapaEmpreendimento } from '@/hooks/useMapaEmpreendimento';
-import { useUpdateUnidade } from '@/hooks/useUnidades';
+import { supabase } from '@/integrations/supabase/client';
 import { getPolygonColor, getPolygonColorWithOpacity, type PolygonCoords, type PolygonPoint, type DrawnItem, type MapaItemTipo } from '@/types/mapa.types';
 import { buildUnitLabel, calculateLabelFontSize, groupUnidadesByBloco, type LabelFormatElement } from '@/lib/mapaUtils';
 import type { Unidade } from '@/types/empreendimentos.types';
@@ -55,6 +66,7 @@ import {
   Check,
   ChevronsUpDown,
   Move,
+  Eraser,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -68,6 +80,19 @@ interface MapaEditorProps {
 }
 
 type EditorTool = 'select' | 'draw_polygon' | 'draw_marker';
+type ClearMode = 'all' | 'markers' | 'polygons';
+
+// Helper to build a snapshot map of initial state for diffing
+interface InitialItemSnapshot {
+  unidadeId: string;
+  points: PolygonPoint[];
+  raio?: number;
+  tipo: MapaItemTipo;
+}
+
+function serializeCoords(points: PolygonPoint[], raio?: number): string {
+  return JSON.stringify({ points, raio });
+}
 
 export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['bloco', 'tipologia', 'numero'], onClose }: MapaEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -87,6 +112,10 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
   const [zoomLevel, setZoomLevel] = useState(1);
   const [markerRadius, setMarkerRadius] = useState(15);
   
+  // Clear all dialog state
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [clearMode, setClearMode] = useState<ClearMode>('all');
+  
   // Auto-link mode state
   const [autoLinkMode, setAutoLinkMode] = useState<boolean>(false);
   const [autoLinkBlocoNome, setAutoLinkBlocoNome] = useState<string | null>(null);
@@ -97,28 +126,49 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
   // Map Fabric objects to item IDs for drag tracking
   const objectToItemIdRef = useRef<Map<FabricObject, string>>(new Map());
 
+  // Snapshot of initial items for diff-based saving
+  const initialSnapshotRef = useRef<Map<string, InitialItemSnapshot>>(new Map());
+  // Set of unidade IDs that originally had polygon_coords
+  const initialLinkedUnidadeIdsRef = useRef<Set<string>>(new Set());
+
   const updateMapa = useUpdateMapa();
-  const updateUnidade = useUpdateUnidade();
+  const queryClient = useQueryClient();
 
   // Initialize existing items from unidades
   useEffect(() => {
     const existingItems: DrawnItem[] = [];
+    const snapshot = new Map<string, InitialItemSnapshot>();
+    const linkedIds = new Set<string>();
+    
     unidades.forEach((unidade) => {
       if (unidade.polygon_coords) {
         const coords = unidade.polygon_coords as PolygonCoords;
         if (coords.points && coords.points.length >= 1) {
           const tipo: MapaItemTipo = coords.points.length === 1 ? 'marker' : 'polygon';
+          const itemId = `existing-${unidade.id}`;
           existingItems.push({
-            id: `existing-${unidade.id}`,
+            id: itemId,
             tipo,
             points: coords.points,
             raio: tipo === 'marker' ? (coords.raio || 15) : undefined,
             unidadeId: unidade.id,
           });
+          
+          // Store snapshot for diffing
+          snapshot.set(unidade.id, {
+            unidadeId: unidade.id,
+            points: coords.points,
+            raio: tipo === 'marker' ? (coords.raio || 15) : undefined,
+            tipo,
+          });
+          linkedIds.add(unidade.id);
         }
       }
     });
+    
     setDrawnItems(existingItems);
+    initialSnapshotRef.current = snapshot;
+    initialLinkedUnidadeIdsRef.current = linkedIds;
   }, [unidades]);
 
   // Calculate responsive height
@@ -675,6 +725,27 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     toast.success('Item duplicado! Posicione e vincule a uma unidade.');
   };
 
+  // Clear items handler
+  const handleClearItems = (mode: ClearMode) => {
+    setDrawnItems(prev => {
+      switch (mode) {
+        case 'all':
+          return [];
+        case 'markers':
+          return prev.filter(i => i.tipo !== 'marker');
+        case 'polygons':
+          return prev.filter(i => i.tipo !== 'polygon');
+        default:
+          return prev;
+      }
+    });
+    setSelectedItemId(null);
+    setShowClearDialog(false);
+    
+    const label = mode === 'all' ? 'Todos os itens' : mode === 'markers' ? 'Marcadores' : 'Polígonos';
+    toast.success(`${label} removidos do mapa`);
+  };
+
   // Keyboard handler for Delete key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -721,40 +792,94 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     ));
   };
 
+  // Optimized save with diff detection + batch + parallel
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Save coordinates to each linked unidade, including raio
-      for (const item of drawnItems) {
+      const initialSnapshot = initialSnapshotRef.current;
+      const initialLinkedIds = initialLinkedUnidadeIdsRef.current;
+      
+      // Build current state map: unidadeId -> coords
+      const currentLinkedItems = drawnItems.filter(item => item.unidadeId);
+      const currentUnidadeMap = new Map<string, DrawnItem>();
+      currentLinkedItems.forEach(item => {
         if (item.unidadeId) {
-          const coordsToSave: PolygonCoords = {
-            points: item.points,
-            ...(item.tipo === 'marker' && item.raio ? { raio: item.raio } : {}),
-          };
-          
-          await updateUnidade.mutateAsync({
-            id: item.unidadeId,
-            empreendimentoId,
-            data: {
-              polygon_coords: coordsToSave,
-            },
-          });
+          currentUnidadeMap.set(item.unidadeId, item);
         }
-      }
-
-      // Clear from unidades that no longer have items
-      const linkedUnidadeIds = drawnItems.map((p) => p.unidadeId).filter(Boolean);
-      for (const unidade of unidades) {
-        if (unidade.polygon_coords && !linkedUnidadeIds.includes(unidade.id)) {
-          await updateUnidade.mutateAsync({
-            id: unidade.id,
-            empreendimentoId,
-            data: { polygon_coords: null },
-          });
+      });
+      
+      // 1. Find unidades that were removed (had coords initially, no longer linked)
+      const removedUnidadeIds: string[] = [];
+      initialLinkedIds.forEach(unidadeId => {
+        if (!currentUnidadeMap.has(unidadeId)) {
+          removedUnidadeIds.push(unidadeId);
         }
+      });
+      
+      // 2. Find unidades that were added or modified
+      const modifiedItems: { unidadeId: string; coords: PolygonCoords }[] = [];
+      currentLinkedItems.forEach(item => {
+        if (!item.unidadeId) return;
+        
+        const coordsToSave: PolygonCoords = {
+          points: item.points,
+          ...(item.tipo === 'marker' && item.raio ? { raio: item.raio } : {}),
+        };
+        
+        const initialItem = initialSnapshot.get(item.unidadeId);
+        if (!initialItem) {
+          // New item - needs saving
+          modifiedItems.push({ unidadeId: item.unidadeId, coords: coordsToSave });
+        } else {
+          // Check if changed
+          const initialSerialized = serializeCoords(initialItem.points, initialItem.raio);
+          const currentSerialized = serializeCoords(item.points, item.raio);
+          if (initialSerialized !== currentSerialized) {
+            modifiedItems.push({ unidadeId: item.unidadeId, coords: coordsToSave });
+          }
+        }
+      });
+      
+      const totalChanges = removedUnidadeIds.length + modifiedItems.length;
+      
+      if (totalChanges === 0) {
+        toast.success('Nenhuma alteração detectada');
+        onClose();
+        return;
       }
+      
+      // 3. Execute batch removal in a single call
+      if (removedUnidadeIds.length > 0) {
+        const { error } = await supabase
+          .from('unidades')
+          .update({ polygon_coords: null })
+          .in('id', removedUnidadeIds);
+        if (error) throw error;
+      }
+      
+      // 4. Execute modified items in parallel
+      if (modifiedItems.length > 0) {
+        const results = await Promise.all(
+          modifiedItems.map(({ unidadeId, coords }) =>
+            supabase
+              .from('unidades')
+              .update({ polygon_coords: coords as any })
+              .eq('id', unidadeId)
+          )
+        );
+        
+        const firstError = results.find(r => r.error);
+        if (firstError?.error) throw firstError.error;
+      }
+      
+      // 5. Invalidate cache once
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['unidades'] }),
+        queryClient.invalidateQueries({ queryKey: ['empreendimento'] }),
+        queryClient.invalidateQueries({ queryKey: ['empreendimentos'] }),
+      ]);
 
-      toast.success('Mapa salvo com sucesso!');
+      toast.success(`Mapa salvo! ${totalChanges} alteração(ões) aplicada(s).`);
       onClose();
     } catch (error) {
       console.error('Error saving map:', error);
@@ -831,6 +956,10 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
 
   const selectedItem = drawnItems.find((p) => p.id === selectedItemId);
 
+  // Count items by type for clear dialog
+  const markerCount = drawnItems.filter(i => i.tipo === 'marker').length;
+  const polygonCount = drawnItems.filter(i => i.tipo === 'polygon').length;
+
   if (showUpload) {
     return (
       <Card>
@@ -888,6 +1017,19 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
             <CircleIcon className="h-4 w-4 mr-2" />
             Marcador
           </Button>
+
+          {/* Clear all button */}
+          {drawnItems.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowClearDialog(true)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Eraser className="h-4 w-4 mr-2" />
+              Limpar
+            </Button>
+          )}
 
           {/* Marker radius when drawing */}
           {activeTool === 'draw_marker' && (
@@ -1117,11 +1259,60 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
 
       {/* Stats */}
       <div className="flex gap-4 text-sm text-muted-foreground">
-        <span>Polígonos: {drawnItems.filter(i => i.tipo === 'polygon').length}</span>
-        <span>Marcadores: {drawnItems.filter(i => i.tipo === 'marker').length}</span>
+        <span>Polígonos: {polygonCount}</span>
+        <span>Marcadores: {markerCount}</span>
         <span>Vinculados: {drawnItems.filter((p) => p.unidadeId).length}</span>
         <span>Unidades sem vínculo: {unlinkedUnidades.length}</span>
       </div>
+
+      {/* Clear all confirmation dialog */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar itens do mapa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione o que deseja remover. As alterações só serão persistidas ao salvar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="flex flex-col gap-2 py-2">
+            <Button
+              variant={clearMode === 'all' ? 'default' : 'outline'}
+              className="justify-start"
+              onClick={() => setClearMode('all')}
+            >
+              Todos os Itens ({drawnItems.length})
+            </Button>
+            <Button
+              variant={clearMode === 'markers' ? 'default' : 'outline'}
+              className="justify-start"
+              onClick={() => setClearMode('markers')}
+              disabled={markerCount === 0}
+            >
+              Apenas Marcadores ({markerCount})
+            </Button>
+            <Button
+              variant={clearMode === 'polygons' ? 'default' : 'outline'}
+              className="justify-start"
+              onClick={() => setClearMode('polygons')}
+              disabled={polygonCount === 0}
+            >
+              Apenas Polígonos ({polygonCount})
+            </Button>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleClearItems(clearMode)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar {clearMode === 'all' ? 'Todos' : clearMode === 'markers' ? 'Marcadores' : 'Polígonos'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
