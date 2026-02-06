@@ -116,6 +116,10 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearMode, setClearMode] = useState<ClearMode>('all');
   
+  // Batch radius dialog state
+  const [showBatchRadiusDialog, setShowBatchRadiusDialog] = useState(false);
+  const [batchRadius, setBatchRadius] = useState(15);
+  
   // Auto-link mode state
   const [autoLinkMode, setAutoLinkMode] = useState<boolean>(false);
   const [autoLinkBlocoNome, setAutoLinkBlocoNome] = useState<string | null>(null);
@@ -792,6 +796,16 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     ));
   };
 
+  const handleBatchRadius = () => {
+    const affected = drawnItems.filter(i => i.tipo === 'marker').length;
+    if (affected === 0) return;
+    setDrawnItems(prev => prev.map(item =>
+      item.tipo === 'marker' ? { ...item, raio: batchRadius } : item
+    ));
+    setShowBatchRadiusDialog(false);
+    toast.success(`Raio de ${affected} marcador(es) atualizado para ${batchRadius}`);
+  };
+
   // Optimized save with diff detection + batch + parallel
   const handleSave = async () => {
     setIsSaving(true);
@@ -1017,6 +1031,21 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
             <CircleIcon className="h-4 w-4 mr-2" />
             Marcador
           </Button>
+
+          {/* Batch radius button */}
+          {markerCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setBatchRadius(15);
+                setShowBatchRadiusDialog(true);
+              }}
+            >
+              <CircleIcon className="h-4 w-4 mr-2" />
+              Redimensionar
+            </Button>
+          )}
 
           {/* Clear all button */}
           {drawnItems.length > 0 && (
@@ -1313,6 +1342,39 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Batch radius dialog */}
+      <Dialog open={showBatchRadiusDialog} onOpenChange={setShowBatchRadiusDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Redimensionar Marcadores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Aplicar novo raio a <strong>{markerCount}</strong> marcador(es) do mapa.
+            </p>
+            <div className="flex items-center gap-3">
+              <Label className="text-sm whitespace-nowrap">Novo raio:</Label>
+              <Input
+                type="number"
+                min={5}
+                max={50}
+                value={batchRadius}
+                onChange={(e) => setBatchRadius(parseInt(e.target.value) || 15)}
+                className="w-24"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBatchRadiusDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleBatchRadius}>
+              Aplicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
