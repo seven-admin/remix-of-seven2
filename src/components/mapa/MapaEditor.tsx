@@ -49,8 +49,10 @@ import { MapaUpload } from './MapaUpload';
 import { useUpdateMapa, type MapaEmpreendimento } from '@/hooks/useMapaEmpreendimento';
 import { supabase } from '@/integrations/supabase/client';
 import { getPolygonColor, getPolygonColorWithOpacity, type PolygonCoords, type PolygonPoint, type DrawnItem, type MapaItemTipo } from '@/types/mapa.types';
-import { buildUnitLabel, calculateLabelFontSize, groupUnidadesByBloco, type LabelFormatElement } from '@/lib/mapaUtils';
+import { buildUnitLabel, calculateLabelFontSize, groupUnidadesByBloco, LABEL_FORMAT_OPTIONS, type LabelFormatElement } from '@/lib/mapaUtils';
 import type { Unidade } from '@/types/empreendimentos.types';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Loader2,
   Save,
@@ -67,6 +69,7 @@ import {
   ChevronsUpDown,
   Move,
   Eraser,
+  Settings2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -111,6 +114,11 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
   const [mousePosition, setMousePosition] = useState<PolygonPoint | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [markerRadius, setMarkerRadius] = useState(15);
+  
+  // Visual settings state
+  const [editorLabelFormato, setEditorLabelFormato] = useState<LabelFormatElement[]>(labelFormato);
+  const [markerOpacity, setMarkerOpacity] = useState(0.7);
+  const [fontSizeScale, setFontSizeScale] = useState(1.0);
   
   // Clear all dialog state
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -284,7 +292,7 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     if (fabricCanvas) {
       renderItems();
     }
-  }, [drawnItems, fabricCanvas, imageScale, imageOffset, selectedItemId, activeTool, currentPoints, mousePosition]);
+  }, [drawnItems, fabricCanvas, imageScale, imageOffset, selectedItemId, activeTool, currentPoints, mousePosition, editorLabelFormato, markerOpacity, fontSizeScale]);
 
   // Mouse move, wheel (zoom), and pan handlers
   useEffect(() => {
@@ -457,8 +465,8 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
           top: center.y * imageScale + imageOffset.y - raio,
           radius: raio,
           fill: isSelected
-            ? getPolygonColorWithOpacity(status, 0.8)
-            : getPolygonColorWithOpacity(status, 0.7),
+            ? getPolygonColorWithOpacity(status, Math.min(markerOpacity + 0.1, 1))
+            : getPolygonColorWithOpacity(status, markerOpacity),
           stroke: isSelected ? '#ffffff' : 'transparent',
           strokeWidth: isSelected ? 3 : 0,
           selectable: activeTool === 'select',
@@ -472,8 +480,8 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
         objectToItemIdRef.current.set(marker, item.id);
 
         // Label
-        const labelText = unidade ? buildUnitLabel(unidade, labelFormato) : '?';
-        const fontSize = calculateLabelFontSize(labelText, raio);
+        const labelText = unidade ? buildUnitLabel(unidade, editorLabelFormato) : '?';
+        const fontSize = Math.round(calculateLabelFontSize(labelText, raio) * fontSizeScale);
         const textShadow = new Shadow({
           color: 'rgba(0,0,0,0.8)',
           blur: 2,
@@ -515,8 +523,8 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
         const isSelected = selectedItemId === item.id;
         const polygon = new Polygon(scaledPoints, {
           fill: isSelected
-            ? getPolygonColorWithOpacity(status, 0.8)
-            : getPolygonColorWithOpacity(status, 0.7),
+            ? getPolygonColorWithOpacity(status, Math.min(markerOpacity + 0.1, 1))
+            : getPolygonColorWithOpacity(status, markerOpacity),
           stroke: isSelected ? '#ffffff' : 'transparent',
           strokeWidth: isSelected ? 3 : 0,
           selectable: activeTool === 'select',
@@ -533,8 +541,8 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
         const centerX = scaledPoints.reduce((sum, p) => sum + p.x, 0) / scaledPoints.length;
         const centerY = scaledPoints.reduce((sum, p) => sum + p.y, 0) / scaledPoints.length;
 
-        const labelText = unidade ? buildUnitLabel(unidade, labelFormato) : 'Sem vínculo';
-        const fontSize = calculateLabelFontSize(labelText);
+        const labelText = unidade ? buildUnitLabel(unidade, editorLabelFormato) : 'Sem vínculo';
+        const fontSize = Math.round(calculateLabelFontSize(labelText) * fontSizeScale);
         const textShadow = new Shadow({
           color: 'rgba(0,0,0,0.8)',
           blur: 2,
@@ -619,7 +627,7 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, drawnItems, currentPoints, selectedItemId, activeTool, unidades, imageScale, imageOffset, mousePosition]);
+  }, [fabricCanvas, drawnItems, currentPoints, selectedItemId, activeTool, unidades, imageScale, imageOffset, mousePosition, editorLabelFormato, markerOpacity, fontSizeScale]);
 
   // Canvas click handler for drawing
   useEffect(() => {
@@ -1116,6 +1124,76 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
             )}
           </div>
 
+          {/* Visual settings popover */}
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Aparência
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72" align="start">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Formato do Label</Label>
+                    <div className="space-y-1.5">
+                      {LABEL_FORMAT_OPTIONS.map((opt) => {
+                        const isChecked = editorLabelFormato.includes(opt.value);
+                        return (
+                          <div key={opt.value} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`label-${opt.value}`}
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                setEditorLabelFormato((prev) =>
+                                  checked
+                                    ? [...prev, opt.value]
+                                    : prev.filter((v) => v !== opt.value)
+                                );
+                              }}
+                            />
+                            <Label htmlFor={`label-${opt.value}`} className="text-sm cursor-pointer">
+                              {opt.label}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Opacidade</Label>
+                      <span className="text-xs text-muted-foreground">{Math.round(markerOpacity * 100)}%</span>
+                    </div>
+                    <Slider
+                      value={[markerOpacity]}
+                      onValueChange={([v]) => setMarkerOpacity(v)}
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Tamanho da Fonte</Label>
+                      <span className="text-xs text-muted-foreground">{Math.round(fontSizeScale * 100)}%</span>
+                    </div>
+                    <Slider
+                      value={[fontSizeScale]}
+                      onValueChange={([v]) => setFontSizeScale(v)}
+                      min={0.5}
+                      max={2}
+                      step={0.1}
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {/* Zoom and pan indicator */}
           <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
             <span className="text-sm text-muted-foreground">
@@ -1257,7 +1335,7 @@ export function MapaEditor({ empreendimentoId, mapa, unidades, labelFormato = ['
       {autoLinkMode && nextAutoLinkUnit && (
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400">
           <strong>Auto-Vincular Ativo:</strong> O próximo item será vinculado a{' '}
-          <span className="font-bold">{buildUnitLabel(nextAutoLinkUnit, labelFormato)}</span>
+          <span className="font-bold">{buildUnitLabel(nextAutoLinkUnit, editorLabelFormato)}</span>
           {' '}({nextAutoLinkUnit.bloco?.nome || 'Sem bloco'})
           <span className="ml-2 text-xs opacity-75">
             — Restam {autoLinkQueue.length} unidades
