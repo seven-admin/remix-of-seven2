@@ -1,210 +1,89 @@
 
+# Plano: Ajustar Marcadores do Mapa, Remover Aparencia e Investigar Proposta LIVTY
 
-# Plano: Listagem de Fichas de Proposta, Gestor Visivel, Log e Teste de Webhooks
+## 1. Opacidade dos Marcadores -- Fixar em 90%
 
-## Resumo
+Alterar a opacidade padrao de TODOS os marcadores e poligonos em todos os mapas do sistema:
 
-Este plano abrange 4 frentes de trabalho:
-1. Nova tela de listagem em tabela para Fichas de Proposta (com filtros, busca e CRUD completo)
-2. Exibir o Gestor de Produto em todas as visoes (Kanban, lista, ficha)
-3. Log de disparos de webhook com historico completo (tabela no banco)
-4. Botao de teste de webhook na tela de configuracoes
+**`src/components/mapa/MapaInterativo.tsx`** (mapa de visualizacao):
+- Normal: `0.7` --> `0.9`
+- Hover: `0.9` --> `1.0`
+- Aplicar tanto para marcadores (Circle) quanto poligonos (Polygon)
+- Sao 6 pontos de alteracao neste arquivo (linhas 301, 345, 352, 375, 426, 433)
 
----
-
-## 1. Tela de Listagem de Fichas de Proposta
-
-### O que sera criado
-
-Uma nova visualizacao em tabela dentro da pagina `/negociacoes`, alternando entre Kanban e Lista via Tabs (semelhante ao padrao usado em Clientes).
-
-### Estrutura da interface
-
-- **Tabs**: "Kanban" | "Lista" (no topo da pagina, substituindo o header fixo)
-- **Barra de filtros** (compartilhada entre as duas views):
-  - Busca por nome do cliente
-  - Filtro por empreendimento
-  - Filtro por corretor
-  - Filtro por gestor de produto (novo)
-  - Filtro por status da proposta
-  - Filtro por etapa do funil
-- **Tabela com colunas**:
-  - Codigo (NEG-XXXXX)
-  - Cliente (nome)
-  - Empreendimento
-  - Gestor de Produto
-  - Corretor
-  - Unidades (qtd)
-  - Valor Proposta
-  - Status Proposta (badge colorido)
-  - Etapa (badge com cor da etapa)
-  - Data Criacao
-  - Acoes (menu dropdown: Editar, Historico, Mover, Excluir)
-- **Paginacao**: Navegacao entre paginas (20 itens por pagina)
-- **Metricas**: Os mesmos cards de metricas ja existentes no topo
-
-### Arquivos envolvidos
-
-| Arquivo | Acao |
-|---------|------|
-| `src/pages/Negociacoes.tsx` | Adicionar Tabs (Kanban/Lista), estado de view, filtros expandidos |
-| `src/pages/negociacoes/NegociacoesTable.tsx` | **Novo** - Componente de tabela |
-| `src/pages/negociacoes/NegociacoesToolbar.tsx` | **Novo** - Barra de filtros compartilhada |
-| `src/hooks/useNegociacoes.ts` | Adicionar hook `useNegociacoesPaginated` com busca e paginacao, e incluir join do gestor |
-
-### Hook `useNegociacoesPaginated`
-
-Novo hook para listagem paginada:
-- Recebe filtros: `search`, `empreendimento_id`, `corretor_id`, `gestor_id`, `status_proposta`, `funil_etapa_id`, `page`, `pageSize`
-- Faz select com joins: `cliente`, `empreendimento`, `corretor`, `funil_etapa`, `gestor:profiles!gestor_id(id, full_name)`, `unidades:negociacao_unidades(id)`
-- Conta total para paginacao via `.count()` (head: true)
-- Retorna `{ negociacoes, total, totalPages }`
+**`src/components/mapa/MapaEditor.tsx`** (editor):
+- Remover a variavel `markerOpacity` do estado (linha 120)
+- Substituir todas as referencias a `markerOpacity` por valor fixo `0.9`
+- Para itens selecionados: `Math.min(0.9 + 0.1, 1)` = `1.0`
+- Sao 4 pontos de alteracao (linhas 468, 469, 526, 527)
 
 ---
 
-## 2. Gestor de Produto Visivel em Todas as Visoes
+## 2. Cores Mais Vibrantes / Fluorescentes
 
-### Situacao atual
+Atualizar as cores em `src/types/mapa.types.ts` para tons mais saturados e luminosos:
 
-- A tabela `negociacoes` ja possui a coluna `gestor_id` (uuid, nullable)
-- O type `Negociacao` ja possui `gestor_id` e `gestor?: { id: string; full_name: string }`
-- O `NegociacaoCard` (Kanban compacto) ja exibe o gestor quando presente
-- Porem os hooks de query (`useNegociacoes`, `useNegociacoesKanban`) **nao fazem join** com profiles para trazer o gestor
+| Status | Cor Atual | Nova Cor | Descricao |
+|--------|-----------|----------|-----------|
+| Disponivel | `rgb(34, 197, 94)` | `rgb(0, 255, 100)` | Verde neon |
+| Reservada | `rgb(234, 179, 8)` | `rgb(255, 200, 0)` | Amarelo vibrante |
+| Negociacao | `rgb(59, 130, 246)` | `rgb(0, 150, 255)` | Azul eletrico |
+| Contrato | `rgb(168, 85, 247)` | `rgb(180, 60, 255)` | Roxo neon |
+| Vendida | `rgb(239, 68, 68)` | `rgb(255, 50, 50)` | Vermelho vivo |
+| Bloqueada | `rgb(107, 114, 128)` | `rgb(120, 130, 150)` | Cinza mais claro |
 
-### Alteracoes
+As cores serao atualizadas tanto em `getPolygonColor`, `getPolygonColorWithOpacity` quanto no array `STATUS_LEGEND`.
+
+---
+
+## 3. Remover Painel de Aparencia do Editor
+
+O painel "Aparencia" com controles de Slider foi adicionado recentemente e esta causando lentidao porque cada alteracao de opacidade ou escala de fonte dispara um re-render completo do canvas com todos os itens.
+
+**Remover de `src/components/mapa/MapaEditor.tsx`:**
+- Estado `markerOpacity` (linha 120) -- substituir por constante fixa `0.9`
+- Estado `fontSizeScale` (linha 121) -- substituir por constante fixa `1.0`
+- Estado `editorLabelFormato` (linha 119) -- voltar a usar `labelFormato` (prop)
+- Importacao do `Slider` (linha 54)
+- Importacao do `Checkbox` (linha 55)
+- Importacao do `Settings2` (linha 72)
+- Importacao do `LABEL_FORMAT_OPTIONS` (linha 52, se nao usado em outro lugar)
+- Todo o bloco JSX do Popover "Aparencia" (linhas 1127-1195)
+- Remover essas variaveis da lista de dependencias do `renderItems` (linha 630) e do `useEffect` (linha 295)
+
+Isso elimina 3 re-renders reactivos que estavam disparando a cada micro-ajuste do slider.
+
+---
+
+## 4. Proposta LIVTY (NEG-00017) -- Diagnostico
+
+**A proposta NAO foi excluida.** Ela existe no banco de dados:
+- Codigo: `NEG-00017`
+- Cliente: `MARTA CAROLINA VALIENTE ZAZYCKI`
+- Empreendimento: `LIVTY` (nao "LIVYT")
+- Etapa: `Ganho` (etapa final de sucesso)
+- Status da proposta: `rascunho`
+- `is_active = true`
+
+A proposta esta visivel no Kanban na coluna "Ganho". Possiveis razoes para nao ter sido encontrada:
+1. Filtros ativos na tela (empreendimento, corretor, etapa) podem estar escondendo
+2. Na view de "Lista", o nome do empreendimento e "LIVTY", nao "LIVYT"
+3. Na coluna "Ganho" do Kanban, se houver muitas fichas, ela pode estar abaixo da dobra (scroll)
+
+**Nenhuma correcao necessaria** -- a proposta esta integra e acessivel.
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useNegociacoes.ts` | Adicionar join `gestor:profiles!gestor_id(id, full_name)` nos selects de `useNegociacoes` e `useNegociacoesKanban` |
-| `src/pages/negociacoes/NegociacoesTable.tsx` | Coluna "Gestor de Produto" na tabela |
-| `src/components/negociacoes/NegociacaoCard.tsx` | Ja exibe (sem alteracao necessaria) |
+| `src/types/mapa.types.ts` | Novas cores fluorescentes em `getPolygonColor`, `getPolygonColorWithOpacity` e `STATUS_LEGEND` |
+| `src/components/mapa/MapaInterativo.tsx` | Opacidade de 0.7/0.9 para 0.9/1.0 |
+| `src/components/mapa/MapaEditor.tsx` | Remover painel Aparencia, fixar opacidade em 0.9, remover estados desnecessarios |
 
-Isso garantira que o gestor apareca tanto no Kanban quanto na listagem.
+## Sequencia
 
----
-
-## 3. Log de Disparos de Webhook
-
-### Nova tabela no banco
-
-Criar tabela `webhook_logs` para registrar cada disparo:
-
-```text
-webhook_logs:
-  id          uuid PK default gen_random_uuid()
-  webhook_id  uuid FK -> webhooks(id) ON DELETE CASCADE
-  evento      text NOT NULL
-  url         text NOT NULL
-  payload     jsonb
-  status_code integer
-  response_body text
-  tempo_ms    integer       -- tempo de resposta em ms
-  sucesso     boolean NOT NULL default false
-  erro        text
-  created_at  timestamptz default now()
-```
-
-RLS: Apenas super_admin pode visualizar (via `is_admin()`).
-
-### Edge Function atualizada
-
-Modificar `supabase/functions/webhook-dispatcher/index.ts` para:
-- Medir o tempo de cada disparo (`Date.now()` antes/depois do fetch)
-- Inserir um registro em `webhook_logs` com: webhook_id, evento, url, payload, status_code, response_body (truncado em 1000 chars), tempo_ms, sucesso, erro
-- Continuar atualizando `ultimo_disparo` e `ultimo_status` na tabela `webhooks` (comportamento existente)
-
-### Interface no frontend
-
-Adicionar uma sub-tab ou secao expansivel na tab "Webhooks" da pagina de Configuracoes:
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useWebhooks.ts` | Adicionar `useWebhookLogs(webhookId?)` - query paginada da tabela `webhook_logs` |
-| `src/pages/Configuracoes.tsx` | Adicionar secao "Historico de Disparos" abaixo da tabela de webhooks |
-
-A secao mostrara:
-- Tabela com colunas: Data/Hora, Evento, URL (truncada), Status HTTP (badge verde/vermelho), Tempo (ex: 245ms), Payload (botao para expandir)
-- Filtro por webhook especifico
-- Ordenacao por data (mais recente primeiro)
-- Limite de 50 registros mais recentes
-
----
-
-## 4. Botao de Teste de Webhook
-
-### Comportamento
-
-Na tabela de webhooks (Configuracoes), adicionar um botao "Testar" no menu de acoes de cada webhook. Ao clicar:
-1. Dispara um POST para a URL configurada com payload de teste:
-```text
-{
-  evento: "[evento_do_webhook]",
-  timestamp: "2026-02-07T...",
-  dados: {
-    _teste: true,
-    mensagem: "Este e um disparo de teste do webhook",
-    evento: "[evento_do_webhook]"
-  }
-}
-```
-2. Exibe um toast com o resultado (sucesso/falha + status code + tempo de resposta)
-3. O resultado tambem sera registrado na tabela `webhook_logs` (pois passa pelo dispatcher)
-
-### Implementacao
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useWebhooks.ts` | Adicionar `useTestarWebhook()` - mutation que chama o `webhook-dispatcher` com flag `_teste: true` |
-| `src/pages/Configuracoes.tsx` | Adicionar item "Testar" no DropdownMenu de cada webhook, com loading state |
-
-O teste sera feito chamando `supabase.functions.invoke('webhook-dispatcher')` com o evento do webhook e dados de teste. A edge function ja cuida de buscar webhooks ativos para aquele evento, disparar e registrar.
-
----
-
-## Detalhes Tecnicos
-
-### Migracao SQL necessaria
-
-Uma unica migracao para criar a tabela `webhook_logs`:
-
-```text
-CREATE TABLE public.webhook_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  webhook_id uuid REFERENCES public.webhooks(id) ON DELETE CASCADE,
-  evento text NOT NULL,
-  url text NOT NULL,
-  payload jsonb,
-  status_code integer,
-  response_body text,
-  tempo_ms integer,
-  sucesso boolean NOT NULL DEFAULT false,
-  erro text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.webhook_logs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Admins can view webhook logs"
-  ON public.webhook_logs FOR SELECT TO authenticated
-  USING (public.is_admin(auth.uid()));
-
-CREATE INDEX idx_webhook_logs_webhook_id ON public.webhook_logs(webhook_id);
-CREATE INDEX idx_webhook_logs_created_at ON public.webhook_logs(created_at DESC);
-```
-
-### Sequencia de implementacao
-
-1. Criar migracao para `webhook_logs`
-2. Atualizar edge function `webhook-dispatcher` (registrar logs)
-3. Atualizar queries em `useNegociacoes.ts` (join gestor)
-4. Criar `NegociacoesTable.tsx` e `NegociacoesToolbar.tsx`
-5. Atualizar `Negociacoes.tsx` (tabs Kanban/Lista)
-6. Atualizar `useWebhooks.ts` (logs + teste)
-7. Atualizar `Configuracoes.tsx` (historico + botao teste)
-
-### Componentes UI reutilizados
-- `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`
-- `Badge`, `Button`, `Select`, `Input`, `Tabs`, `Dialog`
-- `PaginationControls` (ja existente)
-- `DropdownMenu` para acoes
-
+1. Atualizar cores em `mapa.types.ts`
+2. Atualizar opacidade em `MapaInterativo.tsx`
+3. Limpar `MapaEditor.tsx` (remover painel Aparencia + estados)
