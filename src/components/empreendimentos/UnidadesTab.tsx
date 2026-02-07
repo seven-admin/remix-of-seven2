@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import logoImg from '@/assets/logo.png';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw, FileText } from 'lucide-react';
@@ -197,6 +198,13 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
 
     const htmlContent = `
       <div style="font-family: 'Helvetica', 'Arial', sans-serif; color: #333;">
+        <div style="text-align: center; margin-bottom: 8px;">
+          <img src="${logoImg}" alt="Logo" style="height: 50px; margin: 0 auto 8px;" />
+          <div style="font-size: 18pt; font-weight: bold; margin: 0;">CRM 360</div>
+          <div style="font-size: 14pt; margin: 2px 0;">Seven Group 360</div>
+          <div style="font-size: 10pt; color: #777;">Plataforma de Gestão Integrada</div>
+        </div>
+        <hr style="border: none; border-top: 1px solid #ccc; margin: 0 0 20px;" />
         <h2 style="margin: 0 0 4px; font-size: 16pt;">Unidades Disponíveis - ${empreendimento.nome}</h2>
         <p style="margin: 0 0 16px; font-size: 9pt; color: #777;">Gerado em ${dataGeracao}</p>
         <table style="width: 100%; border-collapse: collapse; font-size: 10pt;">
