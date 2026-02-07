@@ -1,19 +1,24 @@
 
-# Plano: Exportar Unidades Disponiveis para Excel
+
+# Plano: Trocar Exportacao de Unidades Disponiveis de Excel para PDF
 
 ## O que sera feito
 
-Adicionar um botao "Exportar Disponiveis" na aba de Unidades/Lotes do empreendimento que gera uma planilha Excel (.xlsx) contendo apenas as unidades com status "disponivel", ordenadas por Quadra/Bloco e Lote/Numero.
+Substituir a funcao `handleExportarDisponiveis` atual (que gera .xlsx) por uma versao que gera um arquivo PDF contendo a tabela de unidades disponiveis. O botao na interface permanece no mesmo lugar, apenas muda o formato de saida.
 
 ## Nome do arquivo
 
-O arquivo tera o formato:
 ```text
-Unidades_Disponiveis_[NOME_EMPREENDIMENTO]_[DD-MM-YYYY].xlsx
+Unidades_Disponiveis_[NOME_EMPREENDIMENTO]_[DD-MM-YYYY].pdf
 ```
-Exemplo: `Unidades_Disponiveis_LIVTY_07-02-2026.xlsx`
+Exemplo: `Unidades_Disponiveis_LIVTY_07-02-2026.pdf`
 
-## Colunas da planilha
+## Conteudo do PDF
+
+O PDF contera:
+- Titulo: "Unidades Disponiveis - [NOME DO EMPREENDIMENTO]"
+- Data de geracao
+- Tabela com as colunas:
 
 | Coluna | Origem |
 |--------|--------|
@@ -21,34 +26,44 @@ Exemplo: `Unidades_Disponiveis_LIVTY_07-02-2026.xlsx`
 | Lote/Numero | `unidade.numero` |
 | Tipologia | `unidade.tipologia?.nome` |
 | Area Privativa (m2) | `unidade.area_privativa` |
-| Valor (R$) | `unidade.valor` |
+| Valor (R$) | `unidade.valor` (formatado como moeda) |
 | Posicao | `unidade.posicao` |
 | Observacoes | `unidade.observacoes` |
 
+- Rodape com total de unidades disponiveis
+
 ## Ordenacao
 
-Utilizara a funcao ja existente `ordenarUnidadesPorBlocoENumero` de `src/lib/unidadeUtils.ts`, que ordena por nome do bloco (natural sort) e depois por numero da unidade.
-
-## Onde o botao sera adicionado
-
-No componente `src/components/empreendimentos/UnidadesTab.tsx`, junto aos botoes de acao existentes (Importar Excel, Venda Historica, etc.). O botao aparecera apenas fora do modo de selecao, com icone de download.
-
-## Arquivos a modificar
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/empreendimentos/UnidadesTab.tsx` | Adicionar botao "Exportar Disponiveis" e funcao `handleExportarDisponiveis` |
-
-Nenhum arquivo novo sera criado. A biblioteca `xlsx` ja esta instalada no projeto.
+Mesma logica atual: `ordenarUnidadesPorBlocoENumero` (ordena por bloco com natural sort, depois por numero).
 
 ## Detalhes tecnicos
 
-A funcao `handleExportarDisponiveis`:
-1. Filtra `unidades` para apenas `status === 'disponivel'`
-2. Ordena usando `ordenarUnidadesPorBlocoENumero`
-3. Mapeia para array de objetos com colunas legais
-4. Usa `XLSX.utils.json_to_sheet` para criar a planilha
-5. Usa `XLSX.writeFile` para salvar com o nome contendo a data atual
-6. Exibe toast de sucesso ou aviso se nao houver unidades disponiveis
+### Arquivo a modificar
 
-Os labels das colunas se adaptam ao tipo do empreendimento (Quadra/Bloco, Lote/Numero).
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/components/empreendimentos/UnidadesTab.tsx` | Reescrever `handleExportarDisponiveis` para gerar PDF em vez de Excel |
+
+### Mudancas no codigo
+
+1. **Remover** importacao do `xlsx` (`import * as XLSX from 'xlsx'`)
+2. **Adicionar** importacao do `html2pdf` (ja instalado no projeto, usado em `ExportarPdfDialog.tsx`)
+3. **Reescrever** `handleExportarDisponiveis`:
+   - Filtra e ordena unidades disponiveis (sem mudanca)
+   - Constroi um HTML com titulo, data e tabela estilizada
+   - Formata valores monetarios com `toLocaleString('pt-BR')`
+   - Usa `html2pdf.js` para gerar o PDF diretamente (sem dialog intermediario)
+   - Configuracao: A4, retrato, margens de 15mm, escala 2
+4. **Trocar** icone do botao de `Download` para `FileText` (indicar PDF)
+5. **Atualizar** texto do botao para "Exportar Disponiveis (PDF)"
+
+### Estilo da tabela no PDF
+
+- Cabecalho com fundo cinza claro e texto em negrito
+- Bordas em todas as celulas
+- Linhas alternadas com fundo levemente diferente para facilitar leitura
+- Fonte 10pt para caber mais dados na pagina
+- Valores monetarios alinhados a direita
+
+A geracao e instantanea (um clique), sem necessidade de dialog de configuracao.
+
