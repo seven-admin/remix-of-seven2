@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { invalidateDashboards } from '@/lib/invalidateDashboards';
+import { dispararWebhook, getUsuarioLogado, isSuperAdmin } from '@/lib/webhookUtils';
 import type { 
   Atividade, 
   AtividadeFormData, 
@@ -10,6 +11,8 @@ import type {
   ConcluirAtividadeData,
   ConfiguracoesAtividades,
 } from '@/types/atividades.types';
+
+
 
 function normalizeUpper(v: unknown): unknown {
   if (typeof v !== 'string') return v;
@@ -181,6 +184,38 @@ export function useCreateAtividade() {
             referencia_tipo: 'atividade',
           }).then(() => {});
         }
+
+        // Webhook: atividade criada por super_admin
+        if (currentUser?.user?.id) {
+          const superAdmin = await isSuperAdmin(currentUser.user.id);
+          if (superAdmin) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', currentUser.user.id)
+              .maybeSingle();
+
+            const { data: gestorProfile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', data.gestor_id)
+              .maybeSingle();
+
+            const { data: empreendimento } = data.empreendimento_id
+              ? await supabase.from('empreendimentos').select('nome').eq('id', data.empreendimento_id).maybeSingle()
+              : { data: null };
+
+            dispararWebhook('atividade_criada_por_superadmin', {
+              titulo: data.titulo,
+              criado_por: { id: currentUser.user.id, nome: profile?.full_name || 'Super Admin' },
+              gestores: [{ id: data.gestor_id, nome: gestorProfile?.full_name || 'Gestor' }],
+              data_inicio: data.data_inicio,
+              data_fim: data.data_fim,
+              tipo: data.tipo,
+              empreendimento: empreendimento?.nome || null,
+            });
+          }
+        }
       }
 
       return data;
@@ -208,6 +243,30 @@ export function useCreateAtividadesParaGestores() {
 
       const { data, error } = await supabase.from('atividades').insert(atividadesParaInserir).select();
       if (error) throw error;
+
+      // Webhook: atividade criada por super_admin em lote
+      const usuario = await getUsuarioLogado();
+      if (usuario && await isSuperAdmin(usuario.id)) {
+        const { data: gestoresProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', gestorIds);
+
+        const { data: empreendimento } = formData.empreendimento_id
+          ? await supabase.from('empreendimentos').select('nome').eq('id', formData.empreendimento_id).maybeSingle()
+          : { data: null };
+
+        dispararWebhook('atividade_criada_por_superadmin', {
+          titulo: formData.titulo,
+          criado_por: { id: usuario.id, nome: usuario.nome },
+          gestores: (gestoresProfiles || []).map(g => ({ id: g.id, nome: g.full_name || 'Gestor' })),
+          data_inicio: formData.data_inicio,
+          data_fim: formData.data_fim,
+          tipo: formData.tipo,
+          empreendimento: empreendimento?.nome || null,
+        });
+      }
+
       return data;
     },
     onSuccess: (data) => {

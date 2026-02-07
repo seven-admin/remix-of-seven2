@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { dispararWebhook, getUsuarioLogado } from '@/lib/webhookUtils';
 import type { AtividadeComentario } from '@/types/atividades.types';
 
 export function useAtividadeComentarios(atividadeId: string | undefined) {
@@ -39,6 +40,37 @@ export function useAtividadeComentarios(atividadeId: string | undefined) {
         });
       
       if (error) throw error;
+
+      // Webhook: atividade comentada (forecast)
+      const usuario = await getUsuarioLogado();
+      if (usuario) {
+        const { data: atividade } = await supabase
+          .from('atividades')
+          .select('titulo, gestor_id')
+          .eq('id', atividadeId)
+          .maybeSingle();
+
+        const responsaveis: { id: string; nome: string }[] = [];
+        if (atividade?.gestor_id) {
+          const { data: gestorProfile } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('id', atividade.gestor_id)
+            .maybeSingle();
+          if (gestorProfile) {
+            responsaveis.push({ id: gestorProfile.id, nome: gestorProfile.full_name || 'Gestor' });
+          }
+        }
+
+        dispararWebhook('atividade_comentada', {
+          tipo: 'forecast',
+          atividade_id: atividadeId,
+          atividade_titulo: atividade?.titulo || '',
+          comentario: comentario.trim(),
+          autor: { id: usuario.id, nome: usuario.nome },
+          responsaveis,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['atividade-comentarios', atividadeId] });

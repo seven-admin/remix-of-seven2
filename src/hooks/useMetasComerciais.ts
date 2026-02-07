@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, format, subMonths, parseISO } from 'date-fns';
+import { dispararWebhook } from '@/lib/webhookUtils';
 
 export interface MetaComercial {
   id: string;
@@ -263,6 +264,19 @@ export function useCreateMeta() {
         .single();
       
       if (error) throw error;
+
+      // Webhook: meta comercial criada
+      dispararWebhook('meta_comercial_criada', {
+        competencia: data.competencia,
+        empreendimento_id: data.empreendimento_id || null,
+        meta_valor: data.meta_valor,
+        meta_unidades: data.meta_unidades,
+        meta_visitas: data.meta_visitas || 0,
+        meta_atendimentos: data.meta_atendimentos || 0,
+        meta_treinamentos: data.meta_treinamentos || 0,
+        meta_propostas: data.meta_propostas || 0,
+      });
+
       return result;
     },
     onSuccess: () => {
