@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConfiguracoesSistema, useUpdateConfiguracoes } from '@/hooks/useConfiguracoesSistema';
-import { useWebhooks, useCreateWebhook, useUpdateWebhook, useDeleteWebhook, useTestarWebhook, WEBHOOK_EVENTS } from '@/hooks/useWebhooks';
+import { useWebhooks, useCreateWebhook, useUpdateWebhook, useDeleteWebhook, useTestarWebhook, WEBHOOK_EVENTS, type Webhook as WebhookType } from '@/hooks/useWebhooks';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, MoreHorizontal, Webhook, Shield, FileText, Play } from 'lucide-react';
+import { Loader2, Plus, Trash2, MoreHorizontal, Webhook, Shield, FileText, Play, Pencil } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RolesManager } from '@/components/configuracoes/RolesManager';
 import { WebhookLogsSection } from '@/components/configuracoes/WebhookLogsSection';
@@ -77,6 +77,7 @@ const Configuracoes = () => {
   const [loginSubtitulo, setLoginSubtitulo] = useState('');
   const [loginDescricao, setLoginDescricao] = useState('');
   const [showWebhookForm, setShowWebhookForm] = useState(false);
+  const [editingWebhook, setEditingWebhook] = useState<WebhookType | null>(null);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -120,13 +121,39 @@ const Configuracoes = () => {
 
 
   const onSubmitWebhook = async (data: WebhookFormData) => {
-    await createWebhook.mutateAsync({
-      evento: data.evento,
-      url: data.url,
-      descricao: data.descricao,
+    if (editingWebhook) {
+      await updateWebhook.mutateAsync({
+        id: editingWebhook.id,
+        data: {
+          evento: data.evento,
+          url: data.url,
+          descricao: data.descricao,
+        },
+      });
+    } else {
+      await createWebhook.mutateAsync({
+        evento: data.evento,
+        url: data.url,
+        descricao: data.descricao,
+      });
+    }
+    handleCloseWebhookForm();
+  };
+
+  const handleEditWebhook = (webhook: WebhookType) => {
+    setEditingWebhook(webhook);
+    webhookForm.reset({
+      evento: webhook.evento,
+      url: webhook.url,
+      descricao: webhook.descricao || '',
     });
+    setShowWebhookForm(true);
+  };
+
+  const handleCloseWebhookForm = () => {
     setShowWebhookForm(false);
-    webhookForm.reset();
+    setEditingWebhook(null);
+    webhookForm.reset({ evento: '', url: '', descricao: '' });
   };
 
   const handleToggleWebhook = async (id: string, isActive: boolean) => {
@@ -269,6 +296,10 @@ const Configuracoes = () => {
                               </Button>
                             </DropdownMenuTrigger>
                              <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditWebhook(webhook)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => testarWebhook.mutate({ id: webhook.id, evento: webhook.evento, url: webhook.url })}
                                 disabled={testarWebhook.isPending}
@@ -473,10 +504,10 @@ const Configuracoes = () => {
       </Tabs>
 
       {/* Webhook Form Dialog */}
-      <Dialog open={showWebhookForm} onOpenChange={setShowWebhookForm}>
+      <Dialog open={showWebhookForm} onOpenChange={(open) => { if (!open) handleCloseWebhookForm(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Adicionar Webhook</DialogTitle>
+            <DialogTitle>{editingWebhook ? 'Editar Webhook' : 'Adicionar Webhook'}</DialogTitle>
           </DialogHeader>
           <Form {...webhookForm}>
             <form onSubmit={webhookForm.handleSubmit(onSubmitWebhook)} className="space-y-4">
@@ -540,12 +571,12 @@ const Configuracoes = () => {
               />
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setShowWebhookForm(false)}>
+                <Button type="button" variant="outline" onClick={handleCloseWebhookForm}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createWebhook.isPending}>
-                  {createWebhook.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Adicionar
+                <Button type="submit" disabled={createWebhook.isPending || updateWebhook.isPending}>
+                  {(createWebhook.isPending || updateWebhook.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingWebhook ? 'Salvar Alterações' : 'Adicionar'}
                 </Button>
               </div>
             </form>
