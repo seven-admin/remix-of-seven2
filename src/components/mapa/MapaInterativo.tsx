@@ -298,13 +298,12 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
       left: center.x * scale + offsetX - raio,
       top: center.y * scale + offsetY - raio,
       radius: raio,
-      fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+      fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       stroke: 'transparent',
       strokeWidth: 0,
       selectable: false,
       hoverCursor: 'pointer',
     });
-
     const textShadow = new Shadow({
       color: 'rgba(0,0,0,0.8)',
       blur: 2,
@@ -342,14 +341,14 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
 
     marker.on('mouseover', () => {
       marker.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
+        fill: getPolygonColorWithOpacity(unidade.status, 1.0),
       });
       canvas.renderAll();
     });
 
     marker.on('mouseout', () => {
       marker.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       });
       canvas.renderAll();
     });
@@ -372,7 +371,7 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
     }));
 
     const polygon = new Polygon(scaledPoints, {
-      fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+      fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       stroke: 'transparent',
       strokeWidth: 0,
       selectable: false,
@@ -423,14 +422,14 @@ export function MapaInterativo({ empreendimentoId, readonly = false }: MapaInter
     // Hover effects
     polygon.on('mouseover', () => {
       polygon.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
+        fill: getPolygonColorWithOpacity(unidade.status, 1.0),
       });
       canvas.renderAll();
     });
 
     polygon.on('mouseout', () => {
       polygon.set({
-        fill: getPolygonColorWithOpacity(unidade.status, 0.7),
+        fill: getPolygonColorWithOpacity(unidade.status, 0.9),
       });
       canvas.renderAll();
     });
