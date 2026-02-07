@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import html2pdf from 'html2pdf.js';
 import { Toggle } from '@/components/ui/toggle';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -163,7 +163,7 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
     handleExitSelectionMode();
   };
 
-  const handleExportarDisponiveis = () => {
+  const handleExportarDisponiveis = async () => {
     if (!unidades || !empreendimento) return;
     
     const disponiveis = unidades.filter(u => u.status === 'disponivel');
@@ -176,27 +176,73 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
 
     const blocoLabel = isLoteamento ? 'Quadra' : 'Bloco';
     const unidLabel = isLoteamento ? 'Lote' : 'Número';
+    const dataGeracao = format(new Date(), 'dd/MM/yyyy');
 
-    const dados = ordenadas.map(u => ({
-      [blocoLabel]: u.bloco?.nome || 'Sem ' + blocoLabel,
-      [unidLabel]: u.numero,
-      'Tipologia': u.tipologia?.nome || '',
-      'Área Privativa (m²)': u.area_privativa ?? '',
-      'Valor (R$)': u.valor ?? '',
-      'Posição': u.posicao || '',
-      'Observações': u.observacoes || '',
-    }));
+    const formatarMoeda = (valor: number | null | undefined) => {
+      if (valor == null) return '-';
+      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+    };
 
-    const ws = XLSX.utils.json_to_sheet(dados);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Disponíveis');
+    const linhasHtml = ordenadas.map((u, i) => `
+      <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
+        <td style="padding: 6px 8px; border: 1px solid #ddd;">${u.bloco?.nome || 'Sem ' + blocoLabel}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd;">${u.numero}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd;">${u.tipologia?.nome || '-'}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: center;">${u.area_privativa ?? '-'}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatarMoeda(u.valor)}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd;">${u.posicao || '-'}</td>
+        <td style="padding: 6px 8px; border: 1px solid #ddd;">${u.observacoes || '-'}</td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <div style="font-family: 'Helvetica', 'Arial', sans-serif; color: #333;">
+        <h2 style="margin: 0 0 4px; font-size: 16pt;">Unidades Disponíveis - ${empreendimento.nome}</h2>
+        <p style="margin: 0 0 16px; font-size: 9pt; color: #777;">Gerado em ${dataGeracao}</p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10pt;">
+          <thead>
+            <tr style="background: #e5e5e5;">
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left; font-weight: bold;">${blocoLabel}</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left; font-weight: bold;">${unidLabel}</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Tipologia</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">Área (m²)</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">Valor (R$)</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Posição</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasHtml}
+          </tbody>
+        </table>
+        <p style="margin: 16px 0 0; font-size: 9pt; color: #555; text-align: right;">
+          Total de unidades disponíveis: <strong>${ordenadas.length}</strong>
+        </p>
+      </div>
+    `;
+
+    const container = document.createElement('div');
+    container.style.width = '210mm';
+    container.style.background = 'white';
+    container.innerHTML = htmlContent;
 
     const nomeEmpreendimento = empreendimento.nome.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').replace(/ /g, '_');
     const dataHoje = format(new Date(), 'dd-MM-yyyy');
-    const nomeArquivo = `Unidades_Disponiveis_${nomeEmpreendimento}_${dataHoje}.xlsx`;
 
-    XLSX.writeFile(wb, nomeArquivo);
-    toast.success(`${disponiveis.length} unidade(s) exportada(s) com sucesso.`);
+    try {
+      await (html2pdf() as any).set({
+        margin: 15,
+        filename: `Unidades_Disponiveis_${nomeEmpreendimento}_${dataHoje}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', width: 794, windowWidth: 794 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+      }).from(container).save();
+      toast.success(`${disponiveis.length} unidade(s) exportada(s) em PDF com sucesso.`);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast.error('Erro ao gerar o PDF.');
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -303,8 +349,8 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
                   </div>
                 )}
                 <Button variant="outline" size="sm" onClick={handleExportarDisponiveis}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Disponíveis
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar Disponíveis (PDF)
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelectionMode('status')}>
                   <RefreshCw className="h-4 w-4 mr-2" />
