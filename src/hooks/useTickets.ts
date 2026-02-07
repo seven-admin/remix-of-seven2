@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { dispararWebhook, getUsuarioLogado } from '@/lib/webhookUtils';
 import type { 
   Ticket, 
   TarefaTicket, 
@@ -479,15 +480,47 @@ export function useComentariosTicket(ticketId: string) {
 
   const createComentario = useMutation({
     mutationFn: async (data: { comentario: string; anexo_url?: string }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      
       const { error } = await supabase
         .from('projeto_comentarios')
         .insert({
           ...data,
           projeto_id: ticketId,
-          user_id: (await supabase.auth.getUser()).data.user?.id
+          user_id: userId
         });
 
       if (error) throw error;
+
+      // Webhook: atividade comentada (marketing)
+      const usuario = await getUsuarioLogado();
+      if (usuario) {
+        // Buscar título da atividade
+        const { data: ticket } = await supabase
+          .from('projetos_marketing')
+          .select('titulo, codigo')
+          .eq('id', ticketId)
+          .maybeSingle();
+
+        // Buscar responsáveis atribuídos
+        const { data: responsaveis } = await supabase
+          .from('projeto_responsaveis')
+          .select('user_id, user:profiles!projeto_responsaveis_user_id_fkey(id, full_name)')
+          .eq('projeto_id', ticketId);
+
+        dispararWebhook('atividade_comentada', {
+          tipo: 'marketing',
+          atividade_id: ticketId,
+          atividade_titulo: ticket?.titulo || '',
+          atividade_codigo: ticket?.codigo || '',
+          comentario: data.comentario,
+          autor: { id: usuario.id, nome: usuario.nome },
+          responsaveis: (responsaveis || []).map((r: any) => ({
+            id: r.user_id,
+            nome: r.user?.full_name || 'Responsável',
+          })),
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comentarios-ticket', ticketId] });

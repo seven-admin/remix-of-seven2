@@ -2,6 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, parseISO } from 'date-fns';
 
+export interface TicketResumo {
+  id: string;
+  codigo: string;
+  titulo: string;
+  status: string;
+  data_previsao: string | null;
+  categoria: string;
+}
+
 export interface MembroEquipe {
   id: string;
   nome: string;
@@ -14,6 +23,9 @@ export interface MembroEquipe {
   tempoMedio: number | null;
   taxaNoPrazo: number;
   totalTickets: number;
+  ticketsEmProducao: TicketResumo[];
+  ticketsPendentes: TicketResumo[];
+  ticketsConcluidos: TicketResumo[];
 }
 
 export interface EquipeMarketingData {
@@ -170,9 +182,9 @@ export function useEquipeMarketing(filters?: Filters) {
       const membros: MembroEquipe[] = membrosEquipe.map(membro => {
         const ticketsMembro = ticketsPorSupervisor.get(membro.id) || [];
         
-        const emProducao = ticketsMembro.filter(t => t.status === 'em_producao').length;
-        const aguardando = ticketsMembro.filter(t => t.status === 'briefing' || t.status === 'triagem').length;
-        const revisao = ticketsMembro.filter(t => t.status === 'revisao' || t.status === 'aprovacao_cliente').length;
+        const emProducaoTickets = ticketsMembro.filter(t => t.status === 'em_producao');
+        const aguardandoTickets = ticketsMembro.filter(t => t.status === 'briefing' || t.status === 'triagem');
+        const revisaoTickets = ticketsMembro.filter(t => t.status === 'revisao' || t.status === 'aprovacao_cliente');
         
         // Tickets concluídos no período
         const ticketsConcluidos = ticketsMembro.filter(t => {
@@ -209,18 +221,30 @@ export function useEquipeMarketing(filters?: Filters) {
           taxaNoPrazo = Math.round((noPrazo.length / comPrazo.length) * 100);
         }
 
+        const mapToResumo = (t: typeof ticketsMembro[0]): TicketResumo => ({
+          id: t.id,
+          codigo: t.codigo,
+          titulo: t.titulo,
+          status: t.status,
+          data_previsao: t.data_previsao,
+          categoria: t.categoria,
+        });
+
         return {
           id: membro.id,
           nome: membro.nome,
           avatar_url: membro.avatar_url,
           cargo: membro.cargo,
-          emProducao,
-          aguardando,
-          revisao,
+          emProducao: emProducaoTickets.length,
+          aguardando: aguardandoTickets.length,
+          revisao: revisaoTickets.length,
           concluidos,
           tempoMedio,
           taxaNoPrazo,
-          totalTickets: ticketsMembro.length
+          totalTickets: ticketsMembro.length,
+          ticketsEmProducao: emProducaoTickets.map(mapToResumo),
+          ticketsPendentes: [...aguardandoTickets, ...revisaoTickets].map(mapToResumo),
+          ticketsConcluidos: ticketsConcluidos.map(mapToResumo),
         };
       });
 

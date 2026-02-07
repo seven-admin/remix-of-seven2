@@ -31,13 +31,17 @@ export const WEBHOOK_EVENTS = [
   { value: 'reserva_criada', label: 'Reserva Criada' },
   { value: 'lead_convertido', label: 'Lead Convertido' },
   { value: 'briefing_triado', label: 'Briefing Triado' },
+  // Novos eventos
+  { value: 'atividade_criada_por_superadmin', label: 'Atividade Criada por Super Admin' },
+  { value: 'meta_comercial_criada', label: 'Meta Comercial Criada' },
+  { value: 'atividade_comentada', label: 'Atividade Comentada (Marketing / Forecast)' },
   // Atividades de Produção - status changes
-  { value: 'ticket_aguardando_analise', label: 'Ticket - Aguardando Análise' },
-  { value: 'ticket_em_producao', label: 'Ticket - Em Produção' },
-  { value: 'ticket_revisao', label: 'Ticket - Revisão' },
-  { value: 'ticket_aprovacao_cliente', label: 'Ticket - Aprovação Cliente' },
-  { value: 'ticket_ajuste', label: 'Ticket - Ajuste' },
-  { value: 'ticket_concluido', label: 'Ticket - Concluído' },
+  { value: 'ticket_aguardando_analise', label: 'Atividade de Produção - Aguardando Análise' },
+  { value: 'ticket_em_producao', label: 'Atividade de Produção - Em Produção' },
+  { value: 'ticket_revisao', label: 'Atividade de Produção - Revisão' },
+  { value: 'ticket_aprovacao_cliente', label: 'Atividade de Produção - Aprovação Cliente' },
+  { value: 'ticket_ajuste', label: 'Atividade de Produção - Ajuste' },
+  { value: 'ticket_concluido', label: 'Atividade de Produção - Concluído' },
 ];
 
 export function useWebhooks() {
