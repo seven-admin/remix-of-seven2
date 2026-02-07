@@ -1,49 +1,55 @@
 
-# Plano: Adicionar Cabecalho com Logo ao PDF de Unidades Disponiveis
+# Plano: CRUD Completo para Webhooks (Adicionar Editar)
+
+## Problema atual
+
+O formulario de webhook so permite **criar** novos registros. Para alterar o evento, URL ou descricao de um webhook existente, o usuario precisa excluir e recadastrar, o que e improdutivo.
 
 ## O que sera feito
 
-Adicionar um cabecalho profissional no topo do PDF exportado, contendo:
+Transformar o dialog de webhook em um formulario de criacao **e edicao**, reutilizando o mesmo componente. Alem disso, adicionar a opcao "Editar" no menu de acoes de cada webhook na tabela.
 
-1. Logo do sistema (imagem `src/assets/logo.png`)
-2. Textos centralizados:
-   - **CRM 360** (destaque principal)
-   - **Seven Group 360**
-   - **Plataforma de Gestao Integrada**
-3. Separador visual antes da tabela
+## Mudancas detalhadas
 
-O cabecalho ficara acima do titulo "Unidades Disponiveis - [Empreendimento]" que ja existe.
+### Arquivo: `src/pages/Configuracoes.tsx`
 
-## Arquivo a modificar
+1. **Novo estado para edicao**
+   - Adicionar `editingWebhook` (tipo `Webhook | null`) para controlar se o dialog esta em modo edicao
+   - Quando `editingWebhook` e nulo, o dialog funciona como criacao; quando preenchido, funciona como edicao
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/empreendimentos/UnidadesTab.tsx` | Adicionar import do logo e inserir bloco HTML do cabecalho no `htmlContent` |
+2. **Funcao `handleEditWebhook`**
+   - Recebe o webhook selecionado
+   - Preenche o formulario com os valores atuais (`evento`, `url`, `descricao`)
+   - Abre o dialog em modo edicao
 
-## Detalhes tecnicos
+3. **Atualizar `onSubmitWebhook`**
+   - Se `editingWebhook` estiver preenchido, chama `updateWebhook.mutateAsync` com o ID do webhook
+   - Caso contrario, chama `createWebhook.mutateAsync` (comportamento atual)
+   - Ao fechar/concluir, limpa `editingWebhook`
 
-1. **Importar** o logo: `import logo from '@/assets/logo.png'` (mesmo padrao usado em Sidebar, LoginForm, etc.)
-2. **Inserir** bloco HTML no inicio do `htmlContent` (linha 199), antes do `<h2>` existente:
-   - Imagem do logo centralizada (altura ~50px)
-   - Texto "CRM 360" em negrito, 18pt
-   - Texto "Seven Group 360" em 14pt
-   - Texto "Plataforma de Gestao Integrada" em 10pt, cor cinza
-   - Linha separadora (`<hr>`) com margem inferior de 20px
-3. A propriedade `useCORS: true` ja esta configurada no `html2canvas`, garantindo que a imagem do logo sera renderizada corretamente no PDF
+4. **Botao "Editar" no DropdownMenu**
+   - Adicionar item "Editar" com icone `Pencil` no menu de acoes de cada webhook (antes do "Testar")
 
-## Layout do cabecalho
+5. **Titulo dinamico do Dialog**
+   - "Adicionar Webhook" quando criando
+   - "Editar Webhook" quando editando
 
-```text
-+------------------------------------------+
-|              [LOGO 50px]                 |
-|              CRM 360                     |
-|          Seven Group 360                 |
-|   Plataforma de Gestao Integrada         |
-|------------------------------------------|
-|  Unidades Disponiveis - LIVTY            |
-|  Gerado em 07/02/2026                    |
-|  ... tabela ...                          |
-+------------------------------------------+
-```
+6. **Botao de submit dinamico**
+   - Texto "Adicionar" quando criando
+   - Texto "Salvar Alteracoes" quando editando
 
-Nenhum arquivo novo sera criado. Apenas uma alteracao pontual no HTML gerado dentro da funcao `handleExportarDisponiveis`.
+7. **Reset ao fechar**
+   - Ao fechar o dialog (via botao Cancelar ou clique fora), limpar `editingWebhook` e resetar o formulario
+
+### Nenhum arquivo novo sera criado
+
+Todas as mudancas sao no `src/pages/Configuracoes.tsx`. O hook `useUpdateWebhook` ja existe e ja aceita atualizacoes parciais de `evento`, `url` e `descricao`.
+
+## Fluxo do usuario
+
+1. Clica no menu "..." de um webhook existente
+2. Seleciona "Editar"
+3. Dialog abre pre-preenchido com os dados atuais
+4. Altera o que precisar (evento, URL, descricao)
+5. Clica "Salvar Alteracoes"
+6. Webhook atualizado sem precisar excluir e recriar
