@@ -137,3 +137,87 @@ export function useDeleteWebhook() {
     },
   });
 }
+
+// ====================================================
+// Webhook Logs
+// ====================================================
+
+export interface WebhookLog {
+  id: string;
+  webhook_id: string | null;
+  evento: string;
+  url: string;
+  payload: unknown;
+  status_code: number | null;
+  response_body: string | null;
+  tempo_ms: number | null;
+  sucesso: boolean;
+  erro: string | null;
+  created_at: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+
+export function useWebhookLogs(webhookId?: string) {
+  return useQuery({
+    queryKey: ['webhook-logs', webhookId],
+    queryFn: async () => {
+      let query = db
+        .from('webhook_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (webhookId) {
+        query = query.eq('webhook_id', webhookId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as WebhookLog[];
+    },
+  });
+}
+
+// ====================================================
+// Testar Webhook
+// ====================================================
+
+export function useTestarWebhook() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (webhook: { id: string; evento: string; url: string }) => {
+      const { data, error } = await supabase.functions.invoke('webhook-dispatcher', {
+        body: {
+          evento: webhook.evento,
+          dados: {
+            _teste: true,
+            mensagem: 'Este é um disparo de teste do webhook',
+            evento: webhook.evento,
+            webhook_id: webhook.id,
+          },
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] });
+      
+      const resultado = data?.resultados?.[0];
+      if (resultado?.sucesso) {
+        toast.success(`Teste bem-sucedido! Status: ${resultado.status} em ${resultado.tempo_ms}ms`);
+      } else {
+        toast.error(`Teste falhou: ${resultado?.erro || `Status ${resultado?.status}`}`);
+      }
+    },
+    onError: (error) => {
+      console.error('Error testing webhook:', error);
+      toast.error('Erro ao testar webhook');
+    },
+  });
+}

@@ -7,12 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConfiguracoesSistema, useUpdateConfiguracoes } from '@/hooks/useConfiguracoesSistema';
-import { useWebhooks, useCreateWebhook, useUpdateWebhook, useDeleteWebhook, WEBHOOK_EVENTS } from '@/hooks/useWebhooks';
+import { useWebhooks, useCreateWebhook, useUpdateWebhook, useDeleteWebhook, useTestarWebhook, WEBHOOK_EVENTS } from '@/hooks/useWebhooks';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, MoreHorizontal, Webhook, Shield, FileText } from 'lucide-react';
+import { Loader2, Plus, Trash2, MoreHorizontal, Webhook, Shield, FileText, Play } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { RolesManager } from '@/components/configuracoes/RolesManager';
+import { WebhookLogsSection } from '@/components/configuracoes/WebhookLogsSection';
 import { TermosEditor } from '@/components/configuracoes/TermosEditor';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -62,6 +63,7 @@ const Configuracoes = () => {
   const createWebhook = useCreateWebhook();
   const updateWebhook = useUpdateWebhook();
   const deleteWebhook = useDeleteWebhook();
+  const testarWebhook = useTestarWebhook();
   const { isSuperAdmin } = usePermissions();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -266,7 +268,14 @@ const Configuracoes = () => {
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                onClick={() => testarWebhook.mutate({ id: webhook.id, evento: webhook.evento, url: webhook.url })}
+                                disabled={testarWebhook.isPending}
+                              >
+                                <Play className="h-4 w-4 mr-2" />
+                                {testarWebhook.isPending ? 'Testando...' : 'Testar'}
+                              </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteWebhook(webhook.id)}
                                 className="text-destructive focus:text-destructive"
@@ -306,6 +315,11 @@ const Configuracoes = () => {
                 ))}
               </div>
             </div>
+
+            {/* Webhook Logs */}
+            {webhooks && webhooks.length > 0 && (
+              <WebhookLogsSection webhooks={webhooks.map(w => ({ id: w.id, evento: w.evento, url: w.url }))} />
+            )}
           </div>
         </TabsContent>
 

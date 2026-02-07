@@ -19,7 +19,6 @@ interface WebhookRecord {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -34,7 +33,6 @@ Deno.serve(async (req) => {
     const { evento, dados } = payload
 
     console.log(`[webhook-dispatcher] Recebido evento: ${evento}`)
-    console.log(`[webhook-dispatcher] Dados:`, JSON.stringify(dados, null, 2))
 
     if (!evento) {
       return new Response(
@@ -72,31 +70,48 @@ Deno.serve(async (req) => {
 
     console.log(`[webhook-dispatcher] Encontrados ${webhooks.length} webhook(s) para disparar`)
 
-    const resultados: Array<{ webhook_id: string; url: string; sucesso: boolean; status?: number; erro?: string }> = []
+    const resultados: Array<{ webhook_id: string; url: string; sucesso: boolean; status?: number; tempo_ms?: number; erro?: string }> = []
+
+    const outboundPayload = {
+      evento,
+      timestamp: new Date().toISOString(),
+      dados
+    }
 
     // Disparar para cada webhook
     for (const webhook of webhooks as WebhookRecord[]) {
       console.log(`[webhook-dispatcher] Disparando para: ${webhook.url}`)
       
+      const startTime = Date.now()
+      let statusCode: number | null = null
+      let responseBody: string | null = null
+      let sucesso = false
+      let erro: string | null = null
+
       try {
         const response = await fetch(webhook.url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            evento,
-            timestamp: new Date().toISOString(),
-            dados
-          }),
+          body: JSON.stringify(outboundPayload),
         })
 
-        const sucesso = response.ok
-        const statusCode = response.status
+        const tempoMs = Date.now() - startTime
+        sucesso = response.ok
+        statusCode = response.status
 
-        console.log(`[webhook-dispatcher] Resposta de ${webhook.url}: ${statusCode}`)
+        // Capturar response body (truncado)
+        try {
+          const text = await response.text()
+          responseBody = text.substring(0, 1000)
+        } catch {
+          responseBody = null
+        }
 
-        // Atualizar último disparo no banco
+        console.log(`[webhook-dispatcher] Resposta de ${webhook.url}: ${statusCode} em ${tempoMs}ms`)
+
+        // Atualizar último disparo no webhook
         await supabase
           .from('webhooks')
           .update({
@@ -105,13 +120,32 @@ Deno.serve(async (req) => {
           })
           .eq('id', webhook.id)
 
+        // Registrar log
+        await supabase
+          .from('webhook_logs')
+          .insert({
+            webhook_id: webhook.id,
+            evento,
+            url: webhook.url,
+            payload: outboundPayload,
+            status_code: statusCode,
+            response_body: responseBody,
+            tempo_ms: tempoMs,
+            sucesso,
+            erro: null,
+          })
+
         resultados.push({
           webhook_id: webhook.id,
           url: webhook.url,
           sucesso,
-          status: statusCode
+          status: statusCode,
+          tempo_ms: tempoMs
         })
       } catch (fetchError) {
+        const tempoMs = Date.now() - startTime
+        erro = fetchError instanceof Error ? fetchError.message : 'Erro desconhecido'
+        
         console.error(`[webhook-dispatcher] Erro ao disparar para ${webhook.url}:`, fetchError)
         
         // Atualizar com erro
@@ -123,11 +157,27 @@ Deno.serve(async (req) => {
           })
           .eq('id', webhook.id)
 
+        // Registrar log de erro
+        await supabase
+          .from('webhook_logs')
+          .insert({
+            webhook_id: webhook.id,
+            evento,
+            url: webhook.url,
+            payload: outboundPayload,
+            status_code: null,
+            response_body: null,
+            tempo_ms: tempoMs,
+            sucesso: false,
+            erro,
+          })
+
         resultados.push({
           webhook_id: webhook.id,
           url: webhook.url,
           sucesso: false,
-          erro: fetchError instanceof Error ? fetchError.message : 'Erro desconhecido'
+          tempo_ms: tempoMs,
+          erro
         })
       }
     }
