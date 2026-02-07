@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Loader2, Grid, Map as MapIcon, Building2, Pencil, Layers, Upload, History, Check, X, Trash2, RefreshCw, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 import { Toggle } from '@/components/ui/toggle';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -28,6 +30,8 @@ import { VendaHistoricaDialog } from './VendaHistoricaDialog';
 import { AlterarStatusLoteDialog } from './AlterarStatusLoteDialog';
 import { cn } from '@/lib/utils';
 import { buildUnitLabel, type LabelFormatElement } from '@/lib/mapaUtils';
+import { ordenarUnidadesPorBlocoENumero } from '@/lib/unidadeUtils';
+import { toast } from 'sonner';
 
 interface UnidadesTabProps {
   empreendimentoId: string;
@@ -159,6 +163,42 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
     handleExitSelectionMode();
   };
 
+  const handleExportarDisponiveis = () => {
+    if (!unidades || !empreendimento) return;
+    
+    const disponiveis = unidades.filter(u => u.status === 'disponivel');
+    if (disponiveis.length === 0) {
+      toast.warning('Nenhuma unidade disponível para exportar.');
+      return;
+    }
+
+    const ordenadas = ordenarUnidadesPorBlocoENumero(disponiveis);
+
+    const blocoLabel = isLoteamento ? 'Quadra' : 'Bloco';
+    const unidLabel = isLoteamento ? 'Lote' : 'Número';
+
+    const dados = ordenadas.map(u => ({
+      [blocoLabel]: u.bloco?.nome || 'Sem ' + blocoLabel,
+      [unidLabel]: u.numero,
+      'Tipologia': u.tipologia?.nome || '',
+      'Área Privativa (m²)': u.area_privativa ?? '',
+      'Valor (R$)': u.valor ?? '',
+      'Posição': u.posicao || '',
+      'Observações': u.observacoes || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Disponíveis');
+
+    const nomeEmpreendimento = empreendimento.nome.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').replace(/ /g, '_');
+    const dataHoje = format(new Date(), 'dd-MM-yyyy');
+    const nomeArquivo = `Unidades_Disponiveis_${nomeEmpreendimento}_${dataHoje}.xlsx`;
+
+    XLSX.writeFile(wb, nomeArquivo);
+    toast.success(`${disponiveis.length} unidade(s) exportada(s) com sucesso.`);
+  };
+
   const handleDeleteSelected = () => {
     deleteUnidadesBatch.mutate(
       { ids: Array.from(selectedUnidadeIds), empreendimentoId },
@@ -262,6 +302,10 @@ export function UnidadesTab({ empreendimentoId }: UnidadesTabProps) {
                     </Toggle>
                   </div>
                 )}
+                <Button variant="outline" size="sm" onClick={handleExportarDisponiveis}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar Disponíveis
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelectionMode('status')}>
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Alterar Status
