@@ -24,46 +24,46 @@ export interface DrawnItem {
 export const getPolygonColor = (status: UnidadeStatus): string => {
   switch (status) {
     case 'disponivel':
-      return '#22c55e'; // Verde
+      return '#00ff64'; // Verde neon
     case 'reservada':
-      return '#eab308'; // Amarelo
+      return '#ffc800'; // Amarelo vibrante
     case 'negociacao':
-      return '#3b82f6'; // Azul
+      return '#0096ff'; // Azul elétrico
     case 'contrato':
-      return '#a855f7'; // Roxo
+      return '#b43cff'; // Roxo neon
     case 'vendida':
-      return '#ef4444'; // Vermelho
+      return '#ff3232'; // Vermelho vivo
     case 'bloqueada':
-      return '#6b7280'; // Cinza
+      return '#788296'; // Cinza mais claro
     default:
       return '#d1d5db'; // Cinza claro (sem vínculo)
   }
 };
 
-export const getPolygonColorWithOpacity = (status: UnidadeStatus, opacity: number = 0.6): string => {
+export const getPolygonColorWithOpacity = (status: UnidadeStatus, opacity: number = 0.9): string => {
   switch (status) {
     case 'disponivel':
-      return `rgba(34, 197, 94, ${opacity})`; // Verde
+      return `rgba(0, 255, 100, ${opacity})`; // Verde neon
     case 'reservada':
-      return `rgba(234, 179, 8, ${opacity})`; // Amarelo
+      return `rgba(255, 200, 0, ${opacity})`; // Amarelo vibrante
     case 'negociacao':
-      return `rgba(59, 130, 246, ${opacity})`; // Azul
+      return `rgba(0, 150, 255, ${opacity})`; // Azul elétrico
     case 'contrato':
-      return `rgba(168, 85, 247, ${opacity})`; // Roxo
+      return `rgba(180, 60, 255, ${opacity})`; // Roxo neon
     case 'vendida':
-      return `rgba(239, 68, 68, ${opacity})`; // Vermelho
+      return `rgba(255, 50, 50, ${opacity})`; // Vermelho vivo
     case 'bloqueada':
-      return `rgba(107, 114, 128, ${opacity})`; // Cinza
+      return `rgba(120, 130, 150, ${opacity})`; // Cinza mais claro
     default:
       return `rgba(209, 213, 219, ${opacity})`; // Cinza claro
   }
 };
 
 export const STATUS_LEGEND = [
-  { status: 'disponivel' as UnidadeStatus, label: 'Disponível', color: '#22c55e' },
-  { status: 'reservada' as UnidadeStatus, label: 'Reservado', color: '#eab308' },
-  { status: 'negociacao' as UnidadeStatus, label: 'Em Negociação', color: '#3b82f6' },
-  { status: 'contrato' as UnidadeStatus, label: 'Em Contrato', color: '#a855f7' },
-  { status: 'vendida' as UnidadeStatus, label: 'Vendido', color: '#ef4444' },
-  { status: 'bloqueada' as UnidadeStatus, label: 'Bloqueado', color: '#6b7280' },
+  { status: 'disponivel' as UnidadeStatus, label: 'Disponível', color: '#00ff64' },
+  { status: 'reservada' as UnidadeStatus, label: 'Reservado', color: '#ffc800' },
+  { status: 'negociacao' as UnidadeStatus, label: 'Em Negociação', color: '#0096ff' },
+  { status: 'contrato' as UnidadeStatus, label: 'Em Contrato', color: '#b43cff' },
+  { status: 'vendida' as UnidadeStatus, label: 'Vendido', color: '#ff3232' },
+  { status: 'bloqueada' as UnidadeStatus, label: 'Bloqueado', color: '#788296' },
 ];
