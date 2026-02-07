@@ -2,64 +2,103 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, Filter } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, LayoutGrid, List } from 'lucide-react';
 import { FunilKanbanBoard } from '@/components/negociacoes/FunilKanbanBoard';
 import { NegociacaoForm } from '@/components/negociacoes/NegociacaoForm';
-import { useEmpreendimentos } from '@/hooks/useEmpreendimentos';
-import { useCorretores } from '@/hooks/useCorretores';
-import { useNegociacoesKanban } from '@/hooks/useNegociacoes';
+import { NegociacoesToolbar, type NegociacoesFilters } from '@/pages/negociacoes/NegociacoesToolbar';
+import { NegociacoesTable } from '@/pages/negociacoes/NegociacoesTable';
+import { MoverNegociacaoDialog } from '@/components/negociacoes/MoverNegociacaoDialog';
+import { NegociacaoHistoricoTimeline } from '@/components/negociacoes/NegociacaoHistoricoTimeline';
+import { useNegociacoesKanban, useNegociacoesPaginated, useDeleteNegociacao } from '@/hooks/useNegociacoes';
 import { useEtapasPadraoAtivas } from '@/hooks/useFunis';
 import { Card } from '@/components/ui/card';
 import { formatarMoedaCompacta } from '@/lib/formatters';
+import { Negociacao } from '@/types/negociacoes.types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const Funil = () => {
   const navigate = useNavigate();
   const [formOpen, setFormOpen] = useState(false);
-  const [filters, setFilters] = useState<{
-    empreendimento_id?: string;
-    corretor_id?: string;
-  }>({});
+  const [view, setView] = useState<'kanban' | 'lista'>('kanban');
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<NegociacoesFilters>({});
+  
+  // Dialog states
+  const [moverNeg, setMoverNeg] = useState<Negociacao | null>(null);
+  const [historicoNeg, setHistoricoNeg] = useState<Negociacao | null>(null);
+  const [excluirNeg, setExcluirNeg] = useState<Negociacao | null>(null);
 
-  const { data: empreendimentos = [] } = useEmpreendimentos();
-  const { corretores = [] } = useCorretores();
-  const { data: negociacoes = [], isLoading: isLoadingNegociacoes } = useNegociacoesKanban(filters);
+  const deleteNegociacao = useDeleteNegociacao();
+
+  // Kanban filters (only empreendimento/corretor)
+  const kanbanFilters = useMemo(() => ({
+    empreendimento_id: filters.empreendimento_id,
+    corretor_id: filters.corretor_id,
+    funil_etapa_id: filters.funil_etapa_id,
+    status_proposta: filters.status_proposta as any,
+  }), [filters.empreendimento_id, filters.corretor_id, filters.funil_etapa_id, filters.status_proposta]);
+
+  const { data: negociacoesKanban = [], isLoading: isLoadingKanban } = useNegociacoesKanban(
+    kanbanFilters,
+    { enabled: view === 'kanban' }
+  );
+
+  // Table data
+  const { negociacoes: negociacoesTabela, total, totalPages, isLoading: isLoadingTabela } = useNegociacoesPaginated({
+    ...filters,
+    page,
+    pageSize: 20,
+  });
+
   const { data: etapas = [] } = useEtapasPadraoAtivas();
 
-  // Calculate metrics
-  const totalNegociacoes = negociacoes.length;
+  // Metrics (use kanban data when available, otherwise table)
+  const metricsSource = view === 'kanban' ? negociacoesKanban : negociacoesTabela;
+  const totalNegociacoes = view === 'kanban' ? negociacoesKanban.length : total;
   const valorTotal = useMemo(
-    () => negociacoes.reduce((acc, n) => acc + (n.valor_negociacao || 0), 0),
-    [negociacoes]
+    () => metricsSource.reduce((acc, n) => acc + (n.valor_negociacao || 0), 0),
+    [metricsSource]
   );
   
-  // Get success stage for conversion calculation
   const etapaFechado = etapas.find(e => e.is_final_sucesso);
   const taxaConversao = totalNegociacoes > 0 && etapaFechado
-    ? ((negociacoes.filter(n => n.funil_etapa_id === etapaFechado.id).length / totalNegociacoes) * 100).toFixed(1)
+    ? ((metricsSource.filter(n => n.funil_etapa_id === etapaFechado.id).length / totalNegociacoes) * 100).toFixed(1)
     : 0;
 
-
-  // Count per stage for mini metrics
   const countPerStage = useMemo(() => {
     const acc: Record<string, number> = {};
-    for (const n of negociacoes) {
+    for (const n of metricsSource) {
       if (!n.funil_etapa_id) continue;
       acc[n.funil_etapa_id] = (acc[n.funil_etapa_id] || 0) + 1;
     }
     return acc;
-  }, [negociacoes]);
+  }, [metricsSource]);
+
+  const handleFiltersChange = (newFilters: NegociacoesFilters) => {
+    setFilters(newFilters);
+    setPage(1);
+  };
+
+  const handleExcluir = async () => {
+    if (!excluirNeg) return;
+    await deleteNegociacao.mutateAsync(excluirNeg.id);
+    setExcluirNeg(null);
+  };
 
   return (
     <MainLayout
       title="Fichas de Proposta"
-      subtitle="Gerencie suas fichas de proposta em modelo Kanban"
+      subtitle="Gerencie suas fichas de proposta"
     >
       {/* Metrics Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -92,74 +131,91 @@ const Funil = () => {
         </Card>
       </div>
 
-      {/* Filters and Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-          <div className="hidden sm:flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filtros:</span>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Select
-              value={filters.empreendimento_id || 'all'}
-              onValueChange={(v) => setFilters(prev => ({ 
-                ...prev, 
-                empreendimento_id: v === 'all' ? undefined : v 
-              }))}
-            >
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Empreendimento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Empreendimentos</SelectItem>
-                {empreendimentos.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.corretor_id || 'all'}
-              onValueChange={(v) => setFilters(prev => ({ 
-                ...prev, 
-                corretor_id: v === 'all' ? undefined : v 
-              }))}
-            >
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Corretor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Corretores</SelectItem>
-                {corretores.map((cor) => (
-                  <SelectItem key={cor.id} value={cor.id}>
-                    {cor.nome_completo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      {/* Tabs + Filters */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <Tabs value={view} onValueChange={(v) => setView(v as 'kanban' | 'lista')} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="kanban" className="gap-1.5">
+              <LayoutGrid className="h-4 w-4" />
+              Kanban
+            </TabsTrigger>
+            <TabsTrigger value="lista" className="gap-1.5">
+              <List className="h-4 w-4" />
+              Lista
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <Button onClick={() => navigate('/negociacoes/nova')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nova Ficha de Proposta
         </Button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="min-h-[500px]">
-        <FunilKanbanBoard
-          filters={filters}
-          negociacoes={negociacoes}
-          isLoadingNegociacoes={isLoadingNegociacoes}
-        />
+      {/* Shared Filters */}
+      <div className="mb-6">
+        <NegociacoesToolbar filters={filters} onFiltersChange={handleFiltersChange} />
       </div>
+
+      {/* Content */}
+      {view === 'kanban' ? (
+        <div className="min-h-[500px]">
+          <FunilKanbanBoard
+            filters={kanbanFilters}
+            negociacoes={negociacoesKanban}
+            isLoadingNegociacoes={isLoadingKanban}
+          />
+        </div>
+      ) : (
+        <NegociacoesTable
+          negociacoes={negociacoesTabela}
+          isLoading={isLoadingTabela}
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          onPageChange={setPage}
+          onMover={(neg) => setMoverNeg(neg)}
+          onHistorico={(neg) => setHistoricoNeg(neg)}
+          onExcluir={(neg) => setExcluirNeg(neg)}
+        />
+      )}
 
       {/* Form Dialog */}
       <NegociacaoForm
         open={formOpen}
         onOpenChange={setFormOpen}
       />
+
+      {/* Mover Dialog */}
+      <MoverNegociacaoDialog
+        negociacao={moverNeg}
+        etapas={etapas}
+        open={!!moverNeg}
+        onOpenChange={(open) => !open && setMoverNeg(null)}
+      />
+
+      {/* Histórico Dialog */}
+      <NegociacaoHistoricoTimeline
+        negociacao={historicoNeg}
+        open={!!historicoNeg}
+        onOpenChange={(open) => !open && setHistoricoNeg(null)}
+      />
+
+      {/* Excluir Dialog */}
+      <AlertDialog open={!!excluirNeg} onOpenChange={(open) => !open && setExcluirNeg(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir ficha?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A ficha <strong>{excluirNeg?.codigo}</strong> será removida. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExcluir}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 };

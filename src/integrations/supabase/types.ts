@@ -5454,6 +5454,56 @@ export type Database = {
           },
         ]
       }
+      webhook_logs: {
+        Row: {
+          created_at: string
+          erro: string | null
+          evento: string
+          id: string
+          payload: Json | null
+          response_body: string | null
+          status_code: number | null
+          sucesso: boolean
+          tempo_ms: number | null
+          url: string
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          erro?: string | null
+          evento: string
+          id?: string
+          payload?: Json | null
+          response_body?: string | null
+          status_code?: number | null
+          sucesso?: boolean
+          tempo_ms?: number | null
+          url: string
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          erro?: string | null
+          evento?: string
+          id?: string
+          payload?: Json | null
+          response_body?: string | null
+          status_code?: number | null
+          sucesso?: boolean
+          tempo_ms?: number | null
+          url?: string
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhooks: {
         Row: {
           created_at: string | null

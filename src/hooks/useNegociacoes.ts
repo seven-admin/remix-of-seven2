@@ -30,6 +30,7 @@ export function useNegociacoes(filters?: NegociacaoFilters, options?: { enabled?
           empreendimento:empreendimentos(id, nome),
           corretor:corretores(id, nome_completo),
           imobiliaria:imobiliarias(id, nome),
+          gestor:profiles!gestor_id(id, full_name),
           funil_etapa:funil_etapas(id, nome, cor, cor_bg, is_inicial, is_final_sucesso, is_final_perda, ordem),
           unidades:negociacao_unidades(
             id,
@@ -87,9 +88,11 @@ export function useNegociacoesKanban(filters?: NegociacaoFilters, options?: { en
           numero_proposta,
           status_proposta,
           funil_etapa_id,
+          gestor_id,
           ordem_kanban,
           cliente:clientes(id, nome),
           empreendimento:empreendimentos(id, nome),
+          gestor:profiles!gestor_id(id, full_name),
           unidades:negociacao_unidades(id)
         `)
         .eq('is_active', true)
@@ -1134,4 +1137,89 @@ export function useRejeitarReserva() {
       toast.error('Erro ao rejeitar reserva: ' + error.message);
     }
   });
+}
+
+// ====================================================
+// Hook Paginado para Listagem em Tabela
+// ====================================================
+
+export interface NegociacoesPaginatedFilters {
+  search?: string;
+  empreendimento_id?: string;
+  corretor_id?: string;
+  gestor_id?: string;
+  status_proposta?: string;
+  funil_etapa_id?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export function useNegociacoesPaginated(filters: NegociacoesPaginatedFilters = {}) {
+  const page = filters.page || 1;
+  const pageSize = filters.pageSize || 20;
+
+  const countQuery = useQuery({
+    queryKey: ['negociacoes-count', filters],
+    queryFn: async () => {
+      let query = db
+        .from('negociacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      if (filters.empreendimento_id) query = query.eq('empreendimento_id', filters.empreendimento_id);
+      if (filters.corretor_id) query = query.eq('corretor_id', filters.corretor_id);
+      if (filters.gestor_id) query = query.eq('gestor_id', filters.gestor_id);
+      if (filters.status_proposta) query = query.eq('status_proposta', filters.status_proposta);
+      if (filters.funil_etapa_id) query = query.eq('funil_etapa_id', filters.funil_etapa_id);
+      if (filters.search) query = query.ilike('cliente.nome', `%${filters.search}%`);
+
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const dataQuery = useQuery({
+    queryKey: ['negociacoes-paginated', filters],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = db
+        .from('negociacoes')
+        .select(`
+          *,
+          cliente:clientes!inner(id, nome, email, telefone),
+          empreendimento:empreendimentos(id, nome),
+          corretor:corretores(id, nome_completo),
+          gestor:profiles!gestor_id(id, full_name),
+          funil_etapa:funil_etapas(id, nome, cor, cor_bg, ordem),
+          unidades:negociacao_unidades(id)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (filters.empreendimento_id) query = query.eq('empreendimento_id', filters.empreendimento_id);
+      if (filters.corretor_id) query = query.eq('corretor_id', filters.corretor_id);
+      if (filters.gestor_id) query = query.eq('gestor_id', filters.gestor_id);
+      if (filters.status_proposta) query = query.eq('status_proposta', filters.status_proposta);
+      if (filters.funil_etapa_id) query = query.eq('funil_etapa_id', filters.funil_etapa_id);
+      if (filters.search) query = query.ilike('cliente.nome', `%${filters.search}%`);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Negociacao[];
+    },
+  });
+
+  const total = countQuery.data || 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  return {
+    negociacoes: dataQuery.data || [],
+    total,
+    totalPages,
+    isLoading: dataQuery.isLoading || countQuery.isLoading,
+  };
 }
